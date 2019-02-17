@@ -1,5 +1,7 @@
 # ［C++］フェラーリの方法による4次方程式の求解
 
+[:contents]
+
 ### フェラーリの方法
 [tex:ax^ 4+bx^ 3+cx^ 2+dx+e=0]の形の実数係数4次方程式の解の公式を求める方法がフェラーリさんによって考案されたフェラーリの方法です。
 まずは、これを導出してみます。
@@ -36,7 +38,7 @@ x^ 4+Ax^ 3+Bx^ 2+Cx+D&=\left(y-\frac{A}{4}\right)^ 4+A\left(y-\frac{A}{4}\right)
 
 係数をp,q,rと置いて次に行きます。
 
-###### チルンハウス変換
+##### チルンハウス変換
 一般のn次方程式[tex:a _ nx^ n + a _ {n-1}x^ {n-1}+ ... + a _ 0 = 0]に対して[tex:x = y - \frac{a _ {n-1}}{na _ n}]のような変数変換を行うと、n-1次の係数を0にすることができます。これをチルンハウス変換と呼びます。
 
 ちなみに、5次方程式で出てくるチルンハウス変換はこれを推し進めた結果4～2次までの項を消し去ることに成功した、少しハイレベルなチルンハウス変換です。結果として手計算がほぼ不可能になっているようですが・・・。
@@ -228,7 +230,7 @@ y^ 4+py^ 2+qy+0&=y^ 4+py^ 2+qy\\
 
 となり、解は[tex:y=0]と[tex:y^ 3+py+q]の3つの解となります。
 
-#### C++実装
+### C++実装
 さて、必要な公式などは一通りそろったのでC++コードにコピペしていきます。公式通り順番にやっていきます。
 
 3次式の時と同じく、値型はテンプレートにしておきます。相変わらず構造化束縛を使用しているのでC++17未満のコンパイラではstd::tieを使う等してください。
@@ -375,7 +377,7 @@ Githubにも上げておきます（ヘッダ分けしてあったり一部異�
 [QuarticEquation.hpp](https://github.com/onihusube/AlgebraicEequationSolver/blob/master/AlgebraicEequationSolver/Include/QuarticEquation.hpp)
 
 
-#### 参考文献
+### 参考文献
 - [四次方程式 - Wikipedia](https://ja.wikipedia.org/wiki/%E5%9B%9B%E6%AC%A1%E6%96%B9%E7%A8%8B%E5%BC%8F)
 - [四次方程式の解法 - 雨男の巣窟](https://blog.rainyman.jp/nest/?p=321)
 - [４次方程式解の公式 - Fukusukeの数学めも](https://mathsuke.jp/ferrari_formula/)
