@@ -1,0 +1,304 @@
+※この内容はC++20より有効なものです。現行（C++17）ではまだ1ミリも利用可能な情報ではありません。また、随時記述が変更される可能性があります。
+
+[:contents]
+
+**Spaceship Operator（宇宙船演算子）とは
+C++20より追加される新しい二項演算子で、比較演算子の一つです。
+ある値a,bでa&lt;=&gt;bとすると、a&lt;b、a&gt;b、a==bをそれぞれ0<、<0、0として一括判定します。
+コードで書くと
+>|cpp|
+#include <compare>//←必須！
+
+int a{}, b{};
+
+std::cin >> a;
+std::cin >> b;
+
+auto comp = a <=> b;
+
+if (comp < 0) {
+   std::cout << "a < b";
+} else if (0 < comp) {
+   std::cout << "a > b";
+} else if (comp == 0) {
+   std::cout << "a = b";
+}
+||<
+[https://wandbox.org/permlink/HlFAIYIGISgmu0TP:title]
+この様に書けます。
+以下この記事では宇宙船演算子と呼びますが、Consistent comparison（一貫比較）、Three-way comparison（三方比較）などとも呼ばれています。
+
+C++で自前クラスに比較演算子を実装したことがあればその面倒さをご存じで、そこに新しくよく分からない一つが加わったとなれば、面倒なだけでいいことなどないと思われるでしょう。
+しかし、そんなあなたにも朗報です。なんと、クラスに対して宇宙船演算子を定義しておくと、最大で6つの比較演算子が自動生成されます。
+
+>|cpp|
+class C {
+   int x;
+   int y;
+   double v;
+   std::string str;
+public:
+   auto operator<=>(const C&) const = default;
+   //外部定義でもok
+   //friend std::strong_equality operator<=>(const C&, const C&);
+   //もしくは
+   //friend auto operator<=>(const C&, const C&) = default;
+};
+||<
+このクラスCは6つの比較演算子（a&lt;b、a&gt;b、a&lt;=b、a&gt;=b、a==b、a!=b）を用いて比較を行うことが出来ます。
+もちろん、default任せにせずに自前で自由な比較を実装可能です。その場合でも最大6つの比較演算子の自動生成を期待できます。
+この様に、宇宙船演算子は複雑な比較を一括で行うだけでなく今まで非常に面倒になっていた比較演算子の実装の手間を大幅に軽減してくれる凄い奴です。
+そして、この宇宙船演算子の登場によってstd::rel_opsはその意味をほぼ失い、非推奨となりました・・・。
+
+**自動生成される演算子
+宇宙船演算子を用いれば他の6つの比較は宇宙船演算子を用いて書くことが出来るので、そのように実装されるはずです。先ほどのクラスCに対してあえて書いてみると
+
+>|cpp|
+class C {
+//省略
+
+   bool operator==(const C& rhs) const { return *this <=> rhs == 0; }
+   bool operator!=(const C& rhs) const { return *this <=> rhs != 0; }
+   bool operator< (const C& rhs) const { return *this <=> rhs <  0; }
+   bool operator> (const C& rhs) const { return *this <=> rhs >  0; }
+   bool operator<=(const C& rhs) const { return *this <=> rhs <= 0; }
+   bool operator>=(const C& rhs) const { return *this <=> rhs >= 0; }
+};
+||<
+この様な形になるでしょう。（ちなみに、宇宙船演算子の優先順位は他のすべての比較演算子よりも高くされています。）
+ただし、実際にはこのように実装される訳ではなく、各比較演算子のオーバーロード解決時にその比較演算子の実装に関わらず、宇宙船演算子を用いて（上記のような実装で）書かれた式をオーバーロード候補に入れて解決を行う、という形で各比較演算子を使用することが出来ます。なので、自動実装ではなく自動生成と呼んでいます。
+
+少し詳しく書いておくと
+任意の型T1,T2の値a,bに対して、任意の比較演算子@が呼び出された場合
+まず、a@b、a&lt;=&gt;b、b&lt;=&gt;aの3つをオーバーロードの候補として加えておく。
+オーバーロード解決の結果a&lt;=&gt;bが選ばれたら、a@b → a&lt;=&gt;b@0、のように書き換える。
+オーバーロード解決の結果b&lt;=&gt;aが選ばれたら、b@a → 0@b&lt;=&gt;a、のように書き換える。
+そして、そのように書き換えた式が比較演算子@であるかのように実行されます。この書き換えは上の定義と同じである事が分かるでしょう。
+
+
+**対称性
+あるクラスに対して宇宙船演算子を定義した場合、同じ型同士の等値比較ならほぼ気になりませんが、異なる型との比較や順序付けを行う場合はその対称性が当然に期待されます。
+つまり
+>|cpp|
+struct A {
+   int a;
+   auto operator<=>(const double) const;   //実装は省略
+};
+
+
+A a = {1};
+
+auto comp1 = a   <=> 2.0;   //こっちが出来るなら、comp < 0
+auto comp2 = 2.0 <=> a;     //こっちも出来てほしい、comp > 0
+||<
+この様に、A<=>doubleが比較可能ならば、その逆のdouble<=>Aも比較可能であってほしいしそれが自然です。でも、一々両方定義するのって面倒ですよね・・・
+ご安心ください、異種比較を行う宇宙船演算子は2対存在していますが、片方が定義されていればもう片方も自動生成されます。
+
+かしこい人はお気づきかもしれませんが、前項のオーバーロード解決に関する説明で次のように書いてありました。
+＞任意の型T1,T2の値a,bに対して、任意の比較演算子@が呼び出された場合
+＞まず、a@b、a&lt;=&gt;b、b&lt;=&gt;aの3つをオーバーロードの候補として加えておく。
+つまり、a@bと書いてもb&lt;=&gt;aが、b@aと書いてもa&lt;=&gt;bがオーバーロード解決の候補に入るため、片方だけ書いておけば良いのです。
+@が&lt;=&gt;の場合、書き換えによって冗長な呼び出しとなる場合は書き換えは行われません。つまり、a&lt;=&gt;bと呼ばれた場合の候補はa&lt;=&gt;bと0&lt;=&gt;(b&lt;=&gt;a)の二つになり、a&lt;=&gt;b → (a&lt;=&gt;b)&lt;=&gt;0のような書き換えは行われません（逆も同様）。
+
+
+**default実装
+宇宙船演算子が非テンプレートの非staticメンバ関数であり、そのクラスのconst参照を引数にとる宣言のみdefault指定することができ、コンパイラ様に実装して頂くことが可能です。
+そのようなdefault実装は、基底クラス及びメンバ変数の辞書式比較によって実装されます。
+辞書式比較とは要するに、ある順番で並んでいる要素をその順番で比較していく方法です。std::tieを使って変数の比較をまとめて行う時も辞書式比較が用いられます。
+defaultの&lt;=&gt;は以下のように比較を行います。
++基底クラスの&lt;=&gt;を呼び出し比較する。その順番は左から右（:の後に書いてある順）へ深さ優先で実行。
++次に、宣言された順でメンバ変数の&lt;=&gt;を呼び出し比較を行う。
+--その際、配列はその要素に添え字順で&lt;=&gt;を適用する。
++これらの比較の際、比較の結果が0でない時点でその結果を返して終了。
+
+>|cpp|
+class D : Base1, Base2 {
+   int x;
+   int y;
+   double v;
+   int array[3];
+   std::string str;
+public:
+   //auto operator<=>(const D&) const = default;
+   auto operator<=>(const D& that) const {
+      if (auto comp = static_cast<const Base1&>(*this) <=> static_cast<const Base1&>(that); comp !=0) return cmp; 
+      if (auto comp = static_cast<const Base2&>(*this) <=> static_cast<const Base2&>(that); comp !=0) return cmp;
+      if (auto comp = x <=> that.x; comp !=0) return cmp;
+      if (auto comp = y <=> that.y; comp !=0) return cmp;
+      if (auto comp = v <=> that.v; comp !=0) return cmp;
+      if (auto comp = array[0] <=> that.array[0]; comp !=0) return cmp;
+      if (auto comp = array[1] <=> that.array[1]; comp !=0) return cmp;
+      if (auto comp = array[2] <=> that.array[2]; comp !=0) return cmp;
+      return str <=> that.str;
+   }
+};
+||<
+つまりはこの様な実装になることになります。もし辞書式順序かつ宣言とは違う順番に比較したいときはこのような形で自前実装する必要があります。
+基底クラスの比較順が深さ優先とは、基底クラスのdefault実装&lt;=&gt;を呼び出したときに、同じことが基底クラスの&lt;=&gt;でも行われるためです。
+
+***戻り値型
+default実装される宇宙船演算子の戻り値の型は後述するComparison category types（比較カテゴリ型）と呼ばれる5つの型のいずれかになります。同様に、組み込み/STLの宇宙船演算子もComparison category typesのいずれかの型を返します。
+default実装は上記のように、基底クラスとメンバに対して連続的に&lt;=&gt;を適用するので、その戻り値型は全ての&lt;=&gt;の戻り値型の比較カテゴリ型を変換できる最も強い型となります。つまり、ユーザーは予測することは可能ですが面倒です（一応、そのような型をもとめるためのstd::common_comparison_category<Ts...>というメタ関数が提供されます）。そのため、戻り値型はautoにしておくことが推奨されます。
+なお、ユーザー定義の宇宙船演算子の戻り値型は自由です。一応0との比較が可能な型が望ましいですが制限はありません。<s>つまりは誤用し放題です。</s>
+
+**Comparison category types（比較カテゴリ型）
+半順序、弱順序、全順序について予め理解しておくとこの節の理解が深まるかもしれません。
+[https://onihusube.hatenablog.com/entry/2018/09/18/022130:title]
+
+前述のようにdefault実装/組み込み型/STLの一部の型、の宇宙船演算子は5つの比較カテゴリ型のいずれかを返します。これらの型はその比較（&lt;=&gt;）が満たしている順序や同値関係に関する性質を表しています。
+新しく追加される&lt;compare&gt;ヘッダにおいて以下の5つが定義されます。
+-weak_equality（同値関係）
+-strong_equality（相等関係、等価性）
+-partial_ordering（半順序）
+-weak_ordering（弱順序）
+-strong_ordering（強順序 = 全順序）
+大きく分けると同値関係と順序の2種類があります。どちらも、partial→weak→strongの順で強く（制約がきつく）なり、逆方向への変換が可能（暗黙変換が定義される）です。
+また、orderingはequalityを包含しておりこれも変換が可能（暗黙変換が定義される）ですが、strong_equalityはstrong_orderingからしか変換できずweak_equalityはpartial_orderingとweak_orderingの両方から変換可能です。
+また、紛らわしい？ですが、weak_equalityはweak_orderingのequalityな部分（==,!=）ではありません。ほぼ気にする必要はないかもしれませんが・・・。
+
+equalityな型は==と!=、orderingな型は6つの比較演算子を用いて比較を行うことができます。その際、比較に使えるのは0リテラルのみで、0以外との比較は未定義動作とされています。例えば、nullptr_tを引数型として実装されます。
+
+宇宙船演算子の返り値は+0-を表現できればいいので任意の符号付整数型でも十分ですが、わざわざこのような複雑な型を返すように定義されているのは、比較というものの分類についてC++型システムの恩恵を受けるためです。
+単純な=という関係にさえ同値と等価の二つの種類があり、順序にも半・弱・全順序の3つの種類があります。中には=を=とみなせない、意味のある順序が付かないものがあり、実装する処理によってはこれを考慮しなければなりません（STL内ソートに関わる「狭義の弱順序」等）。
+この時、その比較が満たしている要件を型で表現しておくことで、テンプレート等の機構によりコンパイル時の検出・切替を行うことができます。そのため、単純な符号付整数を返すのではなく比較のカテゴリを表明する型を返すようになっているのです。
+
+***equalityとordering
+default実装された宇宙船演算子が返す比較カテゴリ型によっては自動生成される演算子が2つになることがありえます（そのため上では最大6つの、という書き方をしていました）。
+-decltype(a&lt;=&gtb)がweak_equality/strong_equalityならば、自動生成される比較演算子は==と!=の二種類のみ。
+-decltype(a&lt;=&gtb)がpartial_ordering/weak_ordering/strong_orderingならば、6つの比較演算子すべてが自動生成される。
+自前で実装する場合でも、実装したい比較の種類によってこの違いを認識しておく必要があるかもしれません。
+
+***substitutability（代入可能性、代入原理）
+代入可能性とは、ある比較カテゴリにおいて[tex:a=b \to f(a)=f(b)]となる性質の事です。これを満たすのはstrong_orderingとstrong_equalityの二つだけです。（数学的にはむしろ、この代入原理を満たしている=がtrueとなるときにのみ等価であるとします）
+半順序（partial_ordering）はその順序付けにおいて比較不可能な値の存在を認めます。弱順序（weak_ordering）は比較不可能な値を同値（=）として扱う事で比較不可能な値を認めません。同値関係（weak_equality）は同値とみなせる値同士の関係がtrueとなりえます。つまり、これらの比較においてa=bは必ずしも等価であることを表しません。そのため、a == b がtrueだとしてもある関数を通した結果のf(a) == f(b)はtrueとは限りません（この場合のfはpure function）。
+宇宙船演算子をユーザー定義してstrong_ordering（かstrong_equality）を返す場合、この性質を満たすかについて慎重に検討する必要があります。特に、データメンバや基底クラスの一部が比較に関与しない実装になっているとこの性質を満たさない可能性があります。
+
+***狭義の弱順序との関係
+C++標準のソートに関わるところで要求されているのはoperator&lt;()が狭義の弱順序を満たすことです。そして、これを満たすような比較カテゴリ型はweak_orderingとstrong_orderingのみです。
+＊_equalityとなる比較カテゴリ型は当然として、partial_orderingは順序付け比較を提供しますがそれを用いてソートをしても意味のある順序をつけることはできません。
+ソートに使用するような比較演算子を提供したい場合、定義する宇宙船演算子の返すカテゴリ型がweak_orderingかstrong_orderingのどちらかに（もしくはそれを満たすように）なるように注意しなければなりません。
+
+<!-- 
+***std::common_comparison_category
+これは、いくつかの型の宇宙船演算子の戻り値型に共通して変換可能な最も強い比較カテゴリ型を判定するために提供されるメタ関数です。例えば、default実装の宇宙船演算子が返す型を求めるのに使えます。
+>|cpp|
+template <class ...Ts>
+struct common_comparison_category {
+   using type = /* 略 */ ; 
+}; 
+
+template <class ...Ts>
+using common_comparison_category_t = typename common_comparison_category<Ts>::type; 
+||<
+
+このメタ関数は以下のような型を返します。
+-Tsが空ならstrong_ordering
+-各Tsが&lt;=&gt;をサポートする場合、各&lt;=&gt;の返す型を変換可能な最も強い比較カテゴリ型
+-それ以外の場合はvoid
+-->
+
+**組み込みの宇宙船演算子
+ここまで当たり前のように前提にしていましたが、C++20からはvoid以外の基本型にはもれなく宇宙船演算子が導入されます。そして、その比較カテゴリは以下のようになります。
+-bool、charやint等の整数型 → std::strong_ordering
+--同じ列挙型、スコープ無し列挙型と整数型、間の比較を含む
+-float、double等の浮動小数点型 → std::partial_ordering
+-関数/メンバポインタ、nullptr → std::strong_equality
+-オブジェクトポインタ → std::strong_ordering
+
+浮動小数点型がstd::partial_orderingなのは、あらゆる値との比較が不可能なNaNを持っているためです（弱順序の要件にすら満たない）。また、関数やメンバポインタの順序には意味が無いため、等価比較のみが可能なstd::strong_equalityとなっています。
+
+以下、少し詳しめの解説。
+ここでは、比較=宇宙船演算子による比較という意味で使います。また、型変換に関しては複雑であるので説明しません、なんとなく同じ型になるんだなあと思ってください（[https://ezoeryou.github.io/cpp-book/C++11-Syntax-and-Feature.xhtml#conv:title=標準型変換（Standard conversions）]等を参照してください）。
+
+任意の基本型T1, T2の値a, bに対してa &lt;=&gt; bが呼ばれた場合
+
+a, bの型（T1, T2）が共に算術型（ただし、片方がboolならもう片方もboolでなければならない）もしくはスコープ無しenumと整数型のペアである場合は、その値に[http://eel.is/c++draft/expr.arith.conv:title=usual arithmetic conversions]が適用された後
+整数型→浮動小数点型、以外の[https://ezoeryou.github.io/cpp-book/C++11-Syntax-and-Feature.xhtml#dcl.init.list:title=縮小変換]が適用される場合はコンパイルエラー（例えば、signed → unsigned）。
+共に整数型となる場合は比較が可能で、カテゴリはstd::strong_ordering。
+共に浮動小数点型となる場合も比較可能で、カテゴリはstd::partial_ordering。
+
+a, bが共に同じ列挙型の値である場合、その基底となる整数型に変換したうえで&lt;=&gt;を適用する（スコープの有無によらず、異なる列挙型間の比較はコンパイルエラー）。
+
+a, bの片方もしくは両方が何らかのポインタである場合、両方をなるべく同じポインタ型（[http://eel.is/c++draft/expr.type#def:composite_pointer_type:title=composite pointer type]）に変換し（配列→ポインタ、派生→基底、関数ポインタ変換、CV修飾変換等による）
+結果のポインタ型が関数ポインタ、メンバポインタ、std::nullptr_t である場合は比較可能で、カテゴリはstd::strong_equality。
+結果のポインタ型がオブジェクトポインタである場合も比較可能で、カテゴリはstd::strong_ordering。
+ただし、どちらのケースも変換されたポインタ同士の比較が規定されていない場合はその比較結果は未規定（[https://ezoeryou.github.io/cpp-book/C++11-Syntax-and-Feature.xhtml#intro.defs.undefined:title=未規定の動作（unspecified behavior）]）。
+また、a, bが共に配列である場合はコンパイルエラー。
+これらに当てはまらないような比較についてもコンパイルエラー。
+
+<!-- 
+**従来の比較演算子との差異
+***符号の異なる整数型の比較
+ -1&lt;=&gt;1u のような、符号の異なる整数型同士の宇宙船演算子による比較はコンパイルエラーとなります。
+しかし、従来の比較演算子（-1 &lt; 1u == false）では可能でした。C++20からは非推奨化されます。
+
+***列挙型と浮動小数点型の比較
+***異なる列挙型間の比較
+***配列同士の比較
+-boolはboolとのみ比較が可能、もし他の型と比較した場合はコンパイルエラー。
+-スコープ付きの列挙型（enum class）は同じ型同士のみ比較可能、異なる型間の比較はコンパイルエラー。
+
+-配列同士の比較はコンパイルエラー
+-->
+
+**任意のクラス型の非型テンプレートパラメータとしての使用
+任意のクラス型（共用体を含まない）がmutable・volatileなメンバを持たず、strong structural equality（後述）であり、default実装の宇宙船演算子がpublicアクセス可能であり、constexprに構築可能であるとき、そのクラスは非型テンプレートパラメータとして利用することができるようになります。
+提案（P0732R2）では、コンパイル時文字列を非型テンプレートパラメータとして利用可能になることを利点としてあげています。その他にも、std::pairやstd::tupleが非型テンプレートパラメータとして利用可能になる可能性があります。
+そのように非型テンプレートパラメータとして渡されたオブジェクトはconstなglvalueオブジェクトとなり、異なる非型テンプレートパラメータ毎に唯一つのインスタンスがプログラム内に存在します。当然、メンバ関数呼び出しやアドレス取得が可能です。
+
+こんなことができる・・・かもしれません。
+>|cpp|
+//何か値のペアを受け取り出力する
+template<auto Pair>
+void f() {
+   std::cout << std::get<0>(Pair) << ", " << std::get<1>(Pair) << std::endl;
+}
+
+f<std::pair<int, int>{10, 20}>();
+f<std::tuple<int, int>{10, 20}>();
+
+//固定文字列型
+template<typename CharT, std::size_t N>
+struct fixed_string {
+   constexpr fixed_string(const CharT (&array)[N + 1]) {
+      std::copy_n(array, N + 1, str);
+   }
+
+   auto operator<=>(const fixed_string&) = default;
+
+   CharT str[N + 1];
+};
+
+template<typename CharT, std::size_t N>
+fixed_string(const CharT (&array)[N]) -> fixed_string<CharT, N-1>;
+
+//fixed_stringを出力
+template<fixed_string Str>
+void g() {
+   std::cout << Str.str<< std::endl;
+}
+
+g<"Hello World!">();
+g<"<=> Awesome!">();
+||<
+
+***strong structural equality（強い構造的等価性）
+ある型Tがstrong structural equalityである（を持つ）とは、Tに定義された宇宙船演算子が=default指定されており、その戻り値型がstd::strong_equalityに変換可能であり、Tのすべての基底型及び非静的メンバ型がstrong structural equalityであることです。
+ちなみに、浮動小数型以外の基本型はstrong structural equalityです。
+浮動小数点型をメンバに持たずに宇宙船演算子をdefault実装していれば、おおよそのケースでこれを満たすことができると思います。
+
+***なぜdefaultの宇宙船演算子とstd::strong_equalityなのか？
+それは、二つのインスタンス化されたテンプレートがあるとき、その等価性を判断するためです。
+通常テンプレートはinline指定されたように振る舞い（複数の翻訳単位にわたって実体がただ一つとなる、ODRのため）、それはコンパイラによる名前マングルとリンカによる重複削除によって実現されます。何も考えずにクラス型を非型テンプレートパラメータとして許可すると、名前マングルだけではテンプレートの同一性を判定できなくなります。
+全基底及びメンバ単位で等価であることが保証できればその問題は解決されますが、ユーザー定義されたoperator==(or !=)においてそれが確実に保証されるかどうかを判定するのは困難です。また、比較演算子のdefault実装もC++17以前にはありません。
+しかしこの度宇宙船演算子が導入され、そのdefault実装は全基底及びメンバの辞書式比較で実行されます。そして、その結果がstd::strong_equalityであれば等価性を保証できます（weak_equalityでは同値であることしか保証できません）。
+このように見れば、ユーザー定義の宇宙船演算子ではこれを保証することが不可能（もしくはコンパイラの多大な努力が必要）であり、結果としてstd::strong_equalityを要求する必然性も理解できるかと思います。
+
+**参考文献
+[http://wg21.link/p0515r3:title=P0515R3 "Consistent comparison"]
+[http://wg21.link/p0768r1:title=P0768R1 "Library support for the spaceship (comparison) operator"]
+[http://wg21.link/p0732r2:title=P0732R2 "Class Types in Non-Type Template Parameters"]
+[http://wg21.link/p1120r0:title=P1120R0 "Consistency improvements for <=> and other comparison operators"]
+[http://eel.is/c++draft/expr.spaceship:title]
+[https://en.cppreference.com/w/cpp/language/operator_comparison#Three-way_comparison:title]
+[https://ja.wikipedia.org/wiki/%E8%BE%9E%E6%9B%B8%E5%BC%8F%E9%A0%86%E5%BA%8F:title]
