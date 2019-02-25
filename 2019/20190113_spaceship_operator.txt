@@ -299,6 +299,9 @@ g<"<=> Awesome!">();
 [http://wg21.link/p0768r1:title=P0768R1 "Library support for the spaceship (comparison) operator"]
 [http://wg21.link/p0732r2:title=P0732R2 "Class Types in Non-Type Template Parameters"]
 [http://wg21.link/p1120r0:title=P1120R0 "Consistency improvements for <=> and other comparison operators"]
+[http://wg21.link/p1185r1:title=p1185R1 "<=> != =="]
 [http://eel.is/c++draft/expr.spaceship:title]
 [https://en.cppreference.com/w/cpp/language/operator_comparison#Three-way_comparison:title]
 [https://ja.wikipedia.org/wiki/%E8%BE%9E%E6%9B%B8%E5%BC%8F%E9%A0%86%E5%BA%8F:title]
+
+[この記事のはてな記法ソース（更新差分確認用）](https://github.com/onihusube/blog/blob/master/2019/20190113_spaceship_operator.txt)
