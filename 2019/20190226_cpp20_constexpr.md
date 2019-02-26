@@ -1,4 +1,7 @@
 # ［C++］C++20のconstexpr
+
+※この内容はC++20から利用可能な情報であり、策定までの間に使用が変更された場合は記述も変更されます。
+
 C++11でconstexprが導入されて以降、STLの全ての関数のconstexpr化を伺うかのようにconstexprは着実に強化されてきました。
 C++20ではC++14以来の大幅な強化が行われ、constexprの世界はさらに広がることになります。
 
@@ -6,8 +9,7 @@ C++20ではC++14以来の大幅な強化が行われ、constexprの世界はさ�
 ついに仮想関数をconstexprの文脈で呼び出せるようになります。初っ端から意味わからないですね・・・。
 
 
-### unionのアクティブメンバの切り替え
-
+### dynamic_castとtype_id
 
 
 ### std::is_constant_evaluated()
@@ -16,43 +18,97 @@ C++20ではC++14以来の大幅な強化が行われ、constexprの世界はさ�
 ```cpp
 ```
 
-### consteval（即時関数）
+### consteval（immediate function : 即時関数）
 constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行される可能性があります。あくまで可能性です。それが本当に定数式として呼ばれたかどうかを知るにはアセンブリを見に行く必要があるでしょう（前述のis_constant_evaluatedを使うこともできますが）。  
 なので、必ずコンパイル時実行され、かつコンパイル時に実行されなければコンパイルエラーとなる関数が欲しい場合があります。そこで、consteval指定子が登場しました。
 
-constevalは関数の頭（constexprと同じ位置）に付け、その関数が必ずコンパイル時実行されることを示します。そして、そのような関数は即時関数と呼ばれます。
+constevalは関数の頭（constexprと同じ位置）に付け、その関数が必ずコンパイル時実行されることを示します。そして、そのような関数は即時関数と呼ばれます。  
+以下で紹介するconsteval関数の特徴以外の、例えばconsteval関数内でできる事/出来ない事等の性質はconstexpr関数と同じです（ただし、ここに書かれていない差異はあります）。
 
 ```cpp
 consteval int square(int n) {
-    return n*n;
+  return n*n;
 }
 
 constexpr int sqc = square(10);   //ok. executed at compile time.
 int x = 10;
 int sqr = square(x);   //compile error! can't executed at compile time.
 ```
-変数`sqc`の初期化はconstexprが付加されていることもあり定数式で実行可能ですので、`square(int)`はコンパイル時に実行され、`sqc == 100`0になります。  
+変数`sqc`の初期化はconstexprが付加されていることもあり定数式で実行可能ですので、`square(10)`はコンパイル時に実行され、`sqc == 100`になります。  
 一方、`sqr`は別の非constexprな変数`x`を介していることもあり、constexpr実行不可能なのでその時点でコンパイルエラーを発生させます（最適化オプションによってはコンパイラがよきに計らってくれるかもしれませんが・・・）。  
 もちろん、consteval関数が定数実行不可能である場合はそれもコンパイルエラーです。
 
-consteval関数はほかのどの関数よりも早く実行されます。すなわち、constexpr関数の実行時点にはconsteval関数の実行終わっています。ただし、consteval関数の中にネストしてconsteval関数が呼び出されている場合はその限りではありません。そのように囲んでいるconsteval関数が最終的に定数評価されればエラーにはなりません。
+consteval関数はほかのどの関数よりも早く実行されます。すなわち、constexpr関数の実行時点にはconsteval関数の実行は終わっています。  
+ただし、consteval関数の中にネストしてconsteval関数が呼び出されている場合はそうではなく、そのように囲んでいるconsteval関数が最終的に定数評価されればエラーにはなりません。
+
 ```cpp
 consteval int sqrsqr(int n) {
-  return sqr(sqr(n)); // Not a constant-expression at this  point,
-}                     // but that's okay.
+  return sqr(sqr(n)); //この時点では定数評価されてないが、エラーにはならない
+}
 
 constexpr int dblsqr(int n) {
-  return 2*sqr(n); // Error: Enclosing function is not
-}                  // consteval.
+  return 2*sqr(n); // compile error! 囲む関数はconstevalではない
+}
 ```
 
-この様な即時関数はコンパイラのフロントエンドで処理され、バックエンドはその存在を知る必要がありません。すなわち、関数形式マクロの代替として利用することができます。
+コンパイル時には全て終わっているという性質のため、consteval関数のアドレスを取ることは出来ません。そのような行為を働いた時点でコンパイルエラーとなります。  
+また、コンストラクタに付けることは出来ますがデストラクタには付けることができません。コンストラクタに付けた場合はconstexpr指定したのと同じ意味になります。
 
-デメリットとしてはテンプレートメタプログラミングと同じでデバッグが困難であることです。constexpr関数であれば通常の関数としてデバッグ可能ですが、consteval関数は実行時には跡形も残りませんので通常の手段ではデバッグ不可能です。
+この即時関数はコンパイラのフロントエンドで処理され、バックエンドはその存在を知りません。すなわち、関数形式マクロ（悪名高いWindows.hのmin,maxマクロのようなプリプロセッサ）の代替として利用することができます。
+
+デメリットとしてはテンプレートメタプログラミングと同じでデバッグが困難であることです。constexpr関数であれば通常の関数としてデバッグ可能ですが、consteval関数は実行時には跡形も残りませんので通常の手段ではデバッグできません。
+
+#### constevalラムダ
+consteval指定はラムダ式に対しても行えます。その場合、ラムダ式によって生成される暗黙の関数オブジェクトの関数呼び出し演算子がconsteval関数になります。  
+付ける位置はmuttableやconstexprと同じ位置です。
+
+```cpp
+
+auto sq = [](auto n) consteval { return n*n; };
+
+constexpr int sqc = sq(10);
+//sqc == 100
+
+```
+そのほかの性質はconsteval関数に準じます。
+
+consteval指定されるのはあくまで関数呼び出し演算子なので、このラムダ式を受けている変数自体は即時評価される必要はありません。あくまで関数呼び出しが即時評価されます。
+
+consteval関数はアドレスを取れないことから関数ポインタなどで持ち回れないので、可搬にするのに利用すると良いかもしれません。  
+後は通常のローカル関数としての利用でしょうか。
+
+#### consteval仮想関数
+仮想関数がconstexpr指定できるようになったので、当然のように？consteval指定することもできます。ただし、constexprが非constexpr仮想関数をオーバーライド出来るのに対して、constevalはconsteval同士の間でしかオーバーライドしたり/されたりしてはいけません。
+
+```cpp
+struct polymorphic_base {
+  virtual int f() const = 0;
+  consteval virtual int g() const { return 0; };
+  consteval virtual int h() const { return 1; };
+};
+
+struct delived : polymorphic_base {
+  //compile error! polymorphic_base::f() is not consteval function.
+  consteval int f() const override {
+    return 10;
+  }
+
+  //ok!
+  consteval int g() const override {
+    return 20;
+  }
+
+  //compile error! missing consteval.
+  int h() const override {
+    return 30;
+  }
+};
+```
+オーバーライド前とオーバーライド後でconsteval指定の有無が一致している必要があります。
+
+### unionのアクティブメンバの切り替え
 
 ### try-catch
-
-### dynamic_castとtype_id
 
 ### STL関数のconstexpr化
 
@@ -60,6 +116,7 @@ constexpr int dblsqr(int n) {
 一部の数学関数にconstexprが付加されるようになります。
 
 #### algorithm
+一部の関数にconstexprが付加されるようになります。
 
 #### 全てのメンバ関数のconstexpr化を達成したクラス
 - std::array
@@ -85,6 +142,7 @@ constexpr int dblsqr(int n) {
 
 
 ### 参考文献
+- [P1064R0 : Allowing Virtual Function Calls in Constant Expressions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1064r0.html)
 - [P0595 : std::is_constant_evaluated()](https://wg21.link/P0595)
 - [P1073 : Immediate functions](https://wg21.link/P1073)
 - [P0784R5 : More constexpr containers](https://wg21.link/P0784)
