@@ -1,6 +1,6 @@
 # ［C++］さらに出来るようになったconstexpr（C++20）
 
-※この内容はC++20から利用可能な情報であり、策定までの間に仕様が変更された場合は記述も変更されます。
+※この内容はC++20から利用可能な情報であり、内容が変更される可能性があります。
 
 C++11でconstexprが導入されて以降、あらゆる処理をconstexprで行うことを目指すかのように（おそらく実際そう）constexprは着実に強化されてきました。
 C++20ではC++14以来の大幅な強化が行われ、constexprの世界はさらに広がることになります。
@@ -166,6 +166,16 @@ constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile err
 
 ```
 
+### try-catch
+constexpr関数内にはこれまでtry-catchブロックを書くことは出来ませんでした。書いてあった場合はコンパイル時実行不可能です。しかし、それを書くことができるようになります。
+
+と言っても、書くことができるようになるだけです。相変わらずthrow式が現れてはいけませんし、コンパイル時実行中に例外が投げられればその時点で実行不可です。  
+つまりは、コンパイル時実行時のtry-catchブロックは無視されます。
+
+この変更は、std::vectorをconstexpr対応させる際に問題となったために為されました。将来的にconstexprをさらに拡大させていく際にも地味な障害となるので早めに取り除いておく方が良いと考えられたのでしょう。
+
+また、C++20では単に無視することにしただけで、将来的にコンパイル時に例外処理が行えるようになる可能性が閉ざされた訳ではありません。
+
 
 ### std::is_constant_evaluated()
 `std::is_constant_evaluated()`はコンパイル時には`true`を、実行時には`false`を返す関数です。これにより、コンパイル時と実行時でそれぞれ効率的な処理を選択することが可能になります。
@@ -173,8 +183,10 @@ constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile err
 おそらくconstexprで数学関数を実装しようと思った方が通るであろう、コンパイル時にはコンパイル時実行可能なアルゴリズムで、実行時にはcmathの対応する関数で実行してほしい！ということがついに可能になります。
 
 ```cpp
+#include <type_traits>  //←必須
+
 template<typename T>
-constexpr auto sin(T theta) {
+constexpr auto my_sin(T theta) {
   if (std::is_constant_evaluated()) {
     //コンパイル時
     auto fabs = [](T v) -> T { return (v < T(0.0))?(-v):(v); };
@@ -188,7 +200,7 @@ constexpr auto sin(T theta) {
       tmp *= x_sq / (fact * (fact+T(1.0)));
       series += tmp;
       fact += T(2.0);
-    } while(fabs(tmp) <= std::numeric_limits<T>::epsilon());
+    } while(fabs(tmp) >= std::numeric_limits<T>::epsilon());
     
     return series;
   } else {
@@ -203,19 +215,26 @@ int main()
   
   std::cout << std::setprecision(16);
   
-  constexpr auto sin_60deg = sin(pi/3.0); //コンパイル時計算
+  //sin(60°)を求める
+  constexpr auto sin_static = my_sin(pi/3.0); //コンパイル時計算
+  auto sin_dynamic = my_sin(pi/3.0);  //実行時計算
   
-  std::cout << sin_60deg << std::endl;
-  std::cout << sin(pi/3.0) << std::endl;  //実行時計算
+  std::cout << sin_static << std::endl;
+  std::cout << sin_dynamic << std::endl;
 }
 ```
-[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/nyXwWTEg4ahNF4Of)
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/AlkWGowaOGevamtw)
 
 `if constexpr`や`static_assert`でこの関数を利用すると必ず`true`として処理されます。なので、コンパイル時と実行時で処理を分けるような目的で利用する場合は通常の`if`で分岐する必要があります。しかし、実行時まで`if`文が残る事は無いでしょう。
 
+また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。同時に、実行時に選択される方のステートメントでもconstexpr関数で現れてはいけない構文が現れてはいけません（例えば、throwやgoto）。
+
 
 ### consteval（immediate function : 即時関数）
-constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行可能であることを表明します。しかし、必ずコンパイル時に定数を生成し、それができなければコンパイルエラーとなる関数が欲しい場合があります。そのような需要に応えるためにconsteval指定子が導入されました。
+constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行可能であることを表明します。  
+しかし、文脈によっては定数実行されたかどうかを確かめることが困難であったり、定数実行中に実行不可となるようなエラーが発生した場合は暗黙的に実行時まで処理が先延ばしされたりします。
+
+そこで、必ずコンパイル時に定数を生成しそれができなければコンパイルエラーとなる関数が欲しい場合があります。そのような需要に応えるためにconsteval指定子が導入されました。
 
 constevalは関数の頭（constexprと同じ位置）に付け、その関数が必ずコンパイル時実行されることを示します。そして、そのような関数は即時関数と呼ばれます。  
 基本的には、consteval関数内でできる事/出来ない事等の性質はconstexpr関数と同じです。
@@ -309,8 +328,7 @@ consteval関数は実行時には跡形もなく消え去るため、consteval�
 
 P0784の提案によってコンパイル時にメモリ確保すら可能になったのでSTLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
 
-それらのクラスでは共用体のアクティブメンバの切り替えが発生する可能性があり、その場合にconstexprの文脈で使用できなくなります。  
-そのため、そのようなクラスをconstexprにさらに対応させるためにこのような制限が撤廃されることになりました。
+それらのクラスでは共用体のアクティブメンバの切り替えが発生する可能性があり、その場合にconstexprの文脈で使用できなくなります。そのようなクラスをconstexprにさらに対応させるため、この制限は撤廃されることになりました。
 
 ```cpp
 union U {
@@ -320,7 +338,7 @@ union U {
 
 //U::fを読み出しアクティブメンバをU::nに切り替える
 constexpr float change(U& u) {
-  float f = u.f;  //u.nがアクティブメンバの場合はここでcompile error
+  float f = u.f;  //u.nがアクティブメンバの場合はここが定数実行不可
   u.n = 0;  //u.nへアクティブメンバを切り替え、C++17までは定数実行不可
   return f;
 }
@@ -332,15 +350,15 @@ constexpr auto f = change(u);
 
 ただし、非アクティブなメンバへのアクセス（そこへの参照からの間接アクセスも含む）は未定義動作であり、定数式で現れてはいけません。つまりは定数式の文脈でそのようなアクセスを行った時点でコンパイルエラーを引き起こします（実はclangの`std::string`のsso実装がこれに当てはまっています）。
 
-### try-catch
-
 ### STLのconstexpr追加対応
 
 #### cmathとcstdlib
 一部の数学関数にconstexprが付加されるようになります。
 
 #### algorithm
-一部の関数にconstexprが付加されるようになります。
+ほとんどの関数にconstexprが付加されるようになります。
+
+これによりstd::vectorも含めて、constexprなイテレータを用いたアルゴリズムをコンパイル時実行できるようになります！
 
 #### 全てのメンバ関数のconstexpr化を達成したクラス
 - std::array
