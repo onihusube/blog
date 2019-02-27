@@ -1,29 +1,224 @@
-# ［C++］C++20のconstexpr
+# ［C++］さらに出来るようになったconstexpr（C++20）
 
-※この内容はC++20から利用可能な情報であり、策定までの間に使用が変更された場合は記述も変更されます。
+※この内容はC++20から利用可能な情報であり、策定までの間に仕様が変更された場合は記述も変更されます。
 
-C++11でconstexprが導入されて以降、STLの全ての関数のconstexpr化を伺うかのようにconstexprは着実に強化されてきました。
+C++11でconstexprが導入されて以降、あらゆる処理をconstexprで行うことを目指すかのように（おそらく実際そう）constexprは着実に強化されてきました。
 C++20ではC++14以来の大幅な強化が行われ、constexprの世界はさらに広がることになります。
 
 ### constexprな仮想関数
 ついに仮想関数をconstexprの文脈で呼び出せるようになります。初っ端から意味わからないですね・・・。
 
+仮想関数呼び出しというと`new`がちらつきますが、ポインタや参照を介してさえいれば`new`によって確保されたオブジェクトでなくても動的ポリモーフィズムを行うことができます。  
+そのような場合であれば不正なキャストなどのチェックを静的に行うことができ、その動的型（dynamic type）を静的に追跡すれば仮想関数呼び出しすら静的に解決することが可能です。
+
+そのため、constexprの文脈で仮想関数呼び出しを禁止している制限は不要であるとして撤廃されました。
+
+```cpp
+struct base {
+  virtual int f() const = 0;
+};
+
+struct derived1 : public base {
+  constexpr int f() const override {
+    return 10;
+  }
+};
+
+struct derived2 : public base {
+  constexpr int f() const override {
+    return 20;
+  }
+};
+
+constexpr derived1 d1{};
+constexpr derived2 d2{};
+  
+constexpr base const& b1 = d1;
+constexpr base const* b2 = &d2;
+  
+constexpr int n1 = b1.f();   //n1 == 10
+constexpr int n2 = b2->f();  //n2 == 20
+```
+この様なコードが動くようになるはずです（おそらく）。
+
+このコードのように、非constexprな仮想関数をconstexprな仮想関数でオーバーライドすることができますし、その逆（constexpr仮想関数を非constexpr仮想関数でオーバーライド）も可能です。  
+また、const修飾はしておかないと実行時に呼び出すことができなくなります（constexprに初期化された変数は実行時にはconstになっているため）。
+
+最基底で定義された仮想関数はそのconstexprの有無に関わらず派生クラスにおいてconstexprの有る無し両方でオーバーライドできます。その際、途中のオーバーライドが非constexprであっても、最終的に呼び出される最派生（most derived）のオーバーライドがconstexprであれば定数実行可能です。
+
+```cpp
+struct base {
+  virtual int f() const = 0;
+
+  constexpr virtual int g() const {
+    return 0;
+  }
+};
+
+struct derived1 : public base {
+  int f() const override {
+    return 0;
+  }
+  
+  constexpr int g() const override {
+    return 10;
+  }
+};
+
+struct derived2 : public derived1 {
+  constexpr int f() const override {
+    return 10;
+  }
+  
+  int g() const override {
+    return 20;
+  }
+};
+
+constexpr derived2 d2{};
+constexpr base const& b = d2;
+
+//ok
+constexpr int a = b.f();  //a == 10
+//compile error! derived2::g() is not constexpr function.
+constexpr int b = b.g();
+```
 
 ### dynamic_castとtype_id
+前項の内容の延長です。constexprな仮想関数が許可されたのと同様の理由により`dynamic_cast`や`type_id`も静的に解決することができます。なのでそれが可能になりました。  
+また、この変更に伴って`std::type_info`の`operator==`と`operator!=`がconstexpr指定され定数式で使用可能になります。
+
+```cpp
+struct base {
+  virtual int f() const = 0;
+};
+
+struct derived1 : public base {
+  constexpr int f() const override {
+    return 10;
+  }
+};
+
+struct derived2 : public base {
+  constexpr int f() const override {
+    return 20;
+  }
+};
+
+//組み込み型に対するtypeid
+{
+  constexpr auto&& int_t  = typeid(int);
+  constexpr auto&& char_t = typeid(char);
+
+  constexpr bool is_same = int_t == char_t;  //is_same == false
+}
+
+//polymorphicな型に対するtypeid
+{
+  constexpr derived1 d1{};
+  constexpr derived2 d2{};
+  
+  constexpr base const* b1 = &d1;
+  constexpr base const* b2 = &d2;
+  
+  constexpr auto&& b1_t = typeid(b1);
+  constexpr auto&& b2_t = typeid(b2);
+
+  constexpr bool is_same = b1_t == b2_t;  //is_same == false
+}
+
+
+struct base2 {
+  virtual int g() const = 0;
+};
+
+struct derived3 : public base, public base2 {
+  constexpr int f() const override {
+    return 20;
+  }
+  
+  constexpr int g() const override {
+    return 30;
+  }
+};
+
+//dynamic_cast
+{
+  constexpr derived3 d{};
+  constexpr base const* b1 = &d;
+  //side cast
+  constexpr base2 const* b2 = dynamic_cast<base2 const*>(b1);
+}
+
+```
+多分このように書けるようになります（普段あまり使わないのと確認できないのとで自信がないですが・・・）。
+
+このような定数実行の中で例外を投げるような適用が行われた場合は定数実行されません。例外を投げるような適用とは、dynamic_castなら参照の変換での失敗時、typeidはnullptrを参照するポインタを受けたとき、です。
+```cpp
+constexpr int* nullp = nullptr;
+constexpr auto&& t = typeid(nullp);  //compile error! 例外を投げるため定数実行不可
+
+constexpr derived1 d1{};
+//b1のmost derived typeはderived1
+constexpr base const& b1 = d1;
+//down cast
+constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile error! 例外を投げるため定数実行不可
+
+```
 
 
 ### std::is_constant_evaluated()
 `std::is_constant_evaluated()`はコンパイル時には`true`を、実行時には`false`を返す関数です。これにより、コンパイル時と実行時でそれぞれ効率的な処理を選択することが可能になります。
 
+おそらくconstexprで数学関数を実装しようと思った方が通るであろう、コンパイル時にはコンパイル時実行可能なアルゴリズムで、実行時にはcmathの対応する関数で実行してほしい！ということがついに可能になります。
+
 ```cpp
+template<typename T>
+constexpr auto sin(T theta) {
+  if (std::is_constant_evaluated()) {
+    //コンパイル時
+    auto fabs = [](T v) -> T { return (v < T(0.0))?(-v):(v); };
+    T x_sq = -(theta * theta);
+    T series = theta;
+    T tmp = theta;
+    T fact = T(2.0);
+    
+    //マクローリン級数の計算
+    do {
+      tmp *= x_sq / (fact * (fact+T(1.0)));
+      series += tmp;
+      fact += T(2.0);
+    } while(fabs(tmp) <= std::numeric_limits<T>::epsilon());
+    
+    return series;
+  } else {
+    //実行時
+    return std::sin(theta);
+  }
+}
+
+int main()
+{
+  constexpr double pi = 3.1415926535897932384626433832795;
+  
+  std::cout << std::setprecision(16);
+  
+  constexpr auto sin_60deg = sin(pi/3.0); //コンパイル時計算
+  
+  std::cout << sin_60deg << std::endl;
+  std::cout << sin(pi/3.0) << std::endl;  //実行時計算
+}
 ```
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/nyXwWTEg4ahNF4Of)
+
+`if constexpr`や`static_assert`でこの関数を利用すると必ず`true`として処理されます。なので、コンパイル時と実行時で処理を分けるような目的で利用する場合は通常の`if`で分岐する必要があります。しかし、実行時まで`if`文が残る事は無いでしょう。
+
 
 ### consteval（immediate function : 即時関数）
-constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行される可能性があります。あくまで可能性です。それが本当に定数式として呼ばれたかどうかを知るにはアセンブリを見に行く必要があるでしょう（前述のis_constant_evaluatedを使うこともできますが）。  
-なので、必ずコンパイル時実行され、かつコンパイル時に実行されなければコンパイルエラーとなる関数が欲しい場合があります。そこで、consteval指定子が登場しました。
+constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行可能であることを表明します。しかし、必ずコンパイル時に定数を生成し、それができなければコンパイルエラーとなる関数が欲しい場合があります。そのような需要に応えるためにconsteval指定子が導入されました。
 
 constevalは関数の頭（constexprと同じ位置）に付け、その関数が必ずコンパイル時実行されることを示します。そして、そのような関数は即時関数と呼ばれます。  
-以下で紹介するconsteval関数の特徴以外の、例えばconsteval関数内でできる事/出来ない事等の性質はconstexpr関数と同じです（ただし、ここに書かれていない差異はあります）。
+基本的には、consteval関数内でできる事/出来ない事等の性質はconstexpr関数と同じです。
 
 ```cpp
 consteval int square(int n) {
@@ -35,11 +230,11 @@ int x = 10;
 int sqr = square(x);   //compile error! can't executed at compile time.
 ```
 変数`sqc`の初期化はconstexprが付加されていることもあり定数式で実行可能ですので、`square(10)`はコンパイル時に実行され、`sqc == 100`になります。  
-一方、`sqr`は別の非constexprな変数`x`を介していることもあり、constexpr実行不可能なのでその時点でコンパイルエラーを発生させます（最適化オプションによってはコンパイラがよきに計らってくれるかもしれませんが・・・）。  
-もちろん、consteval関数が定数実行不可能である場合はそれもコンパイルエラーです。
+一方、`sqr`はconstexprではなく別の非constexprな変数`x`を介していることもあり、constexpr実行不可能なのでその時点でコンパイルエラーを発生させます。  
+また、consteval関数内に定数実行不可能な処理がある場合もコンパイルエラーです。
 
-consteval関数はほかのどの関数よりも早く実行されます。すなわち、constexpr関数の実行時点にはconsteval関数の実行は終わっています。  
-ただし、consteval関数の中にネストしてconsteval関数が呼び出されている場合はそうではなく、そのように囲んでいるconsteval関数が最終的に定数評価されればエラーにはなりません。
+consteval関数はほかのどの関数よりも早く実行されます。すなわち、constexpr関数の実行時点にはconsteval関数の実行は終わっていなければなりません。  
+ただし、consteval関数の中でconsteval関数が呼び出されている場合はそうではなく、そのように囲んでいるconsteval関数が最終的に定数評価されればエラーにはなりません。
 
 ```cpp
 consteval int sqrsqr(int n) {
@@ -52,7 +247,7 @@ constexpr int dblsqr(int n) {
 ```
 
 コンパイル時には全て終わっているという性質のため、consteval関数のアドレスを取ることは出来ません。そのような行為を働いた時点でコンパイルエラーとなります。  
-また、コンストラクタに付けることは出来ますがデストラクタには付けることができません。コンストラクタに付けた場合はconstexpr指定したのと同じ意味になります。
+また、コンストラクタに付けることは出来ますがデストラクタには付けることはできません。コンストラクタに付けた場合はconstexpr指定したのと同じ意味になります。
 
 この即時関数はコンパイラのフロントエンドで処理され、バックエンドはその存在を知りません。すなわち、関数形式マクロ（悪名高いWindows.hのmin,maxマクロのようなプリプロセッサ）の代替として利用することができます。
 
@@ -93,7 +288,7 @@ struct delived : polymorphic_base {
     return 10;
   }
 
-  //ok!
+  //ok
   consteval int g() const override {
     return 20;
   }
@@ -106,11 +301,40 @@ struct delived : polymorphic_base {
 ```
 オーバーライド前とオーバーライド後でconsteval指定の有無が一致している必要があります。
 
+consteval関数は実行時には跡形もなく消え去るため、consteval仮想関数のみが定義されているようなクラスは実行時には多態的な振舞を行えなくなります。しかし、それでも仮想関数テーブル等の動的ポリモーフィズムのための準備が省かれるわけではありません。
+
+
 ### unionのアクティブメンバの切り替え
+共用体（union）のアクティブメンバとは、ある時点の共用体のオブジェクトにおいて最後に初期化されたメンバの事です。共用体の初期化自体はconstexprに行うことが可能ですが、あるメンバの初期化後に別のメンバを初期化した場合にアクティブメンバの切り替えが発生します。アクティブメンバの切り替えはC++17までコンパイル時に行えません。
+
+P0784の提案によってコンパイル時にメモリ確保すら可能になったのでSTLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
+
+それらのクラスでは共用体のアクティブメンバの切り替えが発生する可能性があり、その場合にconstexprの文脈で使用できなくなります。  
+そのため、そのようなクラスをconstexprにさらに対応させるためにこのような制限が撤廃されることになりました。
+
+```cpp
+union U {
+  int n;
+  float f;
+};
+
+//U::fを読み出しアクティブメンバをU::nに切り替える
+constexpr float change(U& u) {
+  float f = u.f;  //u.nがアクティブメンバの場合はここでcompile error
+  u.n = 0;  //u.nへアクティブメンバを切り替え、C++17までは定数実行不可
+  return f;
+}
+
+//fをアクティブメンバとして初期化 (Designated Initialization!)
+U u = { .f = 1.0f };
+constexpr auto f = change(u);
+```
+
+ただし、非アクティブなメンバへのアクセス（そこへの参照からの間接アクセスも含む）は未定義動作であり、定数式で現れてはいけません。つまりは定数式の文脈でそのようなアクセスを行った時点でコンパイルエラーを引き起こします（実はclangの`std::string`のsso実装がこれに当てはまっています）。
 
 ### try-catch
 
-### STL関数のconstexpr化
+### STLのconstexpr追加対応
 
 #### cmathとcstdlib
 一部の数学関数にconstexprが付加されるようになります。
@@ -143,9 +367,16 @@ struct delived : polymorphic_base {
 
 ### 参考文献
 - [P1064R0 : Allowing Virtual Function Calls in Constant Expressions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1064r0.html)
+- [P1327R1 : Allowing dynamic_cast, polymorphic typeid in Constant Expressions](https://wg21.link/P1327)
+- [P1328R0 : Making std::type_info::operator== constexpr](https://wg21.link/P1328)
 - [P0595 : std::is_constant_evaluated()](https://wg21.link/P0595)
 - [P1073 : Immediate functions](https://wg21.link/P1073)
 - [P0784R5 : More constexpr containers](https://wg21.link/P0784)
+- [P1330R0 : Changing the active member of a union inside constexpr
+](www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1330r0.pdf
+)
+- [P1002R1 : Try-catch blocks in constexpr functions
+](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1002r1.pdf)
 - [P0202R3 : Add Constexpr Modifiers to Functions in <algorithm> and <utility> Headers](https://wg21.link/P0202R3)
 - [P0415R1 : Constexpr for std::complex](https://wg21.link/P0415R1)
 - [C++20 - cpprefjp](https://cpprefjp.github.io/lang/cpp20.html)
