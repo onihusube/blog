@@ -166,6 +166,42 @@ constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile err
 
 ```
 
+### STLコンテナのconstexpr対応へ向けて
+
+#### constexprデストラクタ
+C++17まではデストラクタにconstexprを付けることができず、コンパイル時にデストラクタを実行することができませんでした。
+
+
+#### constexprなallocateとdeallocate
+
+### unionのアクティブメンバの切り替え
+共用体（union）のアクティブメンバとは、ある時点の共用体のオブジェクトにおいて最後に初期化されたメンバの事です。共用体の初期化自体はconstexprに行うことが可能ですが、あるメンバの初期化後に別のメンバを初期化した場合にアクティブメンバの切り替えが発生します。アクティブメンバの切り替えはC++17までコンパイル時に行えません。
+
+前項の変更によってコンパイル時にメモリ確保すら可能になったのでSTLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
+
+それらのクラスでは共用体のアクティブメンバの切り替えが発生する可能性があり、その場合にconstexprの文脈で使用できなくなります。そのようなクラスをconstexprにさらに対応させるため、この制限は撤廃されることになりました。
+
+```cpp
+union U {
+  int n;
+  float f;
+};
+
+//U::fを読み出しアクティブメンバをU::nに切り替える
+constexpr float change(U& u) {
+  float f = u.f;  //u.nがアクティブメンバの場合はここが定数実行不可
+  u.n = 0;  //u.nへアクティブメンバを切り替え、C++17までは定数実行不可
+  return f;
+}
+
+//fをアクティブメンバとして初期化 (Designated Initialization!)
+U u = { .f = 1.0f };
+constexpr auto f = change(u);
+```
+
+ただし、非アクティブなメンバへのアクセス（そこへの参照からの間接アクセスも含む）は未定義動作であり、定数式で現れてはいけません。つまりは定数式の文脈でそのようなアクセスを行った時点でコンパイルエラーを引き起こします（実はclangの`std::string`のsso実装がこれに当てはまっています）。
+
+
 ### try-catch
 constexpr関数内にはこれまでtry-catchブロックを書くことは出来ませんでした。書いてあった場合はコンパイル時実行不可能です。しかし、それを書くことができるようになります。
 
@@ -322,34 +358,6 @@ struct delived : polymorphic_base {
 
 consteval関数は実行時には跡形もなく消え去るため、consteval仮想関数のみが定義されているようなクラスは実行時には多態的な振舞を行えなくなります。しかし、それでも仮想関数テーブル等の動的ポリモーフィズムのための準備が省かれるわけではありません。
 
-
-### unionのアクティブメンバの切り替え
-共用体（union）のアクティブメンバとは、ある時点の共用体のオブジェクトにおいて最後に初期化されたメンバの事です。共用体の初期化自体はconstexprに行うことが可能ですが、あるメンバの初期化後に別のメンバを初期化した場合にアクティブメンバの切り替えが発生します。アクティブメンバの切り替えはC++17までコンパイル時に行えません。
-
-P0784の提案によってコンパイル時にメモリ確保すら可能になったのでSTLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
-
-それらのクラスでは共用体のアクティブメンバの切り替えが発生する可能性があり、その場合にconstexprの文脈で使用できなくなります。そのようなクラスをconstexprにさらに対応させるため、この制限は撤廃されることになりました。
-
-```cpp
-union U {
-  int n;
-  float f;
-};
-
-//U::fを読み出しアクティブメンバをU::nに切り替える
-constexpr float change(U& u) {
-  float f = u.f;  //u.nがアクティブメンバの場合はここが定数実行不可
-  u.n = 0;  //u.nへアクティブメンバを切り替え、C++17までは定数実行不可
-  return f;
-}
-
-//fをアクティブメンバとして初期化 (Designated Initialization!)
-U u = { .f = 1.0f };
-constexpr auto f = change(u);
-```
-
-ただし、非アクティブなメンバへのアクセス（そこへの参照からの間接アクセスも含む）は未定義動作であり、定数式で現れてはいけません。つまりは定数式の文脈でそのようなアクセスを行った時点でコンパイルエラーを引き起こします（実はclangの`std::string`のsso実装がこれに当てはまっています）。
-
 ### STLのconstexpr追加対応
 
 #### cmathとcstdlib
@@ -387,14 +395,14 @@ constexpr auto f = change(u);
 - [P1064R0 : Allowing Virtual Function Calls in Constant Expressions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1064r0.html)
 - [P1327R1 : Allowing dynamic_cast, polymorphic typeid in Constant Expressions](https://wg21.link/P1327)
 - [P1328R0 : Making std::type_info::operator== constexpr](https://wg21.link/P1328)
-- [P0595 : std::is_constant_evaluated()](https://wg21.link/P0595)
-- [P1073 : Immediate functions](https://wg21.link/P1073)
 - [P0784R5 : More constexpr containers](https://wg21.link/P0784)
 - [P1330R0 : Changing the active member of a union inside constexpr
 ](www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1330r0.pdf
 )
 - [P1002R1 : Try-catch blocks in constexpr functions
 ](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1002r1.pdf)
-- [P0202R3 : Add Constexpr Modifiers to Functions in <algorithm> and <utility> Headers](https://wg21.link/P0202R3)
+- [P0202R3 : Add Constexpr Modifiers to Functions in `<algorithm>` and `<utility>` Headers](https://wg21.link/P0202R3)
+- [P0595 : std::is_constant_evaluated()](https://wg21.link/P0595)
+- [P1073 : Immediate functions](https://wg21.link/P1073)
 - [P0415R1 : Constexpr for std::complex](https://wg21.link/P0415R1)
 - [C++20 - cpprefjp](https://cpprefjp.github.io/lang/cpp20.html)
