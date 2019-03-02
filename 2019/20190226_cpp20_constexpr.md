@@ -1,9 +1,11 @@
 # ［C++］さらに出来るようになったconstexpr（C++20）
 
-※この内容はC++20から利用可能な情報であり、内容が変更される可能性があります。
+※この内容はC++20から利用可能な情報であり、一部の変更はC++23以降に先延ばしになるなど、内容が変更される可能性があります。
 
 C++11でconstexprが導入されて以降、あらゆる処理をconstexprで行うことを目指すかのように（おそらく実際そう）constexprは着実に強化されてきました。
 C++20ではC++14以来の大幅な強化が行われ、constexprの世界はさらに広がることになります。
+
+[:contents]
 
 ### constexprな仮想関数
 ついに仮想関数をconstexprの文脈で呼び出せるようになります。初っ端から意味わからないですね・・・。
@@ -165,26 +167,21 @@ constexpr base const& b1 = d1;
 constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile error! 例外を投げるため定数実行不可
 
 ```
+### STLコンテナのconstexpr化のために
+※この項は複雑で長くなるのでページ分けして後程追記します。
 
-### STLコンテナのconstexpr対応へ向けて
+ざっとまとめると以下が可能になります
 
-#### constexprデストラクタ
-C++17まではデストラクタにconstexprを付けることはおろか、リテラル型として振舞えるクラスにデストラクタを定義することができず、デストラクタのコンパイル時実行もできませんでした。  
-STLコンテナは例外なくデストラクタがtrivialでない（定義してある）ので、STLコンテナをconstexpr対応させるためにこの制限は撤廃されます。
+- constexpr デストラクタ
+- new式/delete式のコンパイル時実行（operator newではない）
+- `std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`のコンパイル時実行
+- コンパイル時に確保され解放されなかったメモリは静的記憶域に移行され実行時に参照可能
 
-デストラクタにconstexpr指定が可能になり、そのデストラクタはコンパイル時実行されます。ただし、そのようなクラスは仮想基底を持ってはならず、デストラクタの中身はconstexpr実行可能である必要があります。  
-`= default`なデストラクタはメンバや基底クラスのデストラクタが全てconstexprであれば、暗黙的にconstexprとなります。  
-また、trivialなデストラクタは暗黙的にconstexprです。これは主に既存の組み込み型が該当します。
-
-そして、この変更に伴ってリテラル型となるクラスの条件が変更となります。今まではconstexprコンストラクタとtrivialなデストラクタを要求していましたが、constexprコンストラクタとconstexprデストラクタを持つこと、という要求に少し緩和されます。  
-つまり、リテラル型のオブジェクトはコンパイル時に構築・破棄可能でなければなりません。
-
-#### constexprなallocateとdeallocate
 
 ### unionのアクティブメンバの切り替え
 共用体（union）のアクティブメンバとは、ある時点の共用体のオブジェクトにおいて最後に初期化されたメンバの事です。共用体の初期化自体はconstexprに行うことが可能ですが、あるメンバの初期化後に別のメンバを初期化した場合にアクティブメンバの切り替えが発生します。アクティブメンバの切り替えはC++17までコンパイル時に行えません。
 
-前項の変更によってコンパイル時にメモリ確保すら可能になったのでSTLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
+前項の変更によってコンパイル時にメモリ確保すら可能になるため、STLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
 
 それらのクラスでは共用体のアクティブメンバの切り替えが発生する可能性があり、その場合にconstexprの文脈で使用できなくなります。そのようなクラスをconstexprにさらに対応させるため、この制限は撤廃されることになりました。
 
@@ -206,7 +203,7 @@ U u = { .f = 1.0f };
 constexpr auto f = change(u);
 ```
 
-ただし、非アクティブなメンバへのアクセス（そこへの参照からの間接アクセスも含む）は未定義動作であり、定数式で現れてはいけません。つまりは定数式の文脈でそのようなアクセスを行った時点でコンパイルエラーを引き起こします（実はclangの`std::string`のsso実装がこれに当てはまっています）。
+ただし、非アクティブなメンバへのアクセス（そこへの参照からの間接アクセスも含む）は未定義動作であり、定数式で現れてはいけません。つまりは定数式の文脈でそのようなアクセスを行った時点でコンパイルエラーを引き起こします（`std::string`のsso実装がこれに当てはまるようです）。
 
 
 ### try-catch
@@ -227,6 +224,8 @@ constexpr関数内にはこれまでtry-catchブロックを書くことは出�
 
 ```cpp
 #include <type_traits>  //←必須
+#include <cmath>
+#include <iostream>
 
 template<typename T>
 constexpr auto my_sin(T theta) {
@@ -270,12 +269,12 @@ int main()
 
 `if constexpr`や`static_assert`でこの関数を利用すると必ず`true`として処理されます。なので、コンパイル時と実行時で処理を分けるような目的で利用する場合は通常の`if`で分岐する必要があります。しかし、実行時まで`if`文が残る事は無いでしょう。
 
-また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。同時に、実行時に選択される方のステートメントでもconstexpr関数で現れてはいけない構文が現れてはいけません（例えば、throwやgoto）。
+また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。同時に、実行時に選択される方のステートメントでもconstexpr関数で現れてはいけない構文が現れてはいけません（例えば、`throw`や`goto`、`reinterpret_cast`）。
 
 
 ### consteval（immediate function : 即時関数）
 constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行可能であることを表明します。  
-しかし、文脈によっては定数実行されたかどうかを確かめることが困難であったり、定数実行中に実行不可となるようなエラーが発生した場合は暗黙的に実行時まで処理が先延ばしされたりします。
+しかし、文脈によっては定数実行されたかどうかを確かめることが困難であったり、定数実行中に実行不可となるようなエラーが発生した場合は暗黙的に実行時まで処理が先延ばしされたりします（単なるconstな変数の初期化試行時等）。
 
 そこで、必ずコンパイル時に定数を生成しそれができなければコンパイルエラーとなる関数が欲しい場合があります。そのような需要に応えるためにconsteval指定子が導入されました。
 
@@ -309,7 +308,7 @@ constexpr int dblsqr(int n) {
 ```
 
 コンパイル時には全て終わっているという性質のため、consteval関数のアドレスを取ることは出来ません。そのような行為を働いた時点でコンパイルエラーとなります。  
-また、コンストラクタに付けることは出来ますがデストラクタには付けることはできません。コンストラクタに付けた場合はconstexpr指定したのと同じ意味になります。
+また、コンストラクタに付けることは出来ますがデストラクタには付けることはできません。コンストラクタに付けた場合はconstexpr指定したのとほぼ同じ意味になります。
 
 この即時関数はコンパイラのフロントエンドで処理され、バックエンドはその存在を知りません。すなわち、関数形式マクロ（悪名高いWindows.hのmin,maxマクロのようなプリプロセッサ）の代替として利用することができます。
 
@@ -335,7 +334,7 @@ consteval関数はアドレスを取れないことから関数ポインタな�
 後は通常のローカル関数としての利用でしょうか。
 
 #### consteval仮想関数
-仮想関数がconstexpr指定できるようになったので、当然のように？consteval指定することもできます。ただし、constexprが非constexpr仮想関数をオーバーライド出来るのに対して、constevalはconsteval同士の間でしかオーバーライドしたり/されたりしてはいけません。
+仮想関数がconstexpr指定できるようになったので、当然のように？consteval指定することもできます。ただし、constexprが非constexpr仮想関数をオーバーライドしたり出来るのに対して、constevalはconsteval同士の間でしかオーバーライドしたり/されたりしてはいけません。
 
 ```cpp
 struct polymorphic_base {
@@ -367,49 +366,86 @@ consteval関数は実行時には跡形もなく消え去るため、consteval�
 
 ### STLのconstexpr追加対応
 
-#### cmathとcstdlib
-一部の数学関数にconstexprが付加されるようになります。
+#### vector
+上記の様々な変更の結果、`std::vector<T>`およびその特殊化`std::vector<bool>`のすべてのメンバ関数にconstexprが付加され、完全にコンパイル時利用が可能になります。ただし当然ながら、要素型はリテラル型である必要があります。
 
-#### algorithm
-ほとんどの関数にconstexprが付加されるようになります。
+```cpp
+constexpr int test_vector() {
+  std::vector<double> v = {5, 3, 2, 9, 1, 0, 4};
+  v.push_back(11);
+
+  int s{};
+  for(auto n : v) {
+    s += n;
+  }
+
+  return n;
+}
+
+constexpr auto sum = test_vector(); //ok. sum == 35
+```
+
+#### cmathとcstdlib
+一部の数学関数にconstexprが付加されるようになります。とはいえ、std::sin等の特殊関数がconstexpr実行可能になるわけではありません。  
+絶対値（`abs`）や丸め（`ceil, floor, round, trunc`）、剰余（`fmod, remainder, remquo`）等の一部の関数がconstexpr指定されるようになります（[一覧](https://wg21.link/P0533)）。
+
+四則演算はすでにconstexprなので、これで基本的な操作はコンパイル時実行できるようになります。おそらく恩恵が強いのは丸め関数系でしょうか。
+
+#### algorithmとutility
+std::swap()やstd::sort()等、かなりの関数にconstexprが付加されるようになります（[一覧](https://wg21.link/P0202R3)）。
 
 これによりstd::vectorも含めて、constexprなイテレータを用いたアルゴリズムをコンパイル時実行できるようになります！
 
+```cpp
+constexpr std::vector<char> cvec = {`h`, `e`, `l`, `l`, `o`};
+constexpr auto& r = cvec.emplace_back(`.`);
+
+constexpr auto it = std::find(std::begin(cvec), std::end(cvec), `e`);
+//*it == `e`
+
+constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
+//no == std::end(cvec)
+```
+
 #### 全てのメンバ関数のconstexpr化を達成したクラス
-- std::array
-- std::pair
-- std::tuple
-- std::back_insert_iterator
-- std::front_insert_iterator
-- std::insert_iterator
+- `std::vector`
+- `std::array`
+- `std::pair`
+- `std::tuple`
+- `std::back_insert_iterator`
+- `std::front_insert_iterator`
+- `std::insert_iterator`
 
 
-#### 追加のconstexpr対応（関数/クラス）
-- std::complex
+#### 追加のconstexpr対応
+- `std::complex`（非メンバ関数版も含む）
   - 四則演算の演算子（自己代入系含む）
   - 代入演算子
-  - real(), imag()
-  - norm(), conj()
-- std::char_traits
-  - move()
-  - copy()
-  - assign()
-- std::swap()
-- std::exchange()
-
+  - `real(), imag()`
+  - `norm(), conj()`
+- `std::pointer_traits<T*>`
+  - `pointer_to()`
+- `std::char_traits`
+  - `move()`
+  - `copy()`
+  - `assign()`
 
 ### 参考文献
-- [P1064R0 : Allowing Virtual Function Calls in Constant Expressions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1064r0.html)
+- [P1064R0 : Allowing Virtual Function Calls in Constant Expressions](https://wg21.link/P1064)
 - [P1327R1 : Allowing dynamic_cast, polymorphic typeid in Constant Expressions](https://wg21.link/P1327)
 - [P1328R0 : Making std::type_info::operator== constexpr](https://wg21.link/P1328)
+- [P0784R2 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r2.html)
 - [P0784R5 : More constexpr containers](https://wg21.link/P0784)
 - [P1330R0 : Changing the active member of a union inside constexpr
-](www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1330r0.pdf
-)
+](https://wg21.link/P1330)
 - [P1002R1 : Try-catch blocks in constexpr functions
-](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1002r1.pdf)
-- [P0202R3 : Add Constexpr Modifiers to Functions in `<algorithm>` and `<utility>` Headers](https://wg21.link/P0202R3)
+](https://wg21.link/P1002)
 - [P0595 : std::is_constant_evaluated()](https://wg21.link/P0595)
 - [P1073 : Immediate functions](https://wg21.link/P1073)
-- [P0415R1 : Constexpr for std::complex](https://wg21.link/P0415R1)
+- [P1004R1 : Making std::vector constexpr](https://wg21.link/P1004)
+[constexpr for `<cmath>` and `<cstdlib>`
+](https://wg21.link/P0533)
+- [P0202R3 : Add Constexpr Modifiers to Functions in `<algorithm>` and `<utility>` Headers](https://wg21.link/P0202)
+- [P0415R1 : Constexpr for std::complex](https://wg21.link/P0415)
+[P1006R1 : Constexpr in std::pointer_traits](https://wg21.link/P1006)
 - [C++20 - cpprefjp](https://cpprefjp.github.io/lang/cpp20.html)
