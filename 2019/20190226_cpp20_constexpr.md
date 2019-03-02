@@ -418,9 +418,9 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 
 
 #### 追加のconstexpr対応
-- `std::complex`（非メンバ関数版も含む）
-  - 四則演算の演算子（自己代入系含む）
-  - 代入演算子
+- `std::complex`（それぞれ非メンバ関数版を含む）
+  - 全ての四則演算の演算子（自己代入系含む）
+  - 全代入演算子
   - `real(), imag()`
   - `norm(), conj()`
 - `std::pointer_traits<T*>`
