@@ -443,8 +443,7 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 - [P0595 : std::is_constant_evaluated()](https://wg21.link/P0595)
 - [P1073 : Immediate functions](https://wg21.link/P1073)
 - [P1004R1 : Making std::vector constexpr](https://wg21.link/P1004)
-[constexpr for `<cmath>` and `<cstdlib>`
-](https://wg21.link/P0533)
+- [P0533R4 : constexpr for `<cmath>` and `<cstdlib>`](https://wg21.link/P0533)
 - [P0202R3 : Add Constexpr Modifiers to Functions in `<algorithm>` and `<utility>` Headers](https://wg21.link/P0202)
 - [P0415R1 : Constexpr for std::complex](https://wg21.link/P0415)
 [P1006R1 : Constexpr in std::pointer_traits](https://wg21.link/P1006)

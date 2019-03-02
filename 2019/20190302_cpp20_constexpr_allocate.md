@@ -42,3 +42,10 @@ new式は任意の型のメモリ領域の確保と構築、delete式は（new�
 
 `std::allocator<T>`（もしくは`std::allocator_traits<std::allocator<T>>`）は殆どのSTLコンテナで使われているデフォルトのアロケータで、そのメンバ関数によってメモリの確保、解放を行うことができます。それも、その式の入力と出力に際してユーザー側から見てポインタの再解釈は行われません。
 そこで、この`std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`によるメモリの確保もconstexprに行うことができるようになります。
+
+### 参考文献
+- [P0784R2 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r2.html)
+- [P0784R5 : More constexpr containers](https://wg21.link/P0784)
+
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190302_cpp20_constexpr_allocate.md)
