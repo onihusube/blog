@@ -1,6 +1,6 @@
 # ［C++］さらに出来るようになったconstexpr（C++20）
 
-※この内容はC++20から利用可能な情報であり、一部の変更がC++23以降に先延ばしになるなど、内容が変更される可能性があります。
+※この内容はC++20から利用可能になる予定の情報であり、一部の変更がC++23以降に先延ばしになるなど、内容が変更される可能性があります。
 
 C++11でconstexprが導入されて以降、あらゆる処理をconstexprで行うことを目指すかのように（おそらく実際そう）constexprは着実に強化されてきました。
 C++20ではC++14以来の大幅な強化が行われ、constexprの世界はさらに広がることになります。
@@ -409,6 +409,7 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 
 #### 全てのメンバ関数のconstexpr化を達成したクラス
 - `std::vector`
+- `std::allocator<T>`
 - `std::array`
 - `std::pair`
 - `std::tuple`
