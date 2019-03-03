@@ -78,7 +78,7 @@ struct base {
 };
 
 struct derived : base {
-  constexpr int f() const {
+  constexpr int f() const override {
     return 10;
   }
 };
@@ -131,7 +131,7 @@ struct base {
 };
 
 struct derived : base {
-  constexpr bool f() const {
+  constexpr bool f() const override {
     return false;
   }
 };
@@ -219,7 +219,7 @@ struct base {
 };
 
 struct derived : base {
-  constexpr bool f() const {
+  constexpr bool f() const override {
     return false;
   }
 };
