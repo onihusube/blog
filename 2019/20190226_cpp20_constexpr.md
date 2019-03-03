@@ -181,7 +181,7 @@ constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile err
 ### unionのアクティブメンバの切り替え
 共用体（union）のアクティブメンバとは、ある時点の共用体のオブジェクトにおいて最後に初期化されたメンバの事です。共用体の初期化自体はconstexprに行うことが可能ですが、あるメンバの初期化後に別のメンバを初期化した場合にアクティブメンバの切り替えが発生します。アクティブメンバの切り替えはC++17までコンパイル時に行えません。
 
-前項の変更によってコンパイル時にメモリ確保すら可能になるため、STLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
+前項の変更によってコンパイル時にメモリ確保すら可能になるため、STLの多くのクラスをconstexpr対応させることができるようになります。しかし、`std::string`や`std::optional`、`std::variant`はその実装において共用体が使われています（`std::string`はsmall-string optimization : ssoと呼ばれる最適化のために）。
 
 それらのクラスでは共用体のアクティブメンバの切り替えが発生する可能性があり、その場合にconstexprの文脈で使用できなくなります。そのようなクラスをconstexprにさらに対応させるため、この制限は撤廃されることになりました。
 
