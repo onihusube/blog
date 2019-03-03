@@ -168,7 +168,8 @@ constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile err
 
 ```
 ### STLコンテナのconstexpr化のために
-※この項は複雑で長くなるのでページ分けして後程追記します。
+※この項は複雑で長くなるのでページ分けしました  
+[［C++］ constexprなメモリの確保と解放のために（C++20）](https://onihusube.hatenablog.com/entry/2019/03/03/113722)
 
 ざっとまとめると以下が可能になります
 
@@ -176,7 +177,6 @@ constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile err
 - new式/delete式のコンパイル時実行（operator newではない）
 - `std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`のコンパイル時実行
 - コンパイル時に確保され解放されなかったメモリは静的記憶域に移行され実行時に参照可能
-
 
 ### unionのアクティブメンバの切り替え
 共用体（union）のアクティブメンバとは、ある時点の共用体のオブジェクトにおいて最後に初期化されたメンバの事です。共用体の初期化自体はconstexprに行うことが可能ですが、あるメンバの初期化後に別のメンバを初期化した場合にアクティブメンバの切り替えが発生します。アクティブメンバの切り替えはC++17までコンパイル時に行えません。
