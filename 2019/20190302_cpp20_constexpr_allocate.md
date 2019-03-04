@@ -1,8 +1,8 @@
 # ［C++］ constexprなメモリの確保と解放のために（C++20）
 
-※この内容はC++20から利用可能な情報であり、一部の変更がC++23以降に先延ばしになるなど、内容が変更される可能性があります。また、constexprなアロケータを作る類の内容ではないです。
+※この内容はC++20から利用可能予定の情報であり、一部の変更がC++23以降に先延ばしになるなど、内容が変更される可能性があります。また、constexprなアロケータを作る類の内容ではないです。
 
-[前回の記事](https://onihusube.hatenablog.com/entry/2019/03/02/110927)の「STLコンテナのconstexpr化のために」という項に入りきらなかった[P0784](https://wg21.link/P0784)の内容をまとめたものです。
+[前回の記事](https://onihusube.hatenablog.com/entry/2019/03/02/110927)の「コンパイル時メモリアロケーション」という項に入りきらなかった[P0784](https://wg21.link/P0784)の内容をまとめたものです。
 
 [:contents]
 
@@ -260,7 +260,7 @@ constexpr bool b2 = allocate_test2();  //compile error!
 
 プログラマから見た扱いはnew式と同じになるわけです。
 
-### Transient allocationとNon-transient allocation
+### コンパイル時確保メモリの解放タイミング
 
 #### Transient allocation（一時的な割り当て）
 Transient allocationとは、コンパイル時に動的に確保されたメモリのうち、その開放もコンパイル時になされたもののことを言います。  

@@ -167,7 +167,7 @@ constexpr base const& b1 = d1;
 constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile error! 例外を投げるため定数実行不可
 
 ```
-### STLコンテナのconstexpr化のために
+### コンパイル時メモリアロケーション
 ※この項は複雑で長くなるのでページ分けしました  
 [［C++］ constexprなメモリの確保と解放のために（C++20）](https://onihusube.hatenablog.com/entry/2019/03/03/113722)
 
