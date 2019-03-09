@@ -27,8 +27,8 @@ struct literal17 {
   //constexprなコンストラクタが少なくとも一つ必要
   //かつ、メンバをすべてconstexprに初期化できなければならない
   constexpr literal17()
-    m{}
-    d{}
+    : m{}
+    , d{}
   {}
 
   //デストラクタは書けてもdefaultまで
@@ -44,11 +44,11 @@ struct literal20 {
   //constexprなコンストラクタが少なくとも一つ必要
   //かつ、メンバをすべてconstexprに初期化できなければならない
   constexpr literal20()
-    m{}
-    d{}
+    : m{}
+    , d{}
   {}
 
-  //デストラクタを書ける
+  //constexprであればデストラクタを書ける
   constexpr ~literal20() {
       //しかしこの例では意味のある処理を書くのがムズカシイ・・・
       m = 0;
