@@ -125,7 +125,7 @@ delete式についても、コンパイル時に確保されたメモリを開�
 
 ```cpp
 struct base {
-  virtual int f() const = 0;
+  virtual bool f() const = 0;
   
   virtual constexpr ~base() = default;
 };
@@ -139,7 +139,7 @@ struct derived : base {
 constexpr bool allocate_test1() {
   base* d = new derived{};
   auto b = d->f();
-  delete base;
+  delete d;
 
   return b;
 }
@@ -148,7 +148,7 @@ constexpr bool allocate_test2() {
   base* d = new derived{};
   auto b = d->f();
   //現実にもよくあるdelete忘れをする
-  //delete base;
+  //delete d;
 
   return b;
 }
