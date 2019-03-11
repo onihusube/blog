@@ -6,9 +6,7 @@ constexpr関数についてのインスタンス化という言葉はテンプ�
 
 ### 必要な知識
 
-#### potentially evaluated（潜在的に評価される）
-
-#### unevaluated operands（未評価オペランド）
+#### unevaluated operand（未評価オペランド）
 unevaluated operandsとは、`sizeof`、`decltype`、`noexcept`、`typeid`のオペランド（引数）として指定されるもの（式）の事で、その名の通りそのオペランドは評価されません。
 
 評価されないとは、そのオペランドに含まれるいかなる計算や関数呼び出しも実行されないということで、そこで参照される関数やクラス等の宣言のみを考慮する（定義が必要ない）ことを意味します。
@@ -26,9 +24,59 @@ int main()
   std::cout << n;
 }
 ```
-ただし、`noexcept`以外は型名を指定することができ、その場合の型名オペランドはunevaluated operandsではありません。
+ただし、`noexcept`以外は型名を指定することができ、その場合の型名オペランドはunevaluated operandではありません。
 
-#### odr-use(d)
+#### potentially evaluated（おそらく評価される）
+ある式がunevaluated operandでなくその一部分でもないとき、その式はpotentially evaluatedと言われます。評価される（evaluated）のでその式に関わる関数や型には定義が必要になる可能性があります。
+
+```cpp
+template<typename T>
+int f();
+
+int main()
+{
+  //f<int>()はpotentially evaluated、fの定義が必要
+  auto n = f(0);
+  std::cout << n;
+}
+```
+つまりは、`sizeof`、`decltype`、`noexcept`、`typeid`、いずれのオペランドでもない式の事だと思っていいでしょう。
+
+potentiallyというのは、例えば以下のようなとき
+```cpp
+if(true) {
+  f(0);
+} else {
+  f(1);
+}
+```
+この場合、`f(0)`も`f(1)`も評価される可能性のある文脈に現れていますが、`f(1)`の方は絶対に評価されません。しかし、この場合でもコンパイラは両方のコードをコンパイルします。この様に、評価されるとは思うけど本当にされるかどうかはわからない、という意味合いでpotentially evaluatedなのだと思われます。
+
+#### potential results（予想される結果）
+ある式がpotentially evaluatedであるとき、その結果として想定される式の集まりをpotential resultsといいます。
+
+ある式のpotential resultsは必ずしも単一の式ではなく、その式に含まれる式のpotential resultsも含まれます。特に、
+- 配列の添え字演算子の場合は、添え字として指定される式（`a[b+c]`の`b+c`）
+- クラスメンバアクセス、pointer-to-memberアクセス（`.*, ->*`演算子）の場合は、その左辺の式（`(a+b).c, (a+b)->b`の`a+b`）
+- 条件演算子（三項演算子）の場合は、真偽それぞれの結果となる二つの式（`a?b:c;`の`b`と`c`）
+- カンマ演算子の場合は、右側の式（`a,b,c`の`c`）
+
+がそれぞれ含まれます。
+
+また、それらの式に関数呼び出しが含まれる場合、その引数の式はpotential resultsに含まれません。
+```cpp
+struct S { 
+  static const int x = 0; 
+};
+
+const int& f(const int &r);
+
+int n = b ? (1, S::x)  // S​::​x is not odr-used here
+          : f(S::x);   // S​::​x is odr-used here, so a definition is required
+```
+この例で、`n`の初期化式のpotential resultsには最初の`S::x`及び`f(const int&)`が含まれますが、2番目の`f(S::x)`の引数の式`S::x`は含まれません。
+
+#### odr-used
 
 
 #### 特殊メンバ関数が実装されるとき
