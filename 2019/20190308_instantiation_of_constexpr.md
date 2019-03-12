@@ -57,7 +57,7 @@ if(true) {
 
 ある式のpotential resultsは必ずしも単一の式ではなく、その式に含まれる式のpotential resultsも含まれます。特に、
 - 配列の添え字演算子の場合は、添え字として指定される式（`a[b+c]`の`b+c`）
-- クラスメンバアクセス、pointer-to-memberアクセス（`.*, ->*`演算子）の場合は、その左辺の式（`(a+b).c, (a+b)->b`の`a+b`）
+- クラスメンバアクセス（`., ->`）、pointer-to-memberアクセス（`.*, ->*`演算子）の場合は、その左辺の式（`(a+b).c, (a+b)->b`の`a+b`）
 - 条件演算子（三項演算子）の場合は、真偽それぞれの結果となる二つの式（`a?b:c;`の`b`と`c`）
 - カンマ演算子の場合は、右側の式（`a,b,c`の`c`）
 
@@ -74,13 +74,25 @@ const int& f(const int &r);
 int n = b ? (1, S::x)  // S​::​x is not odr-used here
           : f(S::x);   // S​::​x is odr-used here, so a definition is required
 ```
-この例で、`n`の初期化式のpotential resultsには最初の`S::x`及び`f(const int&)`が含まれますが、2番目の`f(S::x)`の引数の式`S::x`は含まれません。
+この例で、`n`の初期化式のpotential resultsには最初の`S::x`及び`f(S::x)`が含まれますが、`f(S::x)`の引数の式`S::x`は含まれません。
 
 #### odr-used
 
 
-#### 特殊メンバ関数が実装されるとき
+##### 変数
+potentially evaluatedな式に含まれている変数`x`は、以下を満たす場合にodr-usedであると言います。
+- `x`を左辺値→右辺値へ変換する際、non-trivialな特殊メンバ関数を呼び出さない。
+- `x`はオブジェクトではない（参照）か、`x`がオブジェクトならより大きな式のpotential resultsの一つ
 
+##### 関数
+
+
+#### 特殊メンバ関数が実装されるとき
+ユーザー定義されていない特殊メンバ関数（デフォルト・コピー・ムーブコンストラクタ、デストラクタ、コピー・ムーブ代入演算子）はコンパイラによって暗黙の宣言が行われ、odr-usedされたときに初めて暗黙に定義されます。
+
+実は、常に定義されているわけではないのです。
+
+odr-usedされたとき、なので`sizeof`等の未評価オペランド内では宣言のみで定義がないことになります。
 
 ### 問題
 ```cpp
@@ -100,12 +112,85 @@ int main()
 コメントを外す : [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/uMlwuCST5e0QM8g7)
 
 
+```cpp
+template<typename T>
+int f(T x)
+{
+    return x.get();
+}
+
+template<typename T>
+constexpr int g(T x)
+{
+    return x.get();
+}
+
+int main() {
+
+  // O.K. The body of `f' is not required.
+  decltype(f(0)) a;
+
+  // Seems to instantiate the body of `g'
+  // and results in an error.
+  decltype(g(0)) b;
+
+  return 0;
+}
+```
+
+
+```cpp
+template<int N>
+struct U {};
+
+int g(int);
+
+template<typename T>
+constexpr int h(T) { return T::error; }
+
+template<typename T>
+auto f(T t) -> U<g(T()) + h(T())> {}
+
+int f(...);
+
+int k = f(0);
+```
+
+```cpp
+#include <type_traits>
+
+template <class T>
+constexpr T f(T t) { return +t; }
+
+struct A { };
+
+template <class T>
+decltype(std::is_scalar<T>::value ? T::fail : f(T()))
+  g() { }
+
+template <class T>
+void g(...);
+
+int main()
+{
+  g<A>();
+}
+```
+
 ### 解決のための変更
+
+#### namedとodr-used
+
+#### potentially constant evaluated
+
+#### needed for constant evaluation
 
 
 ### 参考文献
 - [5.2 未評価オペランド（unevaluated operand） - C++11の文法と機能(C++11: Syntax and Feature)](http://ezoeryou.github.io/cpp-book/C++11-Syntax-and-Feature.xhtml#unevaluated_operand)
 - [リンク時に関連するルールの話 - ここは匣](http://fimbul.hateblo.jp/entry/2014/12/11/000123)
 - [mainとodr-usedとpotentially evaluatedの関係 - Qita](https://qiita.com/yohhoy/items/e06227ab0a5c1f579e35)
-- [P0859R0: Core Issue 1581: When are constexpr member functions defined?](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0859r0.html)
+- [Clause 15 [special] - N4659](https://timsong-cpp.github.io/cppwp/n4659/special)
+- [P1065R0 : constexpr INVOKE](https://wg21.link/p1065)
+- [P0859R0 : Core Issue 1581: When are constexpr member functions defined?](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0859r0.html)
 - [1581. When are constexpr member functions defined? - C++ Standard Core Language Active Issues, Revision 100](http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#1581)
