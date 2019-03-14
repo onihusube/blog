@@ -55,13 +55,18 @@ if(true) {
 #### potential results（予想される結果）
 ある式がpotentially evaluatedであるとき、その結果として想定される式の集まりをpotential resultsといいます。
 
-ある式のpotential resultsは必ずしも単一の式ではなく、その式に含まれる式のpotential resultsも含まれます。特に、
+- 式がid-expression（他の式を含まない単一の式）ならば、potential resultsはその式のみ
 - 配列の添え字演算子の場合は、添え字として指定される式（`a[b+c]`の`b+c`）
-- クラスメンバアクセス（`., ->`）、pointer-to-memberアクセス（`.*, ->*`演算子）の場合は、その左辺の式（`(a+b).c, (a+b)->b`の`a+b`）
+- クラスメンバアクセス（`., ->`）の場合は、その左辺の式（`(a+b).c, (a+b)->b`の`a+b`）
+- その右辺が定数式となるようなpointer-to-memberアクセス（`.*, ->*`演算子）の場合は、その左辺の式（`(a+b).*c, (a+b)->*b`の`a+b`(`c`が定数式となる場合のみ)）
+- 式がかっこで囲まれている場合、その中の式（`(expr)`の`expr`）
 - 条件演算子（三項演算子）の場合は、真偽それぞれの結果となる二つの式（`a?b:c;`の`b`と`c`）
 - カンマ演算子の場合は、右側の式（`a,b,c`の`c`）
+- これらに当てはまらない場合potential resultsは空
 
-がそれぞれ含まれます。
+これらの式、及びこれらの式に含まれる式のpotential resultsが含まれます。
+
+ある式に上記の定義を再帰的に適用して、最後にたどり着いたid-expressionの集合がpotential resultsであるとも言えます。
 
 また、それらの式に関数呼び出しが含まれる場合、その引数の式はpotential resultsに含まれません。
 ```cpp
