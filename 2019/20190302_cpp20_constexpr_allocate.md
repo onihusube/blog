@@ -179,7 +179,7 @@ new/delete式と同じように、`std::allocator<T>::allocate`で確保した�
 #### `std::construct_at`と`std::destroy_at`
 詳しい人はご存知かもしれませんが、`std::allocator<T>`はnew/delete式とは違ってメモリの確保と解放しか行いません。オブジェクトの構築・破棄を行ってくれないのです。
 
-`std::allocator<T>::allocate`で確保したメモリを利用するにはplaccement newが、`std::allocator<T>::deallocate`でメモリの解放を行う前にはpseudo-destructor call（T型のオブジェクトaに対して a.~T()のような形のデストラクタ呼び出し）が必要になります。
+`std::allocator<T>::allocate`で確保したメモリを利用するにはplaccement newが、`std::allocator<T>::deallocate`でメモリの解放を行う前にはpseudo-destructor call（T型のオブジェクトaに対して `a.~T()`のような形のデストラクタ呼び出し）が必要になります。
 
 placement new式はvoidポインタの受け入れに伴って再解釈が発生します。また、両方とも定数式では現在許可されておらず、C++20でも許可されません。
 
@@ -228,13 +228,13 @@ constexpr bool allocate_test1() {
   std::allocator<derived> alloc{};
   //メモリ確保と構築
   base* d = alloc.allocate(1);
-  d = std::construct_at(d);
+  d = std::construct_at(d);  // d = new(d) base{};と等価
 
   auto b = d->f();
 
   //オブジェクト破棄とメモリ解放
-  std::destroy_at(d);
-  alloc.deallocate(p, n);
+  std::destroy_at(d);  // d->~base();と等価
+  alloc.deallocate(d, 1);
 
   return b;
 }
@@ -243,13 +243,13 @@ constexpr bool allocate_test2() {
   std::allocator<derived> alloc{};
   //メモリ確保と構築
   base* d = alloc.allocate(1);
-  std::construct_at(d);
+  std::construct_at(d);  // d = new(d) base{};と等価
 
   auto b = d->f();
 
   //忘れる
   //std::destroy_at(d);
-  //alloc.deallocate(p, n);
+  //alloc.deallocate(p, 1);
 
   return b;
 }
@@ -258,7 +258,7 @@ constexpr bool b1 = allocate_test1();  //ok
 constexpr bool b2 = allocate_test2();  //compile error!
 ```
 
-プログラマから見た扱いはnew式と同じになるわけです。
+プログラマから見た扱いはnew/delete式とほぼ同じになるわけです。
 
 ### コンパイル時確保メモリの解放タイミング
 
@@ -274,13 +274,13 @@ Non-transient allocationはその名の通り、コンパイル時に確保さ�
 
 そのようなメモリ確保を許可する場合、その領域を実行時にどう扱うのかが問題となります。つまり、実行時に改めてメモリを確保しなおすのかどうかということです。C++のゼロオーバーヘッド原則的にも実行時に確保しなおすのはちょっと・・・、という感じでしょう。
 
-そこで、クラス型内部で確保されるメモリについてのみ特別な条件を課すことでこれが可能になります。その条件とは、あるリテラル型`T`について
+そこで、クラス型内部で確保されるメモリについてのみ特別な条件を課すことでこれを可能にします。その条件とは、あるリテラル型`T`について
 
 - `T`は非トリビアルconstexprデストラクタを持つ
 - そのデストラクタはコンパイル時実行可能
-- そのデストラクタ内で、`T`の初期化時に確保されたメモリ（Non-transient allocation）を解放する
+- そのデストラクタ内で、`T`の初期化時に確保されたメモリ領域（Non-transient allocation）を解放する
 
-そして、これらの条件を満たしていれば、そのNon-transient allocationなメモリ領域は静的ストレージへ昇格されます。
+そして、これらの条件を満たしていれば、そのNon-transient allocationなメモリ領域は実行時に静的ストレージへ昇格されます。
 
 ```cpp
 template<typename T>
@@ -309,9 +309,10 @@ struct sample {
 }
 
 constexpr sample<char> str{"Hello."};
-//strは"Hello"を保持する静的配列を参照するようになる
+//実行時には、strは"Hello"を保持する静的配列を参照するようになる
 ```
-このようなsampleクラスが上の条件を満たしています。  
+このようなsampleクラスが上の条件を満たしています。
+
 コンパイル時にメモリを確保してそれを実行時まで残すことを話していたのに、なぜか開放している・・・
 
 どういうことかというと、この場合のsmple::~sample()は必要なものですが呼ばれないものです。Non-transient allocationとなる場合に、このデストラクタは見かけ上コンパイル時に確保したメモリを全て解放しているように見せるためにあります。  
@@ -324,7 +325,7 @@ constexpr sample<char> str{"Hello."};
 #### `std::mark_immutable_if_constexpr()`
 前項でコンパイル時に解放され切らないメモリについての扱いは分かりました。しかしそこにはまだ問題があります。
 
-先のsampleクラスはNon-transient allocationとなる場合にはそのデストラクタは暗黙的なものであると言っていました。それは呼ばれることはありません。そしてそのコンパイル時動的メモリ領域は静的記憶域へ昇格されます。  
+先のsampleクラスがNon-transient allocationとなる場合にはそのデストラクタは見た目だけのもので、それは呼ばれることはありません。そしてそのコンパイル時動的メモリ領域は静的記憶域へ昇格されます。  
 では、そのメモリの内容はどの時点で決まるのでしょうか？
 
 先のsampleクラスはポインタをパブリックに公開しているのでコンパイル時のどの時点でもそれを書き換えることができます。さてその場合、呼び出し時点の値を実行時に持ち越せばいいのでしょうか？それともコンパイル時の全ての評価を待たねばならないのでしょうか？
