@@ -52,7 +52,14 @@ if(true) {
 ```
 この場合、`f(0)`も`f(1)`も評価される可能性のある文脈に現れていますが、`f(1)`の方は絶対に評価されません。しかし、この場合でもコンパイラは両方のコードをコンパイルします。この様に、評価されるとは思うけど本当にされるかどうかはわからない、という意味合いでpotentially evaluatedなのだと思われます。
 
-#### potential results（予想される結果）
+#### odr-used
+
+大さっぱに言えば、potentially evaluatedな式に含まれている変数や関数はodr-usedであると言います。  
+つまり定義が必要となるような使われ方の事で、odr-usedであれば定義が必要になります。
+
+以下、少し詳しめの考察。
+
+##### potential results（予想される結果）
 ある式がpotentially evaluatedであるとき、その結果として想定される式の集まりをpotential resultsといいます。
 
 - 式がid-expression（他の式を含まない単一の式）ならば、potential resultsはその式のみ
@@ -82,13 +89,6 @@ int n = b ? (1, S::x)  // S​::​x is not odr-used here
 この例で、`n`の初期化式のpotential resultsには最初の`S::x`及び`f(S::x)`が含まれますが、`f(S::x)`の引数の式`S::x`は含まれません。
 
 potential resultsに含まれる式は、必ずしもpotentially evaluatedではありません。
-
-#### odr-used
-
-大さっぱに言えば、potentially evaluatedな式に含まれている変数や関数はodr-usedであると言います。  
-つまり定義が必要となるような使われ方の事で、odr-usedであれば定義が必要になります。
-
-以下、少し詳しめの考察。
 
 ##### 変数
 
@@ -137,13 +137,20 @@ non-trivialな特殊メンバ関数を呼び出さない定数式とならない
 
 
 #### 特殊メンバ関数が実装されるとき
-ユーザー定義されていない特殊メンバ関数はコンパイラによって暗黙の宣言が行われ、odr-usedされたときに初めて暗黙に定義されます。
+ユーザー定義されていない特殊メンバ関数はコンパイラによって暗黙の宣言が行われ、odr-usedされたときに初めて暗黙に定義されます。  
+仮に最適化等によってそのodr-usedが最終的に消え去ったとしても、その時点で定義されます。
 
 実は、常に定義されているわけではないのです。
 
 odr-usedされたとき、なので`sizeof`等の未評価オペランド内では宣言のみで定義がないことになります。
 
 ### 問題
+以下は[P0859R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0859r0.html)によって欠陥修正されていない世界のお話です。
+この変更は欠陥の修正なので過去のバージョンにさかのぼって適用されています。なので、clangやgccでは一部の問題が早い段階から修正されているようです。
+
+#### その1
+[Core Issue 1581](http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#1581)より
+
 ```cpp
 struct duration {
   constexpr duration() {}
@@ -157,9 +164,37 @@ int main()
   std::cout << n;
 }
 ```
-コンパイルエラー : [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/NeVfflG6R807YydL)  
-コメントを外す : [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/uMlwuCST5e0QM8g7)
+コンパイルエラー : [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/NeVfflG6R807YydL) 
 
+一見コンパイルの通りそうなこのコードは、C++17までの規格に則るとエラーとなります。なぜでしょう？
+
+`int n = sizeof(short{duration(duration())});`
+
+ここの行に注目すると、オペランド中の`duration(duration())`は`duration`クラスのコピー/ムーブコンストラクタを要求しています。`duration`クラスはそれらを宣言すらしていないので、コンパイラによって暗黙に宣言されています。
+
+しかし`sizeof`のオペランドは未評価オペランドであり、odr-usedではないため`duration`のコピー/ムーブコンストラクタは暗黙定義されません。従って、未定義の関数を呼び出す形になるため定数式では無くなります。ただし、宣言はあるのでコンパイルエラーにはなりません。  
+残るのは、`duration -> short`の変換です。これには`duration::operator int()`が使われて、`int -> short`の変換になりますが、これは縮小変換になるのでコンパイルエラーになります。
+
+なるほど、一つづつ見ていくと納得の動作ですね。  
+では次に、その上の行にあるコメントを外してみましょう！
+
+コメントを外すと : [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/uMlwuCST5e0QM8g7)
+
+コンパイル通りました。なぜでしょうか・・・
+
+`duration d = duration();`
+
+この行では`duration`クラスの変数宣言とデフォルト構築を行っています。最終的にはデフォルトコンストラクタのみになるとはいえ、形式的には左辺でデフォルト構築した一時オブジェクトを右辺`d`にムーブして構築する形になります。つまり、ここで`duration`のムーブコンストラクタはodr-usedされるので、暗黙に定義されます。
+
+そして次の行に行くわけですが、`duration`のムーブコンストラクタは既に定義されているため、`duration`の構築から`int`のリテラル0の変換までが定数式で実行可能になります。そこから`short`への変換ですが、縮小変換であっても、変換元の定数値が変換先の型で表現可能であれば定数実行可能になります。  
+この結果、`sizeof`のオペランドはすべて定数実行可能であり、`short`の定数値0になります。`sizeof`は結果として`short`のサイズを恙なく出力し、何のエラーも起こりません。
+
+何とも奇妙な振舞です。  
+これらの奇妙な振舞の根本は特殊メンバ関数（この場合ムーブコンストラクタ）の暗黙定義のタイミングと定数実行が行われるコンテキストが曖昧であることにあります。
+
+#### その2
+[P1065r0](www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1065r0.html
+)および、[llvm bug 23135](https://bugs.llvm.org/show_bug.cgi?id=23135)より
 
 ```cpp
 template<typename T>
@@ -186,8 +221,16 @@ int main() {
   return 0;
 }
 ```
+ [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/xkl1Uxt4xH9Zkc7U)
 
+一つ目の`decltype(f(0)) a;`は`int a;`と同じ意味であり、`f(0)`はconstexprでもないので何の問題もなく実行可能です。
 
+`decltype(g(0)) b;`も同じであるはずです。しかし、`g(0)`は定数実行可能でありコンパイラが貪欲に定数化しようとした結果、未評価オペランドのはずなのに`g<int>(int)`の定義が評価されてしまい、`int`はメンバ関数`get`を持たないことからコンパイルエラーを引き起こします。
+
+これは明らかにバグですが、根本原因は定数実行が行われるコンテキストが曖昧であることにあります。
+
+#### その3
+[Core Issue 1581](http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#1581)より
 ```cpp
 template<int N>
 struct U {};
@@ -200,10 +243,28 @@ constexpr int h(T) { return T::error; }
 template<typename T>
 auto f(T t) -> U<g(T()) + h(T())> {}
 
-int f(...);
+int f(...) { return 0;}
 
 int k = f(0);
 ```
+失敗例： [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/cca8pP5XNo3GIkxE)   
+成功例： [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/F2hGCM3qZYmwgFDW)
+
+これは少し複雑ですが、最終的に`k = f(0);`によって呼ばれる`f`は引数がellipsisである方が想定されます。
+
+`template<typename T> auto f(T t) -> U<g(T()) + h(T())> {}`
+
+問題となるのはここの関数定義です。特に変数後置部`U<g(T()) + h(T())>`の`operator+`の評価順によって分岐します。  
+
+その左辺`g(T())`を先に評価する場合、`g(int)`はconstexprでなく定義もないので定数実行できません。そのため、定数式ではないことが分かります。そのため、`U`の非型テンプレートパラメータは確定できず、その時点で以降の式を評価する必要がないことが分かるため`h(T())`は評価されず、SFINAEによってもう一つの`f()`を見に行きます。
+
+右辺`h(T())`が先に評価される場合は必ずコンパイルエラーを引き起こします。  
+`h<int>(int)`単体はconstexpr指定されており、定数実行可能である可能性があります。そのためコンパイラは定義を見に行きます。結果、`int`はメンバ変数`error`を持たないためエラーになりますが、このエラーが引き起こされるところはSFINAEによって継続される文脈ではないのでコンパイルエラーを引き起こしてしまいます。
+
+この場合の問題は、constexpr関数のインスタンス化が必要かどうかが不明瞭であることです。  
+ある意味引数評価順序依存という未定義動作を踏んでいるわけですが、どちらにしてもSFINAEしてほしいものです。
+
+#### その4
 
 ```cpp
 #include <type_traits>
@@ -239,7 +300,8 @@ int main()
 - [5.2 未評価オペランド（unevaluated operand） - C++11の文法と機能(C++11: Syntax and Feature)](http://ezoeryou.github.io/cpp-book/C++11-Syntax-and-Feature.xhtml#unevaluated_operand)
 - [リンク時に関連するルールの話 - ここは匣](http://fimbul.hateblo.jp/entry/2014/12/11/000123)
 - [mainとodr-usedとpotentially evaluatedの関係 - Qita](https://qiita.com/yohhoy/items/e06227ab0a5c1f579e35)
-- [Clause 15 [special] - N4659](https://timsong-cpp.github.io/cppwp/n4659/special)
+- [15 Special member functions - N4659](https://timsong-cpp.github.io/cppwp/n4659/special)
+- [15.8.1 Copy/move constructors - N4659](https://timsong-cpp.github.io/cppwp/n4659/class.copy#ctor-12)
 - [P1065R0 : constexpr INVOKE](https://wg21.link/p1065)
 - [P0859R0 : Core Issue 1581: When are constexpr member functions defined?](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0859r0.html)
 - [1581. When are constexpr member functions defined? - C++ Standard Core Language Active Issues, Revision 100](http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#1581)
