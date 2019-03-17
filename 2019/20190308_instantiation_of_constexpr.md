@@ -27,7 +27,7 @@ int main()
 ただし、`noexcept`以外は型名を指定することができ、その場合の型名オペランドはunevaluated operandではありません。
 
 #### potentially evaluated（おそらく評価される）
-ある式がunevaluated operandでなくその一部分でもないとき、その式はpotentially evaluatedと言われます。評価される（evaluated）のでその式に関わる関数や型には定義が必要になる可能性があります。
+ある式がunevaluated operandでなくその部分式（subexpression）でもないとき、その式はpotentially evaluatedと言われます。評価される（evaluated）のでその式に関わる関数や型には定義が必要になる可能性があります。
 
 ```cpp
 template<typename T>
@@ -54,8 +54,29 @@ if(true) {
 
 #### odr-used
 
-大さっぱに言えば、potentially evaluatedな式に含まれている変数や関数はodr-usedであると言います。  
-つまり定義が必要となるような使われ方の事で、odr-usedであれば定義が必要になります。
+大さっぱに言えば、potentially evaluatedな式に含まれている変数や関数はほぼodr-usedとなります。つまりは、定義が必要となる使われ方の事で、odr-usedであれば定義が必要になります。
+
+potentially evaluatedであってodr-usedとならない例は、static constなメンバ変数を定数式でrvalueに変換する場合や、最終的に結果が捨てられる形（discarded-value expression）になる場合などです。
+
+```cpp
+struct S;
+
+S* ps{};  //ポインタは不完全型でも宣言可能、odr-usedではない
+
+struct S { 
+  static const int x = 0; 
+};
+
+decltype(&S::x) p{};  //unevaluated operandなので、odr-usedではない
+
+int f() {
+  S::x;  //discarded-value expression、odr-usedではない
+  return S::x;  //lvalue -> rvalue変換が定数式で可能、odr-usedではない
+}
+
+```
+
+<!-- 
 
 以下、少し詳しめの考察。
 
@@ -89,7 +110,6 @@ int n = b ? (1, S::x)  // S​::​x is not odr-used here
 この例で、`n`の初期化式のpotential resultsには最初の`S::x`及び`f(S::x)`が含まれますが、`f(S::x)`の引数の式`S::x`は含まれません。
 
 potential resultsに含まれる式は、必ずしもpotentially evaluatedではありません。
-
 ##### 変数
 
 potentially evaluatedな式`ex`に含まれている変数`x`は、以下の両方を満たさない場合に（`ex`によって）odr-usedされると言います。
@@ -128,25 +148,72 @@ non-trivialな特殊メンバ関数を呼び出さない定数式とならない
 `x`に左辺値→右辺値変換を適用すると、なので実際に適用されている必要があるわけではありません。odr-usedであるかどうか確認するために適用するわけです。
 
 2. `x`がオブジェクトならば、`ex`は外側の式`e`のpotential resultsの一つ。
-    - そのような`e`はdiscarded-value expressionであるか、左辺値→右辺値変換が適用されている式。
+    - そのような`e`はdiscarded-value expressionであるか、左辺値→右辺値変換が適用されている式。 -->
 
 
 
 
 ##### 関数
 
+関数名がpotentially evaluatedな式に現れるとき、以下の場合にodr-usedされます。
+- 関数は名前探索のただ一つの結果、であるか
+- オーバーロード候補の一つである
 
-#### 特殊メンバ関数が実装されるとき
-ユーザー定義されていない特殊メンバ関数はコンパイラによって暗黙の宣言が行われ、odr-usedされたときに初めて暗黙に定義されます。  
+ただし、以下を満たしていること
+- その関数が純粋仮想関数ならば、明示的な修飾名で呼び出されていること
+- 式の結果がメンバポインタとならない
+
+クラスのコピー・ムーブコンストラクタは、それが最適化などの結果によって省略されたとしても、odr-usedされています。
+
+また、純粋仮想関数ではない仮想関数は常にodr-usedされます。
+
+明示的な修飾名で呼び出されている純粋仮想関数とは、以下のような呼び出しの事です。
+```cpp
+struct base {
+  virtual int f() = 0;
+};
+
+int base::f() {
+  return 0;
+}
+
+struct derived : base {
+  int f() override {
+    return 10;
+  }
+};
+
+base* b = new derived{};
+
+auto n = b->f();        //通常の仮想関数呼び出し、odr-usedでない
+auto m = b->base::f();  //明示的な修飾名での呼び出し、odr-used
+//n == 10, m == 0
+```
+つまり、明示的な修飾名での呼び出しはもはや仮想関数呼び出しではなく、通常の純粋仮想関数の呼び出しはodr-usedではありません。
+
+#### クラスの特殊メンバ関数が実装されるとき
+クラスの特殊メンバ関数とは、デフォルト・コピー・ムーブコンストラクタ、コピー・ムーブ代入演算子、デストラクタ、の事です。
+
+ユーザー定義されていないクラスの特殊メンバ関数はコンパイラによって暗黙の宣言が行われ、odr-usedされたときに初めて暗黙に定義されます。  
 仮に最適化等によってそのodr-usedが最終的に消え去ったとしても、その時点で定義されます。
 
 実は、常に定義されているわけではないのです。
 
 odr-usedされたとき、なので`sizeof`等の未評価オペランド内では宣言のみで定義がないことになります。
 
-### 問題
+#### constexpr関数の実行と評価のタイミング
+constexpr関数は定数式から呼び出されたときにインスタンス化され、実行されます。  
+定数式となるには定数式で現れてはいけない構文が現れなければ定数式となり、コンパイル時に実行可能になります。
+
+これを説明しだすと止まらないので、詳しくは以下をご参照ください。  
+[5.22 定数式（Constant expressions） - C++11の文法と機能(C++11: Syntax and Feature)](http://ezoeryou.github.io/cpp-book/C++11-Syntax-and-Feature.xhtml#expr.const)
+
+しかし、定数実行を行うコンテキストについては規定がありません。そのためコンパイラは可能な限り定数式を処理し、コンパイル時に値を確定させようとします。それが未評価オペランドであっても例外ではありません・・・
+
+### 問題となるコード例
 以下は[P0859R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0859r0.html)によって欠陥修正されていない世界のお話です。
-この変更は欠陥の修正なので過去のバージョンにさかのぼって適用されています。なので、clangやgccでは一部の問題が早い段階から修正されているようです。
+この変更は欠陥の修正なので過去のバージョンにさかのぼって適用されています。なので、clangやgccでは一部の問題が早い段階から修正されているようです。  
+そのために問題が確認できるコンパイラが古いものであることがあります。Wandbox様々です。
 
 #### その1
 [Core Issue 1581](http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#1581)より
@@ -173,7 +240,7 @@ int main()
 ここの行に注目すると、オペランド中の`duration(duration())`は`duration`クラスのコピー/ムーブコンストラクタを要求しています。`duration`クラスはそれらを宣言すらしていないので、コンパイラによって暗黙に宣言されています。
 
 しかし`sizeof`のオペランドは未評価オペランドであり、odr-usedではないため`duration`のコピー/ムーブコンストラクタは暗黙定義されません。従って、未定義の関数を呼び出す形になるため定数式では無くなります。ただし、宣言はあるのでコンパイルエラーにはなりません。  
-残るのは、`duration -> short`の変換です。これには`duration::operator int()`が使われて、`int -> short`の変換になりますが、これは縮小変換になるのでコンパイルエラーになります。
+残るのは、`duration -> short`の変換です。これには`duration::operator int()`が使われて`int -> short`の変換となり、これは縮小変換になるためリスト初期化（波かっこ初期化）において許可されないのでコンパイルエラーになります。
 
 なるほど、一つづつ見ていくと納得の動作ですね。  
 では次に、その上の行にあるコメントを外してみましょう！
@@ -186,7 +253,7 @@ int main()
 
 この行では`duration`クラスの変数宣言とデフォルト構築を行っています。最終的にはデフォルトコンストラクタのみになるとはいえ、形式的には左辺でデフォルト構築した一時オブジェクトを右辺`d`にムーブして構築する形になります。つまり、ここで`duration`のムーブコンストラクタはodr-usedされるので、暗黙に定義されます。
 
-そして次の行に行くわけですが、`duration`のムーブコンストラクタは既に定義されているため、`duration`の構築から`int`のリテラル0の変換までが定数式で実行可能になります。そこから`short`への変換ですが、縮小変換であっても、変換元の定数値が変換先の型で表現可能であれば定数実行可能になります。  
+そして次の行に行くわけですが、`duration`のムーブコンストラクタは既に定義されており、それは暗黙定義のものであり、メンバや基底も特に無いためconstexprになります。その結果`duration`の構築から`int`のリテラル0の変換までが定数式で実行可能になります。そこから`short`への変換ですが、縮小変換であっても、変換元の定数値が変換先の型で表現可能であれば定数実行可能になります。  
 この結果、`sizeof`のオペランドはすべて定数実行可能であり、`short`の定数値0になります。`sizeof`は結果として`short`のサイズを恙なく出力し、何のエラーも起こりません。
 
 何とも奇妙な振舞です。  
@@ -223,7 +290,7 @@ int main() {
 ```
  [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/xkl1Uxt4xH9Zkc7U)
 
-一つ目の`decltype(f(0)) a;`は`int a;`と同じ意味であり、`f(0)`はconstexprでもないので何の問題もなく実行可能です。
+一つ目の`decltype(f(0)) a;`は`int a;`と同じ意味であり、`f(0)`はconstexprでもないので何の問題もなくコンパイル可能です。
 
 `decltype(g(0)) b;`も同じであるはずです。しかし、`g(0)`は定数実行可能でありコンパイラが貪欲に定数化しようとした結果、未評価オペランドのはずなのに`g<int>(int)`の定義が評価されてしまい、`int`はメンバ関数`get`を持たないことからコンパイルエラーを引き起こします。
 
@@ -261,10 +328,10 @@ int k = f(0);
 右辺`h(T())`が先に評価される場合は必ずコンパイルエラーを引き起こします。  
 `h<int>(int)`単体はconstexpr指定されており、定数実行可能である可能性があります。そのためコンパイラは定義を見に行きます。結果、`int`はメンバ変数`error`を持たないためエラーになりますが、このエラーが引き起こされるところはSFINAEによって継続される文脈ではないのでコンパイルエラーを引き起こしてしまいます。
 
-この場合の問題は、constexpr関数のインスタンス化が必要かどうかが不明瞭であることです。  
-ある意味引数評価順序依存という未定義動作を踏んでいるわけですが、どちらにしてもSFINAEしてほしいものです。
+この場合の問題は、constexpr関数のインスタンス化が必要かどうかが不明瞭であることです。エラーになるのかならないのか、はっきりしてほしい所です。
 
 #### その4
+[Core Issue 1581](http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#1581)より
 
 ```cpp
 #include <type_traits>
@@ -286,15 +353,89 @@ int main()
   g<A>();
 }
 ```
+失敗例： [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/33m59K6TZlMrbsQO)   
+成功例： [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/TIZZX0jZo5AoGjxg)
+
+この例はより深淵に踏み込みます。
+
+一つ目の`g()`の戻り値型`decltype(std::is_scalar<T>::value ? T::fail : f(T()))`の評価タイミングが問題です。
+
+constexpr関数がいつインスタンス化するのか？すなわち、構文解析時にここが評価されたとき、`f(T())`がインスタンス化されるかどうかで結果が変わります。
+
+構文解析時にconstexpr関数がインスタンス化される場合、`f(T())`がインスタンス化され、型`A`には単項`+`演算子のオーバーロードはないのでインスタンス化に失敗しエラーとなります。
+
+（構文解析の後の）定数評価時にconstexpr関数がインスタンス化される場合、一つ目の`g()`の戻り値は構文解析時に確定しているので`f(T())`のインスタンス化は（構文解析時も含めて）行われず、つつがなくコンパイルは終了します。
+
+この問題は、constexpr関数のインスタンス化がいつ行われるのか？が曖昧であることが原因で、つまりは定数実行されるコンテキストが明確ではないことが原因です。
+
 
 ### 解決のための変更
 
-#### namedとodr-used
+上記の問題に共通することは、定数式が実行されるコンテキストが曖昧であるために、constexpr関数がインスタンス化されるタイミングも不明解になってしまっている、という事です。
 
-#### potentially constant evaluated
+では、P0859はこれらをどのように解決するのでしょうか？
 
-#### needed for constant evaluation
+#### named by（指名される）
 
+まず、関数のodr-usedについてが以下のように変更されます。
+
+ある関数が、式もしくは何らかの変換の中でnamed byである（指名される）とは
+- 関数は名前探索のただ一つの結果、であるか
+- その式・変換に際し必要となる関数呼び出しについてのオーバーロード候補の一つである
+
+ただし、以下を満たしていること
+- その関数が純粋仮想関数ならば、明示的な修飾名で呼び出されていること
+- 式の結果がメンバポインタとならない
+
+純粋仮想関数ではない仮想関数は常にodr-usedされ、そうでない関数はpotentially-evaluatedな式・変換から指名された（named by）ときにodr-usedされる。
+
+named byという言葉が間に入っただけで実質あまり変わっていません。named byという言葉は後で使います。
+
+#### potentially constant evaluated（おそらく定数評価される）
+
+ある式がpotentially constant evaluatedであるとは、以下の時です
+- manifestly constant-evaluatedな（間違いなく定数評価される）式
+  - 定数式
+  - constexpr if文の条件式
+  - consteval関数の呼び出し
+  - 制約式（コンセプト！）
+  - 定数によって初期化される変数の初期化式
+  - 定数式で使用可能な変数の初期化式
+    - constexpr変数
+    - 参照型
+    - const修飾された整数型
+    - enum型
+- potentially evaluatedな式
+- リスト初期化子の直接の部分式
+- テンプレートパラメータに依存する変数名に対するアドレス取得
+- 上記いずれかの部分式が、ネストした未評価オペランドの部分式ではない
+
+このルールは定数式が実行されうるコンテキストを定めたものと言えます。これらのコンテキストでは定数式が実行されるかもしれません。
+
+manifestly constant-evaluatedな式とは、`std::is_constant_evaluated() == true`となる式の事でもあります。
+
+ネストした未評価オペランドの部分式とは、`sizeof`の中に`sizeof`があるような場合です。
+```cpp
+constexpr int a = 0, b = 1;
+
+auto s = sizeof(sizeof(a + b));   //この場合、`sizeof(size_t)`であることが明らかなので
+                                  //定数式`a+b`はpotentially constant evaluatedではない
+```
+
+#### needed for constant evaluation（定数評価に必要）
+
+ある関数がpotentially constant evaluatedな式から指名（named by）される時、needed for constant evaluationであると言われます。
+
+また、ある変数の名前がpotentially constant evaluatedな式に現れる時、needed for constant evaluationであると言われます。  
+ただし、そのような変数はconstexpr変数、参照型、const修飾された整数型のいずれかであるときに限ります。
+
+#### クラスの特殊メンバ関数が実装されるタイミング
+ユーザー定義されていないクラスの特殊メンバ関数はコンパイラによって暗黙の宣言が行われ、odr-usedされたときに初めて暗黙に定義される、というのが今までの動作でした。
+
+C++20ではそこに加えて、needed for constant evaluationであるときにも暗黙に定義されるようになります。  
+これにより、未評価オペランドの定数式内であっても暗黙に定義されるようになります。
+
+#### で、結局
 
 ### 参考文献
 - [5.2 未評価オペランド（unevaluated operand） - C++11の文法と機能(C++11: Syntax and Feature)](http://ezoeryou.github.io/cpp-book/C++11-Syntax-and-Feature.xhtml#unevaluated_operand)
