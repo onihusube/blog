@@ -524,5 +524,6 @@ g<A>();
 - [P1065R0 : constexpr INVOKE](https://wg21.link/p1065)
 - [P0859R0 : Core Issue 1581: When are constexpr member functions defined?](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0859r0.html)
 - [1581. When are constexpr member functions defined? - C++ Standard Core Language Active Issues, Revision 100](http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#1581)
+- [Should decltype(foo(1)) instantiate the constexpr function template foo? - stackoverflow](https://stackoverflow.com/questions/40593515/should-decltypefoo1-instantiate-the-constexpr-function-template-foo)
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190308_instantiation_of_constexpr.md)
