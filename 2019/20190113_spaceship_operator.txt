@@ -57,12 +57,15 @@ public:
 class C {
 //省略
 
-   bool operator==(const C& rhs) const { return *this <=> rhs == 0; }
-   bool operator!=(const C& rhs) const { return *this <=> rhs != 0; }
+   //bool operator==(const C& rhs) const { return *this <=> rhs == 0; }
+   //bool operator!=(const C& rhs) const { return *this <=> rhs != 0; }
    bool operator< (const C& rhs) const { return *this <=> rhs <  0; }
    bool operator> (const C& rhs) const { return *this <=> rhs >  0; }
    bool operator<=(const C& rhs) const { return *this <=> rhs <= 0; }
    bool operator>=(const C& rhs) const { return *this <=> rhs >= 0; }
+
+   bool operator==(const C& rhs) const = default;  //実装は後述
+   bool operator!=(const C& rhs) const { return !(*this == rhs); }
 };
 ||<
 この様な形になるでしょう。（ちなみに、宇宙船演算子の優先順位は他のすべての比較演算子よりも高くされています。）
@@ -74,6 +77,9 @@ class C {
 オーバーロード解決の結果a&lt;=&gt;bが選ばれたら、a@b → a&lt;=&gt;b@0、のように書き換える。
 オーバーロード解決の結果b&lt;=&gt;aが選ばれたら、b@a → 0@b&lt;=&gt;a、のように書き換える。
 そして、そのように書き換えた式が比較演算子@であるかのように実行されます。この書き換えは上の定義と同じである事が分かるでしょう。
+
+ただし、等値比較演算子（operator==,operator!=）は宇宙船演算子を用いて生成されません。operator==は独自に、operator!=はoperator==を利用してそれぞれ実装されます。
+しかし、宇宙船演算子を=defaultで宣言しておけばoperator==が自動実装されるので、2つの等値比較演算子も利用可能になります。
 
 
 **対称性
@@ -100,12 +106,14 @@ auto comp2 = 2.0 <=> a;     //こっちも出来てほしい、comp > 0
 つまり、a@bと書いてもb&lt;=&gt;aが、b@aと書いてもa&lt;=&gt;bがオーバーロード解決の候補に入るため、片方だけ書いておけば良いのです。
 @が&lt;=&gt;の場合、書き換えによって冗長な呼び出しとなる場合は書き換えは行われません。つまり、a&lt;=&gt;bと呼ばれた場合の候補はa&lt;=&gt;bと0&lt;=&gt;(b&lt;=&gt;a)の二つになり、a&lt;=&gt;b → (a&lt;=&gt;b)&lt;=&gt;0のような書き換えは行われません（逆も同様）。
 
+等値比較演算子の場合も同様に、a==b(a!=b)と書いてもb==a(b!=a)がオーバーロードの候補に入れられるのでどちらか片方があればよくなります。
+
 
 **default実装
 宇宙船演算子が非テンプレートの非staticメンバ関数であり、そのクラスのconst参照を引数にとる宣言のみdefault指定することができ、コンパイラ様に実装して頂くことが可能です。
-そのようなdefault実装は、基底クラス及びメンバ変数の辞書式比較によって実装されます。
+そのようなdefault実装は、基底クラス及びメンバ変数の辞書式比較によって実装されます。同時に宣言されるoperator==も同様の実装になります。
 辞書式比較とは要するに、ある順番で並んでいる要素をその順番で比較していく方法です。std::tieを使って変数の比較をまとめて行う時も辞書式比較が用いられます。
-defaultの&lt;=&gt;は以下のように比較を行います。
+defaultの&lt;=&gt;(==)は以下のように比較を行います。
 +基底クラスの&lt;=&gt;を呼び出し比較する。その順番は左から右（:の後に書いてある順）へ深さ優先で実行。
 +次に、宣言された順でメンバ変数の&lt;=&gt;を呼び出し比較を行う。
 --その際、配列はその要素に添え字順で&lt;=&gt;を適用する。
@@ -131,10 +139,23 @@ public:
       if (auto comp = array[2] <=> that.array[2]; comp !=0) return cmp;
       return str <=> that.str;
    }
+
+   //auto operator==(const D&) const = default;
+   auto operator==(const D& that) const {
+      if (auto comp = static_cast<const Base1&>(*this) == static_cast<const Base1&>(that); comp != true) return false; 
+      if (auto comp = static_cast<const Base2&>(*this) == static_cast<const Base2&>(that); comp != true) return false;
+      if (auto comp = x == that.x; comp != true) return false;
+      if (auto comp = y == that.y; comp != true) return false;
+      if (auto comp = v == that.v; comp != true) return false;
+      if (auto comp = array[0] == that.array[0]; comp != true) return false;
+      if (auto comp = array[1] == that.array[1]; comp != true) return false;
+      if (auto comp = array[2] == that.array[2]; comp != true) return false;
+      return str == that.str;
+   }
 };
 ||<
 つまりはこの様な実装になることになります。もし辞書式順序かつ宣言とは違う順番に比較したいときはこのような形で自前実装する必要があります。
-基底クラスの比較順が深さ優先とは、基底クラスのdefault実装&lt;=&gt;を呼び出したときに、同じことが基底クラスの&lt;=&gt;でも行われるためです。
+基底クラスの比較順が深さ優先とは、基底クラスのdefault実装&lt;=&gt;(==)を呼び出したときに、同じことが基底クラスの&lt;=&gt;(==)でも行われるためです。
 
 ***戻り値型
 default実装される宇宙船演算子の戻り値の型は後述するComparison category types（比較カテゴリ型）と呼ばれる5つの型のいずれかになります。同様に、組み込み/STLの宇宙船演算子もComparison category typesのいずれかの型を返します。
