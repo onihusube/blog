@@ -434,6 +434,7 @@ operator==のdefault実装は最初の方で説明したように、基底・メ
 **任意のクラス型の非型テンプレートパラメータとしての使用
 
 この項目は、前項の変更の余波により宇宙船演算子との関連が薄くなったのでページを移しました。
+[https://onihusube.hatenablog.com/entry/2019/03/23/141537:embed:cite]
 
 <!--
 任意のクラス型（共用体を含まない）がmutable・volatileなメンバを持たず、strong structural equality（後述）であり、default実装の宇宙船演算子がpublicアクセス可能であり、constexprに構築可能であるとき、そのクラスは非型テンプレートパラメータとして利用することができるようになります。

@@ -41,10 +41,15 @@ constexpr base const* b2 = &d2;
 constexpr int n1 = b1.f();   //n1 == 10
 constexpr int n2 = b2->f();  //n2 == 20
 ```
-この様なコードが動くようになるはずです（おそらく）。
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/mWChtjk8RYRkMukD)  
+この様なコードが動くようになります。
 
 このコードのように、非constexprな仮想関数をconstexprな仮想関数でオーバーライドすることができますし、その逆（constexpr仮想関数を非constexpr仮想関数でオーバーライド）も可能です。  
 また、const修飾はしておかないと実行時に呼び出すことができなくなります（constexprに初期化された変数は実行時にはconstになっているため）。
+
+ただし、constexprなポインタ・参照はstatic変数やグローバル変数のように、staticストレージと呼ばれるところにあるものしか参照できません。  
+なので、ローカルconstexpr変数を束縛したポインタ・参照からは仮想関数だけでなくいかなる関数呼び出しもできません。  
+（[@mokamukurugaさん、ご教授ありがとうございました！](https://twitter.com/mokamukuruga/status/1109410491158269952)）
 
 最基底で定義された仮想関数はそのconstexprの有無に関わらず派生クラスにおいてconstexprの有る無し両方でオーバーライドできます。その際、途中のオーバーライドが非constexprであっても、最終的に呼び出される最派生（most derived）のオーバーライドがconstexprであれば定数実行可能です。
 
@@ -271,6 +276,83 @@ int main()
 
 また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。同時に、実行時に選択される方のステートメントでもconstexpr関数で現れてはいけない構文が現れてはいけません（例えば、`throw`や`goto`、`reinterpret_cast`）。
 
+#### `true`と評価されるところ
+`std::is_constant_evaluated()`は、manifestly constant-evaluated（間違いなく定数評価される）という式の中で`true`となります。
+
+manifestly constant-evaluatedな式とは以下のようなものです。
+
+- 定数式
+- constexpr if文の条件式
+- consteval関数の呼び出し（consteval関数の中身）
+- 制約式（コンセプト）
+- 定数初期化（constant initialization）できる変数の初期化式
+- 定数式で使用可能な変数の初期化式
+  - constexpr変数
+  - 参照型
+  - const修飾された整数型
+  - enum型
+
+難しく書いてありますが、要するにコンパイル時計算中に`true`となるという事です。  
+サンプルコードを見てみましょう（ドラフト規格文書より）
+
+```cpp
+//(1)
+template<bool>
+struct X {};
+X<std::is_constant_evaluated()> x; // type X<true>
+
+//(2)
+int y;
+const int a = std::is_constant_evaluated() ? y : 1; // dynamic initialization to 1
+double z[a];  // ill-formed: "a" is not "usable in constant expressions"
+
+//(3)
+const int b = std::is_constant_evaluated() ? 2 : y; // static initialization to 2 
+
+//(4)
+int c = y + (std::is_constant_evaluated() ? 2 : y); // dynamic initialization to y+y
+
+//(5)
+constexpr int f() {
+  const int n = std::is_constant_evaluated() ? 13 : 17; // n == 13
+  int m = std::is_constant_evaluated() ? 13 : 17; // m might be 13 or 17 (see below)
+  char arr[n] = {}; // char[13]
+  return m + sizeof(arr);
+}
+
+int p = f();     // m == 13; initialized to 26
+int q = p + f(); // m == 17 for this call; initialized to 56
+```
+
+さて、これらの場合に`std::is_constant_evaluated()`はどちらに評価されるのでしょうか？順に考えていきましょう。
+
+(1)はクラスXのテンプレートパラメータ指定時に呼ばれています。  
+Xのテンプレート引数は`bool`の非型テンプレートパラメータなので、その初期化式は定数式です。結果は`true`になります。
+
+(2)は`const int`な変数`a`の初期化式で呼ばれています。  
+これは定数式ですので（上記「定数初期化（constant initialization）できる変数の初期化式」に当たります）まず結果は`true`になります。しかしその場合は非constexprで未初期化の変数`y`を用いて初期化することになり、これは定数実行不可なので定数式では初期化されません。  
+そのため、`a`の初期化はコンパイル時ではなく実行時に行われ、その場合の結果（と我々から見た結果）は`false`になります。  
+これにより変数`a`は実行時に`1`で初期化されることになり、整数定数を要求する配列のサイズ指定に用いることは出来ず、配列`z`の宣言も失敗します。  
+つまりこの場合の結果は、`true`と`false`両方となります。
+
+(3)は`const int`な変数`b`の初期化式で呼ばれています。
+この結果は先ほどと逆になる事が分かるでしょう。  
+つまり、結果が`true`となる方のリテラル`2`での初期化が常に定数式で可能なため、この場合の結果は必ず`true`となります。
+
+(4)は普通の`int`の変数`c`の初期化で呼ばれます。  
+初期化式にはいきなり非定数の未初期化変数`y`がでてきます。この時点で定数式ではないので、この場合の結果は必ず`false`です。
+
+(5)は少し複雑です。
+まずは`int p = f();`で、`f()`の中で呼ばれます。  
+`f()`はconstexpr関数であり`int`は定数初期化が可能ですのでこの場合の初期化式は定数式になります（上記「定数初期化（constant initialization）できる変数の初期化式」に当たります）。  
+そのため`f()`はコンパイル時に実行され、中の`is_constant_evaluated()`は全て`true`になります。
+結果、コンパイル時の`f()`は`26`を返し、`int p`は`26`で定数初期化されます。
+
+次に、`int q = p + f();`ですが、`p`は定数初期化されているだけで定数ではありません。なので、これは定数式ではありません。  
+そのため`f()`は実行時に実行されます。その時の`f()`内では、`int m`の初期化式の`is_constant_evaluated()`だけが`false`になります（`const int n`の初期化式は常に定数実行、つまり`true`になります）。  
+結果`m`は`17`になるので、実行時の`f()`は`30`を返します。`p`は`26`で定数初期化されているので、`q`は実行時に`56`で初期化されます。
+
+
 
 ### consteval（immediate function : 即時関数）
 constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行可能であることを表明します。  
@@ -291,7 +373,7 @@ int x = 10;
 int sqr = square(x);   //compile error! can't executed at compile time.
 ```
 変数`sqc`の初期化はconstexprが付加されていることもあり定数式で実行可能ですので、`square(10)`はコンパイル時に実行され、`sqc == 100`になります。  
-一方、`sqr`はconstexprではなく別の非constexprな変数`x`を介していることもあり、constexpr実行不可能なのでその時点でコンパイルエラーを発生させます。  
+一方`sqr`の初期化では、`square`即時関数の引数が非constexprな変数`x`になっているために即時実行不可なのでその時点でコンパイルエラーを発生させます。  
 また、consteval関数内に定数実行不可能な処理がある場合もコンパイルエラーです。
 
 consteval関数はほかのどの関数よりも早く実行されます。すなわち、constexpr関数の実行時点にはconsteval関数の実行は終わっていなければなりません。  
@@ -299,11 +381,11 @@ consteval関数はほかのどの関数よりも早く実行されます。す�
 
 ```cpp
 consteval int sqrsqr(int n) {
-  return sqr(sqr(n)); //この時点では定数評価されてないが、エラーにはならない
+  return square(square(n)); //この時点では定数評価されてないが、エラーにはならない
 }
 
 constexpr int dblsqr(int n) {
-  return 2*sqr(n); // compile error! 囲む関数はconstevalではない
+  return 2*square(n); // compile error! 囲む関数はconstevalではない
 }
 ```
 
@@ -328,7 +410,8 @@ constexpr int sqc = sq(10);
 ```
 そのほかの性質はconsteval関数に準じます。
 
-consteval指定されるのはあくまで関数呼び出し演算子なので、このラムダ式を受けている変数自体は即時評価される必要はありません。あくまで関数呼び出しが即時評価されます。
+consteval指定されるのはあくまで関数呼び出し演算子なので、このラムダ式を受けている変数自体は即時評価される必要はありません。あくまで関数呼び出しが即時評価されます。  
+とはいえ、キャプチャをする場合の変数は定数、もしくはconsteval関数によって初期化されるリテラル型である必要があるはずです。
 
 consteval関数はアドレスを取れないことから関数ポインタなどで持ち回れないので、可搬にするのに利用すると良いかもしれません。  
 後は通常のローカル関数としての利用でしょうか。
@@ -371,7 +454,7 @@ consteval関数は実行時には跡形もなく消え去るため、consteval�
 
 ```cpp
 constexpr int test_vector() {
-  std::vector<double> v = {5, 3, 2, 9, 1, 0, 4};
+  std::vector<int> v = {5, 3, 2, 9, 1, 0, 4};
   v.push_back(11);
 
   int s{};
@@ -379,7 +462,7 @@ constexpr int test_vector() {
     s += n;
   }
 
-  return n;
+  return s;
 }
 
 constexpr auto sum = test_vector(); //ok. sum == 35
