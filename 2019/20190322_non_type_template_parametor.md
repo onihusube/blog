@@ -45,8 +45,8 @@ struct fixed_string {
       std::copy_n(array, N + 1, str);
    }
 
-   auto operator<=>(const fixed_string&) = default;
-
+   //auto operator<=>(const fixed_string&) = default;
+   auto operator==(const fixed_string&) = default;
    CharT str[N + 1];
 };
 
