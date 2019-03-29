@@ -48,12 +48,12 @@ constexpr int n2 = b2->f();  //n2 == 20
 また、const修飾はしておかないと実行時に呼び出すことができなくなります（constexprに初期化された変数は実行時にはconstになっているため）。
 
 ただし、constexprなポインタ・参照はstatic変数やグローバル変数のように、staticストレージと呼ばれるところにあるものしか参照できません。  
-なので、ローカルconstexpr変数を束縛したポインタ・参照からは仮想関数だけでなくいかなる関数呼び出しもできません。  
+なので、ローカルconstexpr変数をポインタ・参照に入れることは出来ません。  
 （[@mokamukurugaさん、ご教授ありがとうございました！](https://twitter.com/mokamukuruga/status/1109410491158269952)）
 
 しかし、constexpr関数の内部で利用する分にはその制約は受けず、そのconstexpr関数が定数実行されれば目的を達せます。  
 [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/CUE6S95SDCyTWOOx)  
-この例は引数に渡してますが、完全にconstexpr関数内で生成から仮想関数呼び出しまでを普通に行っても問題ありません。
+この例でもは引数に渡してますが、完全にconstexpr関数内で生成から仮想関数呼び出しまでを完結させても問題ありません。
 
 最基底で定義された仮想関数はそのconstexprの有無に関わらず派生クラスにおいてconstexprの有る無し両方でオーバーライドできます。その際、途中のオーバーライドが非constexprであっても、最終的に呼び出される最派生（most derived）のオーバーライドがconstexprであれば定数実行可能です。
 
@@ -380,7 +380,7 @@ int sqr = square(x);   //compile error! can't executed at compile time.
 一方`sqr`の初期化では、`square`即時関数の引数が非constexprな変数`x`になっているために即時実行不可なのでその時点でコンパイルエラーを発生させます。  
 また、consteval関数内に定数実行不可能な処理がある場合もコンパイルエラーです。
 
-consteval関数はほかのどの関数よりも早く実行されます。すなわち、constexpr関数の実行時点にはconsteval関数の実行は終わっていなければなりません。  
+consteval関数はほかのどの関数よりも早く実行され、consteval関数が出現したらほぼその場で実行されます。つまり、constexpr関数実行時点ではその内部のconsteval関数実行は終了しています。  
 ただし、consteval関数の中でconsteval関数が呼び出されている場合はそうではなく、そのように囲んでいるconsteval関数が最終的に定数評価されればエラーにはなりません。
 
 ```cpp
@@ -392,7 +392,9 @@ constexpr int dblsqr(int n) {
   return 2*square(n); // compile error! 囲む関数はconstevalではない
 }
 ```
-つまりはconsteval関数呼び出しが実行時まで残っている可能性のある場合にエラーとなり、実行時には必ず定数値に置き換えられていなければなりません。
+つまりはconsteval関数呼び出しが実行時まで残っている可能性のある場合にエラーとなり、実行時には必ず結果となる定数値に置き換えられていなければなりません。
+
+また、consteval関数内にconstexpr関数呼び出しがあっても良いようです。
 
 そのように、コンパイル時には全て終わっているという性質のためconsteval関数のアドレスを取ることは出来ません。そのような行為を働いた時点でコンパイルエラーとなります。  
 ただし、consteval関数内で扱われている限りはconsteval関数のアドレスを扱うことができます。
@@ -406,7 +408,7 @@ constexpr int r = h();  //ok
 constexpr auto e = g(); //compile error! consteval関数のアドレスは定数式として許可されない
 ```
 
-この即時関数はコンパイラのフロントエンドで処理され、バックエンドはその存在を知りません。すなわち、関数形式マクロ（悪名高いWindows.hのmin,maxマクロのようなプリプロセッサ）の代替として利用することができます。
+このような性質から、即時関数はコンパイラのフロントエンドで処理され、バックエンドはその存在を知りません。すなわち、関数形式マクロ（悪名高いWindows.hのmin,maxマクロのようなプリプロセッサ）の代替として利用することができます。
 
 デメリットとしてはテンプレートメタプログラミングと同じでデバッグが困難であることです。constexpr関数であれば通常の関数としてデバッグ可能ですが、consteval関数は実行時には跡形も残りませんので通常の手段ではデバッグできません。
 
@@ -415,7 +417,7 @@ constexpr auto e = g(); //compile error! consteval関数のアドレスは定数
 consteval指定はコンストラクタに行うこともできます。そのようなコンストラクタもまた即時関数となり、そのコンストラクタを通じた初期化は他のconsteval関数と同じタイミング（constexprコンストラクタよりも早い）で行われます。  
 コンストラクタに付ける場合に（そのクラスに）必要な要件・制限はconstexpr指定したのとほぼ同じです。
 
-constevalコンストラクタの挙動は通常のconsteval関数と全く同じです。  
+constevalコンストラクタの挙動は通常のconsteval関数と同じです。  
 すなわち、その初期化は定数かリテラル型を通して行われなければならず、constexpr関数内で使用される場合はその関数が実行される時点で既に初期化が終了していなければなりません。  
 そして、実行時にはそのコンストラクタは残らないため、実行時にconstevalコンストラクタは使用不可能になります。アドレスも取得不可です。
 
@@ -446,7 +448,7 @@ consteval auto make_immediate(int m, double d) -> immediate {
 }
 
 constexpr auto make_immediate2(int m, double d) -> immediate {
-  return immediate{m, d};  //ng
+  return immediate{m, d};  //ng、この関数はconstevalではない
 }
 
 int main() {
@@ -458,10 +460,10 @@ int main() {
   immediate im3{n, d};  //ng
   auto im4 = make_immediate(n, d);  //ng
 
-  immediate im5{30, 1.618};  //おそらくok、即時生成した一時オブジェクトをムーブする
+  immediate im5{30, 1.618};  //ok?、即時生成した一時オブジェクトをムーブする?
 
-  constexpr auto m = int(im1)    + im2;  //ok, m == 30
-  constexpr auto e = double(im1) + im2;  //ok, e == 5.859
+  constexpr auto m = int(im1)    + int(im2);     //ok, m == 30
+  constexpr auto e = double(im1) + double(im2);  //ok, e == 5.859
   
   std::cout << int(im1)    << ", " << int(im2)    << std::endl;  //ok
   std::cout << double(im1) << ", " << double(im2) << std::endl;  //ok
@@ -486,10 +488,9 @@ constexpr int sqc = sq(10);
 そのほかの性質はconsteval関数に準じます。
 
 consteval指定されるのはあくまで関数呼び出し演算子なので、このラムダ式を受けている変数自体は即時評価される必要はありません。あくまで関数呼び出しが即時評価されます。  
-ただし、キャプチャをする場合の変数は定数、もしくはconsteval関数によって初期化されるリテラル型である必要があるはずで、その場合はラムダ式を受けている変数にconstexprが必須になると思われます（ラムダ式の生成する関数オブジェクトの初期化がconstevalコンストラクタを通して行われるため）。
+ただし、キャプチャをする場合の変数は定数、もしくはconsteval関数によって初期化されるリテラル型である必要があり、その場合はラムダ式を受けている変数にconstexprが必須になるかもしれません（ラムダ式の生成する関数オブジェクトの初期化がconstevalコンストラクタを通して行われるため）。
 
-consteval関数はアドレスを取れないことから関数ポインタなどで持ち回れないので、可搬にするのに利用すると良いかもしれません。  
-後は通常のローカル関数としての利用でしょうか。
+consteval関数を持ち回るのに利用すると良いかもしれません。後は通常のローカル関数としての利用でしょうか。
 
 #### consteval仮想関数
 仮想関数がconstexpr指定できるようになったので、当然のように？consteval指定することもできます。ただし、constexprが非constexpr仮想関数をオーバーライドしたり出来るのに対して、constevalはconsteval同士の間でしかオーバーライドしたり/されたりしてはいけません。
