@@ -412,14 +412,14 @@ constexpr auto e = g(); //compile error! consteval関数のアドレスは定数
 
 #### constevalコンストラクタ
 
-consteval指定はコンストラクタに行うこともできます。そのようなコンストラクタもまた即時関数となり、そのコンストラクタを通じた初期化は他のconsteval関数と同じタイミング（constexprコンストラクタを持つリテラル型よりも早い）で行われます。  
+consteval指定はコンストラクタに行うこともできます。そのようなコンストラクタもまた即時関数となり、そのコンストラクタを通じた初期化は他のconsteval関数と同じタイミング（constexprコンストラクタよりも早い）で行われます。  
 コンストラクタに付ける場合に（そのクラスに）必要な要件・制限はconstexpr指定したのとほぼ同じです。
 
 constevalコンストラクタの挙動は通常のconsteval関数と全く同じです。  
-すなわち、その初期化は完全な定数かconstevalなリテラル型を通して行われなければならず、constexpr関数内で使用される場合はその関数が実行される時点で既に初期化が終了していなければなりません。  
+すなわち、その初期化は定数かリテラル型を通して行われなければならず、constexpr関数内で使用される場合はその関数が実行される時点で既に初期化が終了していなければなりません。  
 そして、実行時にはそのコンストラクタは残らないため、実行時にconstevalコンストラクタは使用不可能になります。アドレスも取得不可です。
 
-つまりは、constevalコンストラクタのみを持つようなクラスは（consteval関数以外から見ると）完全な定数として振舞い、実行時に生成することができなくなります。
+つまりは、constevalコンストラクタのみを持つようなクラスは（consteval関数以外から見ると）定数として振舞い、実行時に生成することができなくなります。
 
 ```cpp
 struct immediate {
@@ -445,6 +445,10 @@ consteval auto make_immediate(int m, double d) -> immediate {
   return immediate{m, d};
 }
 
+constexpr auto make_immediate2(int m, double d) -> immediate {
+  return immediate{m, d};  //ng
+}
+
 int main() {
   constexpr immediate im1{10, 3.141};  //ok
   constexpr auto im2 = make_immediate(20, 2.718);  //ok
@@ -463,10 +467,9 @@ int main() {
   std::cout << double(im1) << ", " << double(im2) << std::endl;  //ok
 }
 ```
-この様な`immediate`クラスはもはや実行時にオブジェクトを生成することはできません。ただし、その特殊メンバ関数はconstexprに暗黙定義されており、コピーやムーブは実行時でも可能なはずです。  
-ただし、暗黙定義される特殊メンバ関数はconsteval関数にはなりません。
+この様な`immediate`クラスはもはや実行時にオブジェクトを生成することはできません。ただし、その特殊メンバ関数はconstexprに暗黙定義されており、コピーやムーブは実行時でも可能なはずです（現状では、暗黙定義される特殊メンバ関数はconsteval関数にはなりません）。
 
-その他のメンバ関数にもつけることはできますが、デストラクタには付けることはできません。
+その他のメンバ関数にもconstevalをつけることができますが、デストラクタに付けることはできません。
 
 #### constevalラムダ
 consteval指定はラムダ式に対しても行えます。その場合、ラムダ式によって生成される暗黙の関数オブジェクトの関数呼び出し演算子がconsteval関数になります。  
