@@ -4,6 +4,8 @@
 
 ※内容はC++20正式策定までに変化する可能性があります。
 
+[:contents]
+
 集成体初期化（Aggregate Initilization）とは、配列か集成体（Aggregate）となる条件を満たしたクラスに対して行える特別な初期化方法の事です。
 
 C++17まではこれは波かっこ"{}"の時にのみ使用することができ、丸かっこ"()"による初期化は常にその型のコンストラクタを呼び出していました。  
@@ -11,7 +13,7 @@ C++17まではこれは波かっこ"{}"の時にのみ使用することがで�
 
 ```cpp
 struct aggregate {
-  int a;
+  int a = -10;
   double b;
 };
 
@@ -21,12 +23,19 @@ aggregate b(10, 3.14);  //ok
 aggregate c = {20, 2.72};  //ok
 aggregate d = (20, 2.72);  //ng
 
+aggregate e();  //ok e.a == -10, e.b == 0.0
+
 int arr1[]{0, 1, 2, 3};  //ok
 int arr2[](0, 1, 2, 3);  //ok
 
 int arr3[] = {0, 1, 2, 3};  //ok
 int arr4[] = (0, 1, 2, 3);  //ng
+
+int arr5[4](0, 1) //ok 残りの要素は0で初期化
 ```
+
+波かっこの時と同じように、初期化子の数が足りないときはデフォルトメンバ初期化で初期化され、それもない場合は値初期化（デフォルトコンストラクタを呼び出すような初期化）されます。  
+逆に、初期化子の数が多すぎる場合はコンパイルエラーになります。これも波かっこと同じです。
 
 丸かっこによる集成体初期化はなるべく波かっこによるものと同じように実行されます。一方で、今までの丸かっこによる初期化の持つ意味が変わらないようにもなっています。  
 そのため、波かっこによる集成体初期化と少し異なる挙動をするところがあります。
@@ -107,7 +116,7 @@ if (auto [end, err] = std::to_chars(begin, std::end(str), 3.141592653589793); er
 ネストする波かっこ省略とは → [宣言時のメンバ初期化を持つ型の集成体初期化を許可 - cpprefjp](https://cpprefjp.github.io/lang/cpp14/brace_elision_in_array_temporary_initialization.html)
 
 波かっこ初期化時はネストしている内部の型に対する波かっこ初期化時に、一番外側以外の波かっこを省略できます。しかし、丸かっこではできません・・・。  
-何故かというと、ネストする丸かっこにはすでに意味があるからです。
+また、ネストする初期化のために丸かっこを使うと意図しない結果になります。何故かというと、ネストする丸かっこにはすでに意味があるからです。
 
 ```cpp
 //この二つは同じ意味
@@ -119,9 +128,11 @@ int arr3[2][2]({1, 2}, {3, 4}); //ok
 
 //できない・・・
 int arr4[2][2](1, 2, 3, 4);   　//ng
-int arr5[2][2]((1, 2), (3, 4)); //ng
+int arr5[2][2]((1, 2), (3, 4)); //ng (2, 4)と書いたのと同じになるがどのみちできない
 ```
-おそらく3次元以上の配列の場合は2番目の波かっこの内側では省略できます。そんなこと普通しないのであまり意味は無いですが・・・
+おそらく3次元以上の配列の場合は丸かっこ内の波かっこのさらに内側では波かっこを省略できます。そんな配列初期化は普通しないと思うのであまり意味は無いですが・・・
+
+そして、丸かっこ初期化の内側でさらに丸かっこを使う場合は、通常のかっこに囲まれた式として処理されてしまい、内側のカンマはカンマ演算子として解釈されます。
 
 クラス型の集成体の場合
 ```cpp
@@ -134,15 +145,145 @@ std::array<int, 3> arr3({ 1, 2, 3 }); //ok
 
 //できない・・・
 std::array<int, 3> arr4( 1, 2, 3 );   //ng
+std::array<int, 3> arr4(( 1, 2, 3 )); //ng arr4(3)と同じ、どのみちできない
 ```
+
+丸かっこ初期化の内側に丸かっこを使えないのはおそらくどうしようもないですが、波かっこ省略はそのうち可能になるような気はします。
 
 ### 一時オブジェクトの寿命延長（されない！）
 
+ドラフト規格文書より、以下のコードをご覧ください。
+
+```cpp
+struct A {
+  int a;
+  int&& r;
+};
+
+int f();  //実装略
+int n = 10;
+
+A a1{1, f()};                   // OK, lifetime is extended
+A a2(1, f());                   // well-formed, but dangling reference
+A a3{1.0, 1};                   // error: narrowing conversion
+A a4(1.0, 1);                   // well-formed, but dangling reference
+A a5(1.0, std::move(n));        // OK
+```
+
+### Designated Initialization（できない！！）
+Designated Initializationについて → [Designated Initialization @ C++ - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20170820/p1)
+
+Designated Initialization（指示付初期化）は同じくC++20より可能になる集成体初期化の新しい形です。  
+その名の通り、集成体要素を直接指定する形で初期化を行います。
+
+```cpp
+struct aggregate {
+  int a = -10;
+  double b;
+};
+
+aggregate a = {.a = 10, .b = 3.14};
+
+union U {
+  char c;
+  float f;
+};
+
+U u = {.f = 2.72};
+```
+この様に、どの変数をどの初期化子で初期化しているのかが見やすくなり、特に共用体においては最初に初期化するアクティブメンバを選択できるようになります。
+
+しかし、残念なことに、このDesignated Initializationは波かっこによる集成体初期化時にしか使えません。丸かっこでは、できません・・・・
+
 ### 引数の評価順序
+
+丸かっこによる集成体初期化時、渡された初期化子リスト内の要素の評価順序は左から右と規定されます。  
+これは波かっこと異なる動作ではなく同じ動作で、むしろ今までの丸かっこによるコンストラクタ呼び出しと異なる動作です。
+
+詳細には、集成体（クラス、配列）の`n`個の要素を先頭（基底クラス→メンバの順）から`1 <= i < j <= n`となるように添え字付けしたとして、`i`番目の要素の初期化に関連するすべての値の計算（value computation）及び副作用（side effect）は、`j`番目の要素の初期化の開始前に位置づけられる（sequenced before）、ように規定されます。
+
+つまり、かっこの種類にかかわらず集成体初期化を行う場合は、初期化子に与えた式の順序に依存するようなコードを書いても未定義動作にならず意図したとおりの結果を得ることができます。
+
+```cpp
+{
+  int i{};
+
+  int array[]{++i, ++i, ++i, ++i};
+  //array = {0, 1, 2, 3}
+}
+
+{
+  int i{};
+
+  int array[](++i, ++i, ++i, ++i);
+  //array = {0, 1, 2, 3}
+}
+
+//集成体でない
+struct int_4 {
+  int_4(int a, int b, int c, int d)
+    : a1{a}, a2{b}, a3{c}, a4{d}
+    {}
+
+  int a1, a2, a3, a4;
+};
+
+{
+  int i{};
+
+  int_4 m{++i, ++i, ++i, ++i};
+  //m = {0, 1, 2, 3}
+}
+
+{
+  int i{};
+
+  //undefined behavior, a1~a4にどの値が入るか（++iがどの順で実行されるか）は未定義
+  int_4 m(++i, ++i, ++i, ++i);
+}
+
+//集成体
+struct agg_int_4 {
+  int a1, a2, a3, a4;
+};
+
+{
+  int i{};
+
+  agg_int_4 m(++i, ++i, ++i, ++i);
+  //m = {0, 1, 2, 3}
+}
+```
+
+この様に、丸かっこによる初期化時にコンストラクタを呼び出しときは相変わらず未定義動作となってしまう点は注意です。
 
 ### この変更の目的
 
 この様になんだか複雑さを増した上に影響範囲がでかそうな変更をなぜ行ったのかというと、STLにおける`make_~`系や`emplace`系の関数に代表される、内部で要素を構築するような関数において、集成体初期化が行われないことをどうにかするためです。
 
+例えば`std::make_from_tuple`関数の実装例を見てみると
+```cpp
+template<class T, class Tuple, std::size_t... Index>
+constexpr T make_from_tuple_impl(Tuple&& t, std::index_sequence<Index...>){
+  //ここで、Tのコンストラクタを呼びだしている
+  return T(std::get<Index>(std::forward<Tuple>(t))...);
+}
+
+template <class T, class Tuple>
+constexpr T make_from_tuple(Tuple&& t) {
+  return make_from_tuple_impl(std::forward<Tuple>(t), std::make_index_sequence<std::tuple_size_v<std::decay_t<Tuple>>>{});
+}
+```
+`make_from_tuple_impl`内で`T`を"()"で初期化することでコンストラクタを呼び出しています。"{}"ではないので集成体初期化が行われることはありません。  
+これは、与えられた引数（この場合は`t`に含まれる要素）が空か、`T`かその派生型のただ一つだけ、で無ければ集成体は構築できないことを意味しています。  
+じゃあここを"{}"にすればいいじゃん？と思うかもしれませんが、上で述べた縮小変換が禁止されていることによって多くのケースで謎のエラーが発生することになるのでそれは解決にならないのです。
+
+この関数だけでなく、STLコンテナや`std::optional`等Vocabulary typesにある`emplace`系関数のように便利に広く使われるものでも同様の問題が発生しており、解決のために丸かっこによる集成体初期化が許可されました。
+
+この変更によってこれらの関数は集成体を問題なく内部で構築できるようになり、丸かっこと波かっこの間の初期化に関するセマンティクスの一貫性が少し改善されることになります（むしろ悪化・・・？）。
+
 ### 参考文献
 - [P0960R3 : Allow initializing aggregates from a parenthesized list of values](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0960r3.html)
+- [コピー初期化 - cppreference.com](https://ja.cppreference.com/w/cpp/language/copy_initialization)
+- [XOR swap今昔物語: sequence pointからsequenced-beforeへの変遷 - Qita](https://qiita.com/yohhoy/items/ab15739c99d3f8872407)
+- [std::make_from_tuple - cpprefjp](https://cpprefjp.github.io/reference/tuple/make_from_tuple.html)
