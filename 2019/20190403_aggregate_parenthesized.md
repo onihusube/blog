@@ -160,7 +160,10 @@ struct A {
   int&& r;
 };
 
-int f();  //実装略
+int f() { 
+  return -1;
+}
+
 int n = 10;
 
 A a1{1, f()};                   // OK, lifetime is extended
@@ -169,6 +172,44 @@ A a3{1.0, 1};                   // error: narrowing conversion
 A a4(1.0, 1);                   // well-formed, but dangling reference
 A a5(1.0, std::move(n));        // OK
 ```
+コメントにもある通り、右辺値参照メンバ`A::r`を`f()`の戻り値やリテラル`1`という`prvalue`で初期化するときに問題が起きています（縮小変換によるエラーはここでは関係ありません）。
+
+まず、`prvalue`を右辺値参照（もしくはconst左辺値参照）に束縛する（結びつける）と`xvalue`な一時オブジェクトに変換されたうえで、結びつけられます。
+
+波かっこ初期化ではそのような一時オブジェクトは集成体要素の右辺値参照（`A::r`）に直接結び付ける（形になる）ため、その一時オブジェクトの寿命は結びつけた参照（`A::r`）の寿命まで延長されます。
+
+しかし、丸かっこによる集成体初期化ではそのような一時オブジェクトの寿命の延長がありません。正確にはその一時オブジェクトが生成された後の最初のセミコロンまでは延長されます。  
+つまりは、初期化の完了後に一時オブジェクトの寿命は尽きることになり、メンバの参照は不正な参照となります。これを何か利用することは未定義動作です。
+
+左辺値（`n`）を`move`した後の値（`xvalue`）は一時オブジェクトではないので、先ほどの規則には当てはまらず、右辺値参照（const左辺値参照）に束縛すればその参照の寿命まで延長されます。
+
+なぜこのような謎な仕様になっているかははっきりとしませんが、従来の丸かっこによるコンストラクタ呼び出しとの一貫性を確保するためだと思われます。  
+コンストラクタでメンバの右辺値参照を初期化するときは、一時オブジェクト等はコンストラクタ引数の右辺値参照でいったん受けてから、メンバ初期化子リストで`move`することになります。
+
+```cpp
+struct A {
+  A(int&& arg)
+    : r(std::move(arg))
+  {}
+
+  int&& r;
+};
+
+
+int n = 10;
+
+//共にA::rが不正な参照になることはない
+A a(1);
+A b(std::move(n));
+```
+
+これであれば、2回寿命延長が入ることで結果的にその参照の寿命まで一時オブジェクトの寿命は延長されることになります。
+
+丸かっこによる集成体初期化時もこの様な挙動を前提にしており、一旦コンストラクタ引数で受けてから各メンバの初期化を行うような挙動をとります（実際にそのように行われる訳ではありませんが）。その際、`move`するかしないかを引数型から推測することには問題があるため、メンバ初期化リストでの`move`は行われず、2度目の寿命延長が発生しません。  
+その結果初期化終了後に一時オブジェクトの寿命が尽きることになるのだと思われます。
+
+
+右辺値参照メンバなんてものはそうそう使うことはないでしょうが、これがconst 左辺値参照メンバならばたまに使う事があるでしょう。その際も同じ罠が待ち構えていることになるので注意せねばなりません・・・
 
 ### Designated Initialization（できない！！）
 Designated Initializationについて → [Designated Initialization @ C++ - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20170820/p1)
@@ -284,6 +325,9 @@ constexpr T make_from_tuple(Tuple&& t) {
 
 ### 参考文献
 - [P0960R3 : Allow initializing aggregates from a parenthesized list of values](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0960r3.html)
+- [［C++］集成体の要件とその変遷 -  地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2019/02/22/201044)
 - [コピー初期化 - cppreference.com](https://ja.cppreference.com/w/cpp/language/copy_initialization)
 - [XOR swap今昔物語: sequence pointからsequenced-beforeへの変遷 - Qita](https://qiita.com/yohhoy/items/ab15739c99d3f8872407)
+- [値カテゴリ - cppreference.com](https://ja.cppreference.com/w/cpp/language/value_category)
+- [一時具体化（Temporary materialization conversion） - cppreference.com](https://ja.cppreference.com/w/cpp/language/implicit_conversion#Temporary_materialization)
 - [std::make_from_tuple - cpprefjp](https://cpprefjp.github.io/reference/tuple/make_from_tuple.html)
