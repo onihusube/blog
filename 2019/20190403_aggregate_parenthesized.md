@@ -303,7 +303,7 @@ struct int_4 {
 {
   int i{};
 
-  //undefined behavior, a1~a4にどの値が入るか（++iがどの順で実行されるか）は未定義
+  //unspecified behavior, a1~a4にどの値が入るか（++iがどの順で実行されるか）は未規定
   int_4 m(++i, ++i, ++i, ++i);
 }
 
@@ -319,6 +319,7 @@ struct agg_int_4 {
   //m = {0, 1, 2, 3}
 }
 ```
+（[@yohhoyさんご指摘ありがとうございました！](https://twitter.com/yohhoy/status/1114541900768243712)）
 
 この様に、丸かっこによる初期化時にコンストラクタを呼び出しときは相変わらず未定義動作となってしまう点は注意です。
 
