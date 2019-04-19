@@ -120,3 +120,4 @@ int main()
 - [@kazatsuyuさん](https://twitter.com/kazatsuyu/status/1118111753122902017)
 - [@hoge_fuga_0000さん](https://twitter.com/hoge_fuga_0000/status/1118123498432372736)
 
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190419_lambda_operator_plus.md)
