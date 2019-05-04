@@ -227,31 +227,31 @@ struct derived : base {
 constexpr bool allocate_test1() {
   std::allocator<derived> alloc{};
   //メモリ確保と構築
-  base* d = alloc.allocate(1);
-  d = std::construct_at(d);  // d = new(d) base{};と等価
+  derived* d = alloc.allocate(1);
+  base* b = std::construct_at(d);  // b = new(d) derived{};と等価
 
-  auto b = d->f();
+  auto r = b->f();
 
   //オブジェクト破棄とメモリ解放
-  std::destroy_at(d);  // d->~base();と等価
+  std::destroy_at(b);  // b->~base();と等価
   alloc.deallocate(d, 1);
 
-  return b;
+  return r;
 }
 
 constexpr bool allocate_test2() {
   std::allocator<derived> alloc{};
   //メモリ確保と構築
-  base* d = alloc.allocate(1);
-  std::construct_at(d);  // d = new(d) base{};と等価
+  derived* d = alloc.allocate(1);
+  base* b = std::construct_at(d);  // b = new(d) derived{};と等価
 
-  auto b = d->f();
+  auto r = d->f();
 
   //忘れる
-  //std::destroy_at(d);
-  //alloc.deallocate(p, 1);
+  //std::destroy_at(b);
+  //alloc.deallocate(d, 1);
 
-  return b;
+  return r;
 }
 
 constexpr bool b1 = allocate_test1();  //ok
@@ -376,6 +376,8 @@ constexpr sample<char> str{"Hello."};
 //strは"Hello"を保持する静的配列を参照するようになる
 ```
 この様にしておけば、`str`はその後どう弄繰り回されても実行時から見たら`Hello`を保持するようになります。
+
+これらの多大なる努力によってコンパイル時メモリ確保に関する障害がほぼ取り除かれ、全人類の夢であったコンパイル時動的メモリ確保が可能になることになります（予定）。
 
 ### 参考文献
 - [P0784R2 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r2.html)
