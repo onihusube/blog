@@ -8,12 +8,12 @@ C++17で追加された`std::from_chars`はその効果の説明においてCラ
 それについては少し厄介な書き方をされているため、この記事はそこを読み解くためのメモです。
 
 ### C++17 `std::from_chars`
-C++17(N4659) §23.2.9 [utility.from.chars]の`std::from_chars`の関数の効果は以下のように記述されています。
+C++17(N4659) §23.2.9 [utility.from.chars]の`std::from_chars`関数の効果は以下のように記述されています。
 
-整数型のオーバーロード
+整数型のオーバーロードの効果
 > The pattern is the expected form of the subject sequence in the "C" locale for the given nonzero base, as described for strtol, (以下略
 
-浮動小数点型のオーバーロード
+浮動小数点型のオーバーロードの効果
 > The pattern is the expected form of the subject sequence in the "C" locale, as described for strtod, (以下略
 
 両方をまとめてざっと訳すと
@@ -24,7 +24,7 @@ C++17(N4659) §23.2.9 [utility.from.chars]の`std::from_chars`の関数の効果
 （subject sequenceは説明のため、expected formはピッタリな訳が思いつかないのでそのままにしておきます・・・）
 
 ### C11 strtol, strtod
-C11(N1570) §7.22.1.3, §7.22.1.4 の`strtol, strtod`では以下のように記述されています（長いので一部抜粋）。
+C11(N1570) §7.22.1.3, §7.22.1.4 の`strtol, strtod`関数の所には以下のように記述されています（長いので一部抜粋）。
 
 `strtod`
 >First, they decompose the input string into three parts: an initial, possibly empty, sequence of white-space characters (as speciﬁed by the isspace function), a subject sequence resembling a ﬂoating-point constant or representing an inﬁnity or NaN; and a ﬁnal string of one or more unrecognized characters, including the terminating null character of the input string.  
@@ -48,8 +48,8 @@ C11(N1570) §7.22.1.3, §7.22.1.4 の`strtol, strtod`では以下のように記
 > 入力文字列がexpected formでない場合、subject sequenceは空になる。
 
 ### subject sequence
-賢い人はお気づきかもしれません、C++の`std::from_chars`の効果の説明における`subject sequence`という言葉は明らかにCの`strtol, strtod`における`subject sequence`を指しています。  
-そして、`subject sequence`は先頭のホワイトスペースのシーケンスを除いた最初の、パターンにマッチする文字列から構成されます。すなわち、`subject sequence`には先頭ホワイトスペースの文字列は含まれていません。
+この両方を参照すると、C++の`std::from_chars`の効果の説明における`subject sequence`という言葉はCの`strtol, strtod`における`subject sequence`を指している事が分かります。  
+そして、`subject sequence`は先頭のホワイトスペースのシーケンスを除いて最初に現われる、想定するパターンにマッチする文字列から構成されます。すなわち、`subject sequence`には先頭ホワイトスペースの文字列は含まれていません。
 
 また、`std::from_chars`が入力文字列中からまず探すのは`subject sequence`（のexpected form）であり、先頭ホワイトスペースについては何ら記述がありません。
 
@@ -60,3 +60,5 @@ C11(N1570) §7.22.1.3, §7.22.1.4 の`strtol, strtod`では以下のように記
 - [std::from_chars - cpprefjp](https://cpprefjp.github.io/reference/charconv/from_chars.html)
 - [Primitive numeric input conversion - N4659](https://timsong-cpp.github.io/cppwp/n4659/utility.from.chars)
 - [ISO/IEC 9899:201x DIS N1570](http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190507_from_chars_space.md)
