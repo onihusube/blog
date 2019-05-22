@@ -95,8 +95,10 @@ constexpr int a = b.f();  //a == 10
 constexpr int b = b.g();
 ```
 
+[ちなみに、純粋仮想関数の定義もconstexprにできます。](https://wandbox.org/permlink/2x1gP9U0enF6m8qn)
+
 ### dynamic_castとtype_id
-前項の内容の延長です。constexprな仮想関数が許可されたのと同様の理由により`dynamic_cast`や`type_id`も静的に解決することができます。なのでそれが可能になりました。  
+前項の内容の延長です。constexprな仮想関数が許可されたのと同様の理由により`dynamic_cast`や多態的な型のオブジェクトに対する`type_id`も静的に解決することができます。なのでそれが可能になりました。  
 また、この変更に伴って`std::type_info`の`operator==`と`operator!=`がconstexpr指定され定数式で使用可能になります。
 
 ```cpp
@@ -120,8 +122,10 @@ struct derived2 : public base {
 {
   constexpr auto&& int_t  = typeid(int);
   constexpr auto&& char_t = typeid(char);
+  //ここまではC++11以降なら可能
 
-  constexpr bool is_same = int_t == char_t;  //is_same == false
+  constexpr bool is_same = int_t == char_t;  //constexprな同値比較はC++20より
+  static_assert(is_same == false);
 }
 
 //polymorphicな型に対するtypeid
@@ -132,10 +136,11 @@ struct derived2 : public base {
   constexpr base const* b1 = &d1;
   constexpr base const* b2 = &d2;
   
-  constexpr auto&& b1_t = typeid(b1);
-  constexpr auto&& b2_t = typeid(b2);
+  constexpr auto&& b1_t = typeid(*b1);
+  constexpr auto&& b2_t = typeid(*b2);
 
-  constexpr bool is_same = b1_t == b2_t;  //is_same == false
+  constexpr bool is_same = b1_t == b2_t;
+  static_assert(is_same == false);
 }
 
 
@@ -166,12 +171,14 @@ struct derived3 : public base, public base2 {
 
 このような定数実行の中で例外を投げるような適用が行われた場合は定数実行されません。例外を投げるような適用とは、dynamic_castなら参照の変換での失敗時、typeidはnullptrを参照するポインタを受けたとき、です。
 ```cpp
-constexpr int* nullp = nullptr;
-constexpr auto&& t = typeid(nullp);  //compile error! 例外を投げるため定数実行不可
+constexpr base* nullp = nullptr;
+constexpr auto&& t = typeid(*nullp);  //compile error! 例外を投げるため定数実行不可
+
 
 constexpr derived1 d1{};
 //b1のmost derived typeはderived1
 constexpr base const& b1 = d1;
+
 //down cast
 constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile error! 例外を投げるため定数実行不可
 
@@ -285,7 +292,8 @@ int main()
 
 `if constexpr`や`static_assert`でこの関数を利用すると必ず`true`として処理されます。なので、コンパイル時と実行時で処理を分けるような目的で利用する場合は通常の`if`で分岐する必要があります。しかし、実行時まで`if`文が残る事は無いでしょう。
 
-また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。
+また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。  
+しかし、`false`となる方のステートメントにconstexpr実行不可能なもの（`throw`や`memcopy`等）が現れることは問題ありません。
 
 #### `true`と評価されるところ
 `std::is_constant_evaluated()`は、manifestly constant-evaluated（間違いなく定数評価される）という式の中で`true`となります。
@@ -467,7 +475,7 @@ int main() {
   immediate im3{n, d};  //ng
   auto im4 = make_immediate(n, d);  //ng
 
-  immediate im5{30, 1.618};  //ok?、即時生成した一時オブジェクトをムーブする?
+  immediate im5 = immediate{30, 1.618};  //ok?、即時生成した一時オブジェクトをムーブする?
 
   constexpr auto m = int(im1)    + int(im2);     //ok, m == 30
   constexpr auto e = double(im1) + double(im2);  //ok, e == 5.859
