@@ -201,16 +201,23 @@ union U {
 };
 
 //U::fを読み出しアクティブメンバをU::nに切り替える
-constexpr float change(U& u) {
-  float f = u.f;  //u.nがアクティブメンバの場合はここが定数実行不可
-  u.n = 0;  //u.nへアクティブメンバを切り替え、C++17までは定数実行不可
+constexpr float change() {
+  //fをアクティブメンバとして初期化 (Designated Initialization!)
+  U u = { .f = 3.1415f };
+
+  float f = u.f;  //u.nがアクティブメンバの場合はここは定数実行不可
+  u.n = 10;  //u.nへアクティブメンバを切り替え、C++17までは定数実行不可
+
   return f;
 }
 
-//fをアクティブメンバとして初期化 (Designated Initialization!)
-U u = { .f = 1.0f };
-constexpr auto f = change(u);
+int main()
+{
+  constexpr auto f = change();
+  static_assert(f == 3.1415f);
+}
 ```
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/KhZmpwNfPAQ0X4Nu)
 
 ただし、非アクティブなメンバへのアクセス（そこへの参照からの間接アクセスも含む）は未定義動作であり、定数式で現れてはいけません。つまりは定数式の文脈でそのようなアクセスを行った時点でコンパイル時実行不可能になります（`std::string`のsso実装がこれに当てはまってしまっています）。
 
@@ -278,7 +285,7 @@ int main()
 
 `if constexpr`や`static_assert`でこの関数を利用すると必ず`true`として処理されます。なので、コンパイル時と実行時で処理を分けるような目的で利用する場合は通常の`if`で分岐する必要があります。しかし、実行時まで`if`文が残る事は無いでしょう。
 
-また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。同時に、実行時に選択される方のステートメントでもconstexpr関数で現れてはいけない構文が現れてはいけません（例えば、`throw`や`goto`、`reinterpret_cast`）。
+また、通常の`if`を使うという事は`true`及び`false`となる両方のステートメントがコンパイル出来なければなりません。
 
 #### `true`と評価されるところ
 `std::is_constant_evaluated()`は、manifestly constant-evaluated（間違いなく定数評価される）という式の中で`true`となります。
