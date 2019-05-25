@@ -243,7 +243,7 @@ struct pair {
 このコンストラクタには要件があります。
 >型Tの選択されたコンストラクタがconstexprであれば、このコンストラクタもconstexprとなる  
 >型Uから型Tがムーブ構築可能でなければ、このオーバーロードはオーバーロード解決の候補から除外される  
->型Uから型Tに暗黙的に型変換ができる場合、このオーバーロードは非explicitとなる。
+>型Uから型Tに暗黙的に型変換ができる場合、このオーバーロードは非explicitとなる。  
 >型Uから型Tに明示的な型変換ならできる場合、このオーバーロードはexplicitとなる
 
 [§23.6.3.1 Constructors [optional.ctor] - N4659](https://timsong-cpp.github.io/cppwp/n4659/optional.ctor#23)も見るとより詳細が分かります。
