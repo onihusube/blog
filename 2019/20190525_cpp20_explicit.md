@@ -1,12 +1,14 @@
 # ［C++］explicit(bool)の使いどころ
 
+※この内容はC++20から利用可能になる予定の情報であり、一部の内容が変更される可能性があります。
+
 ### `explicit(bool)`指定子
 
-C++11よりコンストラクタに付けることのできていた`explicit`指定子は
+従来コンストラクタと変換関数に付けることのできていた`explicit`指定子は
 、C++20より`explicit(expr)`という形のものに置き換えられます。  
 かっこの中の`expr`に指定出来るのは`bool`に変換可能な定数式です。
 
-そして、その`expr`が`true`となる場合はそのコンストラクタはexplictコンストラクタになり、`false`となる場合は通常の非explicitコンストラクタとして扱われます。
+そして、その`expr`が`true`となる場合はそのコンストラクタ（変換関数）はexplictコンストラクタになり、`false`となる場合は通常の非explicitコンストラクタとして扱われます。
 
 また、従来の式を指定しない`explicit`指定は`explicit(true)`として扱われるようになります。
 
@@ -329,3 +331,5 @@ optional {
 - [条件付きexplicit指定子 - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20180609/p1)
 - [Perfect Initializationイディオム - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20150416/p1)
 - [explicit 指定子 - cppreference.com](https://ja.cppreference.com/w/cpp/language/explicit)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190525_cpp20_explicit.md)
