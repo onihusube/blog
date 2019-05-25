@@ -261,14 +261,12 @@ class optional {
 
   template<typename U=T,
     enabler<
-      std::conjunction<
-        std::is_constructible<T, U&&>,
-        std::negation<
-          std::is_same<std::decay_t<U>, in_place_t>
-        >,
-        std::negation<
-          std::is_same<optional<T>, std::decay_t<U>>
-        >
+      std::is_constructible<T, U&&>,
+      std::negation<
+        std::is_same<std::decay_t<U>, std::in_place_t>
+      >,
+      std::negation<
+        std::is_same<std::optional<T>, std::decay_t<U>>
       >,
       std::is_convertible<U&&, T>
     > = nullptr
@@ -277,14 +275,12 @@ class optional {
 
   template<typename U=T,
     enabler<
-      std::conjunction<
-        std::is_constructible<T, U&&>,
-        std::negation<
-          std::is_same<std::decay_t<U>, in_place_t>
-        >,
-        std::negation<
-          std::is_same<optional<T>, std::decay_t<U>>
-        >
+      std::is_constructible<T, U&&>,
+      std::negation<
+        std::is_same<std::decay_t<U>, std::in_place_t>
+      >,
+      std::negation<
+        std::is_same<std::optional<T>, std::decay_t<U>>
       >,
       std::negation<
         std::is_convertible<U&&, T>
@@ -304,15 +300,13 @@ optional {
 
   template<typename U=T,
     enabler<
-      std::conjunction<
-        std::is_constructible<T, U&&>,
-        std::negation<
-          std::is_same<std::decay_t<U>, in_place_t>
-        >,
-        std::negation<
-          std::is_same<optional<T>, std::decay_t<U>>
-        >
-      >
+      std::is_constructible<T, U&&>,
+      std::negation<
+        std::is_same<std::decay_t<U>, std::in_place_t>
+      >,
+      std::negation<
+        std::is_same<std::optional<T>, std::decay_t<U>>
+      >,
     > = nullptr
   >
   explicit(!std::is_convertible_v<U&&, T>)
