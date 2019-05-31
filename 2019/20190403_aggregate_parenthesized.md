@@ -120,8 +120,8 @@ if (auto [end, err] = std::to_chars(begin, std::end(str), 3.141592653589793); er
 
 <!-- ただし、このような縮小変換が許可されるのはクラス型の集成体初期化時のみで、配列に対する丸かっこ集成体初期化時は相変わらず禁止されます。配列は元々丸かっこ初期化を持っておらず、挙動が曖昧にはならないためです。 -->
 
-### ネストする波かっこ省略（できない！）
-ネストする波かっこ省略とは → [宣言時のメンバ初期化を持つ型の集成体初期化を許可 - cpprefjp](https://cpprefjp.github.io/lang/cpp14/brace_elision_in_array_temporary_initialization.html)
+### ネストするかっこの省略（できない！）
+ネストする波かっこ省略について → [宣言時のメンバ初期化を持つ型の集成体初期化を許可 - cpprefjp](https://cpprefjp.github.io/lang/cpp14/brace_elision_in_array_temporary_initialization.html)
 
 波かっこ初期化時はネストしている内部の型に対する波かっこ初期化時に、一番外側以外の波かっこを省略できます。しかし、丸かっこではできません・・・。  
 また、ネストする初期化のために丸かっこを使うと意図しない結果になります。何故かというと、ネストする丸かっこにはすでに意味があるからです。
@@ -267,7 +267,7 @@ U u(.f = 2.72);
 
 詳細には、集成体（クラス、配列）の`n`個の要素を先頭（基底クラス→メンバの順）から`1 <= i < j <= n`となるように添え字付けしたとして、`i`番目の要素の初期化に関連するすべての値の計算（value computation）及び副作用（side effect）は、`j`番目の要素の初期化の開始前に位置づけられる（sequenced before）、ように規定されます。
 
-つまり、かっこの種類にかかわらず集成体初期化を行う場合は、初期化子に与えた式の順序に依存するようなコードを書いても未定義動作にならず意図したとおりの結果を得ることができます。
+つまり、かっこの種類にかかわらず集成体初期化を行う場合は、初期化子に与えた式の順序に依存するようなコードを書いても未規定状態にならず意図したとおりの結果を得ることができます。
 
 ```cpp
 {
@@ -321,7 +321,7 @@ struct agg_int_4 {
 ```
 （[@yohhoyさんご指摘ありがとうございました！](https://twitter.com/yohhoy/status/1114541900768243712)）
 
-この様に、丸かっこによる初期化時にコンストラクタを呼び出しときは相変わらず未定義動作となってしまう点は注意です。
+この様に、丸かっこによる初期化時にコンストラクタを呼び出したときは相変わらず未規定の動作となってしまう点は注意です。
 
 ### この変更の目的
 
@@ -344,7 +344,40 @@ constexpr T make_from_tuple(Tuple&& t) {
 これは、与えられた引数（この場合は`t`に含まれる要素）が空か、`T`かその派生型のただ一つだけ、で無ければ集成体は構築できないことを意味しています。  
 じゃあここを"{}"にすればいいじゃん？と思うかもしれませんが、上で述べた縮小変換が禁止されていることによって多くのケースで謎のエラーが発生することになるのでそれは解決にならないのです。
 
-この関数だけでなく、STLコンテナや`std::optional`等Vocabulary typesにある`emplace`系関数のように便利に広く使われるものでも同様の問題が発生しており、解決のために丸かっこによる集成体初期化が許可されました。
+また、もう一つのケースとして集成体を要素とするコンテナを扱う時にも同じ問題が起こります。
+```cpp
+//集成体
+struct aggregate {
+  int n;
+  double d;
+  char c[5];
+};
+
+int main() {
+  std::vactor<aggregate> vec{};
+
+  vec.emplace_back(10, 1.0, "abc");   //compile error!
+  vec.emplace_back(aggregate{10, 1.0, "abc"});  //ok
+}
+```
+`emplace_back`は要素型のコンストラクタ引数を受け取って、内部で直接構築する関数です。その際、呼び出すのは丸かっこによるコンストラクタであり、集成体初期化を行いません。
+
+結果、1つ目の`emplace_back`はコンパイルエラーとなります。しかもこのエラーはSTL内部で発生することになるので、一見すると意味の分からないものになってしまいます。
+
+例：clang 8.0.0のエラー例
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/rQ4LS7kiOUIZnHWG)
+```
+/opt/wandbox/clang-8.0.0/include/c++/v1/memory:1826:31: error: no matching constructor for initialization of 'aggregate'
+            ::new((void*)__p) _Up(_VSTD::forward<_Args>(__args)...);
+                              ^   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/opt/wandbox/clang-8.0.0/include/c++/v1/memory:1718:18: note: in instantiation of function template specialization 'std::__1::allocator<aggregate>::construct<aggregate, int, double, char const (&)[4]>' requested here
+            {__a.construct(__p, _VSTD::forward<_Args>(__args)...);}
+                 ^
+```
+
+このエラーをよく見ると、placement newによる要素構築時に丸かっこを用いている事が分かるでしょう。
+
+これらのケースだけでなく、他のSTLコンテナや`std::optional`等Vocabulary typesにも`emplace`系関数があり、`std::pair`のpiecewise constructなど他の直接構築系の操作においても同様の問題が発生しており、この解決のために丸かっこによる集成体初期化が許可されました。
 
 この変更によってこれらの関数は集成体を問題なく内部で構築できるようになり、丸かっこと波かっこの間の初期化に関するセマンティクスの一貫性が少し改善されることになります（むしろ悪化・・・？）。
 
