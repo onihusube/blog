@@ -73,13 +73,16 @@ class C {
 
 少し詳しく書いておくと
 任意の型T1,T2の値a,bに対して、任意の比較演算子@が呼び出された場合
-まず、a@b、a&lt;=&gt;b、b&lt;=&gt;aの3つをオーバーロードの候補として加えておく。
-オーバーロード解決の結果a&lt;=&gt;bが選ばれたら、a@b → a&lt;=&gt;b@0、のように書き換える。
-オーバーロード解決の結果b&lt;=&gt;aが選ばれたら、b@a → 0@b&lt;=&gt;a、のように書き換える。
-そして、そのように書き換えた式が比較演算子@であるかのように実行されます。この書き換えは上の定義と同じである事が分かるでしょう。
++まず、a@b、a&lt;=&gt;b、b&lt;=&gt;aの3つをオーバーロードの候補として加えておく。
++オーバーロード解決の結果a&lt;=&gt;bが選ばれたら、a@b → a&lt;=&gt;b@0、のように書き換える。
++オーバーロード解決の結果b&lt;=&gt;aが選ばれたら、b@a → 0@b&lt;=&gt;a、のように書き換える。
++そして、そのように書き換えた式が比較演算子@であるかのように実行されます。この書き換えは上の定義と同じである事が分かるでしょう。
+なお、書き換えた式内の&lt;=&gt;及び==演算子に対してこの演算子生成は行われません。
 
 ただし、同値比較演算子（operator==,operator!=）は宇宙船演算子を用いて生成されません。operator==は独自に、operator!=はoperator==を利用してそれぞれ実装されます。
 しかし、宇宙船演算子を=defaultで宣言しておけばoperator==が自動実装されるので、2つの同値比較演算子も利用可能になります。
+上の手順において@が==か!=である場合、&lt;=&gt;の代わりに==を用いた書き換えが行われます。
+
 残念ながら、自分で実装を行う場合はoperator==の実装も書かなければなりません・・・
 
 
@@ -116,12 +119,15 @@ auto comp2 = 2.0 <=> a;     //こっちも出来てほしい、comp2 > 0
 結局、それぞれの演算子を書いたときに考慮される候補は以下のようになります。
 |呼び出す演算子 a@b|オーバーロード候補|
 |a &lt;=&gt; b|a &lt;=&gt; b<br> 0 &lt;=&gt; (b &lt;=&gt; a)|
-|a == b| a == b<br> b == a|
-|a != b| !(a == b)<br> !(b == a)|
+|a == b| a == b<br> (b == a) ? true : false|
+|a != b| a != b <br> (a == b) ? false : true <br> (b == a) ? false : true|
 |a &lt; b|a &lt; b<br> (a &lt;=&gt; b) &lt; 0<br> 0 &lt; (b &lt;=&gt; a)|
 |a &lt;= b|a &lt;= b<br> (a &lt;=&gt; b) &lt;= 0<br> 0 &lt;= (b &lt;=&gt; a)|
 |a &gt; b|a &gt; b<br> (a &lt;=&gt; b) &gt; 0<br> 0 &gt; (b &lt;=&gt; a)|
 |a &gt;= b|a &gt;= b<br> (a &lt;=&gt; b) &gt;= 0<br> 0 &gt;= (b &lt;=&gt; a)|
+
+この時、生成される候補の式内で使用される&lt;=&gt;及び==演算子は、型T1,T2それぞれのメンバ・非メンバ・組み込み、のものが考慮され、見つかった演算子ごとにオーバーロード候補に入れられます。
+すなわち、表内のオーバーロード候補1つに対して複数の候補が見つかることがあり得るため、a@bのオーバーロード候補は3つよりも多くなることがあります。
 
 **default実装
 宇宙船演算子が非テンプレートの非staticメンバ関数であり、そのクラスのconst参照を引数にとる宣言のみdefault指定することができ、コンパイラ様に実装して頂くことが可能です。
@@ -143,14 +149,14 @@ class D : Base1, Base2 {
 public:
    //auto operator<=>(const D&) const = default;
    auto operator<=>(const D& that) const {
-      if (auto comp = static_cast<const Base1&>(*this) <=> static_cast<const Base1&>(that); comp !=0) return cmp; 
-      if (auto comp = static_cast<const Base2&>(*this) <=> static_cast<const Base2&>(that); comp !=0) return cmp;
-      if (auto comp = x <=> that.x; comp !=0) return cmp;
-      if (auto comp = y <=> that.y; comp !=0) return cmp;
-      if (auto comp = v <=> that.v; comp !=0) return cmp;
-      if (auto comp = array[0] <=> that.array[0]; comp !=0) return cmp;
-      if (auto comp = array[1] <=> that.array[1]; comp !=0) return cmp;
-      if (auto comp = array[2] <=> that.array[2]; comp !=0) return cmp;
+      if (auto comp = static_cast<const Base1&>(*this) <=> static_cast<const Base1&>(that); comp !=0) return comp; 
+      if (auto comp = static_cast<const Base2&>(*this) <=> static_cast<const Base2&>(that); comp !=0) return comp;
+      if (auto comp = x <=> that.x; comp !=0) return comp;
+      if (auto comp = y <=> that.y; comp !=0) return comp;
+      if (auto comp = v <=> that.v; comp !=0) return comp;
+      if (auto comp = array[0] <=> that.array[0]; comp !=0) return comp;
+      if (auto comp = array[1] <=> that.array[1]; comp !=0) return comp;
+      if (auto comp = array[2] <=> that.array[2]; comp !=0) return comp;
       return str <=> that.str;
    }
 
@@ -202,16 +208,21 @@ struct C {
 
 前述のようにdefault実装/組み込み型/STLの一部の型、の宇宙船演算子は5つの比較カテゴリ型のいずれかを返します。これらの型はその比較（&lt;=&gt;）が満たしている順序や同値関係に関する性質を表しています。
 新しく追加される&lt;compare&gt;ヘッダにおいて以下の5つが定義されます。
--weak_equality（同値関係）
--strong_equality（相等関係、等価関係）
--partial_ordering（半順序）
--weak_ordering（弱順序）
--strong_ordering（強順序 = 全順序）
+
+|比較カテゴリ型|対応する2項関係|生成される演算子|
+|std::weak_equality|同値関係（相当関係も含む全ての同値関係）|* == !=|
+|std::strong_equality|相当関係（最も細かい（強い）同値関係）|* == != |
+|std::partial_ordering|半順序|* == != &lt; &lt;= &gt; &gt;= |
+|std::weak_ordering|弱順序|* == != &lt; &lt;= &gt; &gt;= |
+|std::strong_ordering|全順序|* == != &lt; &lt;= &gt; &gt;= |
+
 大きく分けると同値関係と順序の2種類があります。どちらも、partial→weak→strongの順で強く（制約がきつく）なり、逆方向への変換が可能です（暗黙変換が定義される）。
 また、orderingはequalityを包含しておりこれも変換が可能（暗黙変換が定義される）ですが、strong_equalityはstrong_orderingからしか変換できずweak_equalityはpartial_orderingとweak_orderingの両方から変換可能です。
-また、紛らわしい？ですが、weak_equalityはweak_orderingのequalityな部分（==,!=）ではありません。ほぼ気にする必要はないかもしれませんが・・・。
+また、weak_equalityはweak_orderingのequalityな部分（==,!=）ではありません。weak_orderingはweak_equalityを包含していますが、weak_equalityであっても順序律を満たさずweak_orderingとなれないことがあるためです。
 
 比較カテゴリ型の関係（矢印の方向に変換可能）: p0515r3より[https://raw.githubusercontent.com/onihusube/blog/master/2019/20190113_spaceship_operator/comparison_categories.png:image=https://raw.githubusercontent.com/onihusube/blog/master/2019/20190113_spaceship_operator/comparison_categories.png]
+
+この暗黙の変換関係はそれ自体が一つの順序を示していて、strong_equalityとpartial/weak_orderingの間に順序付けが出来ない（比較不能）ことから、この順序は半順序関係を成しています。
 
 equalityな型は==と!=、orderingな型は6つの比較演算子を用いて比較を行うことができます。その際、比較に使えるのは0リテラルのみで、0以外との比較は未定義動作とされています。例えば、nullptr_tを引数型として実装されます。
 
@@ -268,6 +279,41 @@ strongでない（partialやweakな）比較カテゴリ型による同値比較
 C++標準のソートに関わるところで要求されているのはoperator&lt;()が狭義の弱順序を満たすことです。そして、これを満たすような比較カテゴリ型はweak_orderingとstrong_orderingのみです。
 ＊_equalityとなる比較カテゴリ型は当然として、partial_orderingは順序付け比較を提供しますがそれを用いてソートをしても意味のある順序をつけることはできません。
 ソートに使用するような比較演算子を提供したい場合、定義する宇宙船演算子の返すカテゴリ型がweak_orderingかstrong_orderingのどちらかに（もしくはそれを満たすように）なるように注意しなければなりません。
+
+
+***共通比較カテゴリ型（Common comparison category type）
+宇宙船演算子の戻り値型をautoにする場合、その型は比較に参加するすべての型の宇宙船演算子による比較の結果となる比較カテゴリ型から共通して変換できる最も強い型、になります。
+そのような型を共通比較カテゴリ型と言い、共通比較カテゴリ型は以下のように決定されます。
+
+共通比較カテゴリ型をUとして、比較に参加するすべての型の宇宙船演算子による比較カテゴリ型をそれぞれ`Ti (0 <= i < N)`とすると
+
++ Tiの中に一つでも比較カテゴリ型でない型がある場合、U = void
++ Tiの中に1つでもweak_equalityかstrong_equalityがあり、それ以外のTiの中に1つでもpartial_orderingかweak_orderingがある場合、U = weak_equality
++ Tiの中に1つでもstrong_equalityがある場合、U = strong_equality
++ Tiの中に1つでもpartial_orderingがある場合、U = partial_ordering
++ Tiの中に1つでもweak_orderingがある場合、U = weak_ordering
++ それ以外の場合、U = strong_ordering
+
+これを一々考えるのは面倒なのでautoとしておくか、これを求めるために提供されるstd::common_comparison_categoryというメタ関数を使用するといいでしょう。
+
+>|cpp|
+//<compare>ヘッダにて定義
+
+namespace std {
+   template <class ...Ts>
+   struct common_comparison_category {
+      using type = /* 略 */ ; 
+   };
+
+   template <class ...Ts>
+   using common_comparison_category_t = typename common_comparison_category<Ts...>::type;
+}
+||<
+
+このメタ関数は以下のような型を返します。
+-Tsが空ならstrong_ordering
+-各Tsが&lt;=&gt;をサポートする場合、各&lt;=&gt;の返す型を変換可能な最も強い比較カテゴリ型
+-それ以外の場合はvoid
 
 <!-- 
 ***std::common_comparison_category
