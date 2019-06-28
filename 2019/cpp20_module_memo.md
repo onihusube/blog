@@ -1253,7 +1253,15 @@ X x;                // ill-formed: Xは被修飾名探索において可視で�
 意訳：ユーザー定義リテラルはモジュールリンケージを持つことができる！
 
 ### 13 Templates [temp]
-テンプレートの宣言は名前空間スコープ・クラススコープにおける宣言として現れることができる。  
-そのような宣言は、エクスポート宣言（export-declaration）であってはならない。
+- template-declaration:
+	- template-head declaration
+	- template-head concept-definition
+- template-head:
+	- template < template-parameter-list > requires-clause(opt)
 
-（おそらく、`export template<typename T> ...`というのができないと言っているのではなく、宣言のみのテンプレートのエクスポートが出来ない、と言っていると思われる）
+
+テンプレート宣言（template-declaration）は名前空間スコープ・クラススコープにおける宣言として現れることができる。  
+その宣言（template-headに続くdeclaration）は、エクスポート宣言（export-declaration）であってはならない。
+
+（`export template<typename T> ...`というのができないと言っているのではなく、`template<typename T> export ...`という宣言ができないと言っている）
+
