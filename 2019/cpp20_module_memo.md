@@ -1603,3 +1603,60 @@ pp-impotの2つ目の形式では、header-name-tokensが`#include`ディレク�
 マクロは置換されるか再定義され、そのマクロ名に対して複数のマクロ定義がアクティブとなっているとき、アクティブなマクロ定義は全て同じマクロの有効な再宣言でなければならない。  
 [Note: pp-import間の相対的な順序は、特定のマクロ定義がアクティブかどうかとは関係ない。]
 
+#### 6
+
+```cpp
+//インポート可能なヘッダ "a.h":
+#define X 123   // #1
+#define Y 45    // #2
+#define Z a     // #3
+#undef X        // a.hにおける#1の未定義点
+
+//インポート可能なヘッダ "b.h":
+import "a.h";   // b.hにおける、#1,#2,#3の定義点、#1の未定義点（正確にはセミコロンの後ろ）
+
+#define X 456   // OK, #1はアクティブでないため、新しいマクロXの定義が可能
+#define Y 6     // error: #2はアクティブなため、定義をするなら同じ内容にならなければならない
+
+//インポート可能なヘッダ "c.h":
+#define Y 45    // #4
+#define Z c     // #5
+
+//インポート可能なヘッダ "d.h":
+import "a.h";   // d.hにおける、#1,#2,#3の定義点、#1の未定義点
+import "c.h";   // d.hにおける、#4,#5の定義点
+
+int a = Y;      // OK, アクティブなマクロ定義#2と#4、#4はYの有効な再定義
+int c = Z;      // error: クティブなマクロ定義#3と#5、#5はZの有効な再定義ではない
+```
+
+## Annex C (informative) Compatibility [diff]
+
+### C.5.1 [lex]: lexical conventions [diff.cpp17.lex]
+
+Affected subclause: [lex.header]   
+Change: header-nameトークンはより多くのコンテキストで生成される  
+Rationale: 新機能に必要  
+Effect on original feature: 識別子`import`の後に`<`が続くと、header-nameトークンが形成されることがある。
+```cpp
+template<typename>
+class import {};
+
+import<int> f();                // ill-formed;（ヘッダーユニットのインポート宣言として解釈され、エラー） 以前は有効だった
+::import<int> g();              // OK
+```
+
+### C.5.2 [basic]: basics [diff.cpp17.basic]
+Affected subclauses: [basic.link], [module.unit], and [module.import]  
+Change: 特別な意味を持つ新しい識別子  
+Rationale: 新機能に必要  
+Effect on original feature: `module`または`import`で始まるトップレベル宣言は、この国際規格（C++20）では、ill-fomredとなるか解釈が異なることがある。
+```cpp
+class module;
+module *m1;         // ill-formed;（モジュール宣言とみなされる）以前は有効
+::module *m2;       // OK
+
+class import {};
+import j1;          // 以前は変数宣言、現在はインポート宣言
+::import j2;        // 変数宣言
+```
