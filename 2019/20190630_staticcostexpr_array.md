@@ -1,6 +1,6 @@
 # ［C++］static constexprな配列メンバの定義
 
-あるクラスの静的メンバ変数は通常クラス外にその定義が必要になります。
+クラスの静的メンバ変数は通常クラス外にその定義が必要になります。
 
 ```cpp
 struct sample {
@@ -46,6 +46,7 @@ constexpr int sample::m[];
 細かく説明するのは困難なので簡単に要約すると、ある変数`x`は以下の場合を除いてodr-usedされます。
 
 `x`が評価されうる式`ex`に現われていて
+
 - `x`にlvalue-rvalue変換を適用すると、非トリビアルな関数を呼び出さない定数式、で行うことができる
 - `x`は参照である
 - `x`はオブジェクトであり、かつ
@@ -105,7 +106,7 @@ C++17以降は、冒頭の`static constexpr`な配列メンバにおいても定
 クラスの静的メンバ変数に`constexpr`がついているとき、暗黙的に`inline`指定したのと同じになり、定義がその場で生成されます。  
 しかも、`inline`変数なのでヘッダに書いて複数ファイルからインクルードしてもその定義は一つに保たれるためにODR違反に悩まされることもありません。
 
-つまりはC++17以降を使いましょう、という事です・・・。
+つまりはC++17以降を使いましょう、という事ですね・・・。
 
 ### 参考文献
 - [N4659 : Working Draft, Standard for Programming Language C++](https://timsong-cpp.github.io/cppwp/n4659/)
@@ -117,3 +118,4 @@ C++17以降は、冒頭の`static constexpr`な配列メンバにおいても定
 
 - [@mokamukurugaさん](https://twitter.com/mokamukuruga/status/1144578490512969729)
 
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190630_staticcostexpr_array.md)
