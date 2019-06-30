@@ -476,9 +476,9 @@ inline関数/変数の定義は、discarded statementの外側でodr-usedされ�
 
 - translation-unit
   - top-level-declaration-seq (opt)
-  - global-module-fragment (opt) module-declarationtop-level-declaration-seq (opt) private-module-fragment (opt)
+  - global-module-fragment (opt) module-declaration top-level-declaration-seq (opt) private-module-fragment (opt)
 - private-module-fragment:
-  - `module : private ;` top-level-declaration-seq (opt)
+  - `module : private;` top-level-declaration-seq (opt)
 - top-level-declaration-seq:
   - top-level-declaration
   - top-level-declaration-seq top-level-declaration
@@ -487,7 +487,7 @@ inline関数/変数の定義は、discarded statementの外側でodr-usedされ�
   - declaration 
 
 #### 2
-private-module-fragmentはプライマリモジュールインターフェース単位にだけ表れる。 
+プライベートモジュールフラグメント（private-module-fragment）はプライマリモジュールインターフェース単位にだけ表れる。 
 private-module-fragmentを持つモジュール単位は、そのモジュールで唯一のモジュール単位となる。その診断は不要。
 
 #### 3  
@@ -575,7 +575,7 @@ inline変数・関数がある翻訳単位でodr-usedされているとき、そ
 外部リンケージまたはモジュールリンケージを持つinline関数内で定義された型はすべての翻訳単位で同じ型）
 
 #### 7
-エクスポートされたinline関数・変数は、（存在している場合）プライベートモジュールフラグメントの外側で、そのエクスポートされた宣言を含む翻訳単位で定義される。  
+エクスポートされたinline関数・変数は、（存在している場合は）プライベートモジュールフラグメントの外側で、そのエクスポートされた宣言を含む翻訳単位で定義される。  
 [Note: エクスポートされたinline関数の本体から参照できるエンティティのリンケージに制限はない（リンケージ無しでもok）。constexpr関数は暗黙inline]
 
 ### 9.1.7.4 The auto speciﬁer [dcl.spec.auto]
@@ -583,7 +583,7 @@ inline変数・関数がある翻訳単位でodr-usedされているとき、そ
 [dcl.spec.auto]に変更されてる）
 
 #### 10
-プレースホルダ型（`auto`のこと）を戻り値型に使用する宣言を持つエクスポートされた関数は、そのエクスポートされた宣言を含む翻訳単位内で、かつ（存在している場合）プライベートモジュールフラグメントの外側で定義されなければならない。  
+プレースホルダ型（`auto`のこと）を戻り値型に使用する宣言を持つエクスポートされた関数は、そのエクスポートされた宣言を含む翻訳単位内で、かつ（存在している場合は）プライベートモジュールフラグメントの外側で定義されなければならない。  
 [Note: 推論される戻り値型のリンケージに制限はない]
 
 ### 9.7 Namespaces [basic.namespace]
@@ -917,7 +917,7 @@ export namespace N {
   - `export`(opt) `import` header-name attribute-specifier-seq(opt);
 
 #### 1
-モジュール単位におけるすべてのモジュールインポート宣言（module-import-declaration）は、その翻訳単位及び（存在するなら）プライベートモジュールフラグメントにおけるtop-level-declaration-seq内にあり、かつそこに含まれる他の全てのtop-level-declarationsよりも前に宣言されなければならない。  
+モジュール単位におけるすべてのモジュールインポート宣言（module-import-declaration）は、その翻訳単位及び（存在する場合は）プライベートモジュールフラグメントにおけるtop-level-declaration-seq内にあり、かつそこに含まれる他の全てのtop-level-declarationsよりも前に宣言されなければならない。  
 モジュールインポート宣言に対する属性指定（attribute-specifier-seq）はモジュールインポート宣言に作用する。
 
 #### 2
@@ -992,7 +992,7 @@ global-module-fragmentは、モジュール単位の __グローバルモジュ�
 その`postfix-expression`が依存名を表すか、演算子が依存名を表す演算子式の場合、  
 それぞれの型に依存する引数やオペランドを名前空間やエンティティに関連付けられていないプレースホルダ型の値に置き換えることで`E`から合成された式の中で、  
 対応する名前を名前探索することによって`D`は`S`から見つかる。
-    - `postfix-expression( expression-list(opt) )`とは、`static_cast`等のキャストや`typeid`式及び、それらの結果に対する演算子（`++,->`等）の適用
+    - `postfix-expression( expression-list(opt) )`とは、関数形式キャストや`static_cast`等のキャストや`typeid`式及び、それらの結果に対する演算子（`++,->`等）の適用
 4. `S`にはターゲット型が依存するオーバーロードされた関数のアドレスを取る式が含まれており、そのオーバーロードの集合には`D`が含まれている。
 5. `M`が`S`から宣言的に到達可能であり、次のいずれかに該当する名前空間定義ではない宣言`M`が存在する。
     - `D`は`M`から宣言的に到達可能である
@@ -1092,7 +1092,7 @@ __インスタンス化コンテキスト__（*instantiation context*）とは�
 #### 3
 あるテンプレートのインスタンス化地点がそれを囲んでいる別のテンプレートの特殊化の中にあり、その（囲まれている）テンプレートがそこで暗黙的にインスタンス化される時のインスタンス化コンテキストは、囲んでいるテンプレートの特殊化のインスタンス化コンテキストの和集合であり、  
 テンプレートがモジュール`M`のインターフェース単位で定義され、インスタンス化地点が`M`のインターフェース単位内にない場合、  
-そのインスタンス化地点は、`M`のプライマリーモジュールインターフェース単位のtop-level-declaration-seqの最後の点（存在する場合、private-module-fragmentの前）である。
+そのインスタンス化地点は、`M`のプライマリーモジュールインターフェース単位のtop-level-declaration-seqの最後の点（存在する場合、プライベートモジュールフラグメントの前）である。
 
 #### 4
 default指定された特殊メンバ関数の暗黙の定義中で参照されているために、暗黙にインスタンス化されているテンプレートのインスタンス化コンテキストは、そのdefault指定された特殊メンバ関数のインスタンス化コンテキストである。
@@ -1177,7 +1177,7 @@ void test() {
 #### 3
 宣言`D`は次のそれぞれの場合に、インスタンス化コンテキスト内の任意の点`P`から到達可能、もしくは必ず到達可能、となる
 - `D`は同じ翻訳単位内にあり、`P`より前に現れる
-- `D`は破棄されておらず、`P`から到達可能、または必ず到達可能な翻訳単位に現れており、それぞれが、private-module-fragmentに現れていないか、`P`を含むモジュールのprivate-module-fragmentに現れる。
+- `D`は破棄されておらず、`P`から到達可能、または必ず到達可能な翻訳単位に現れており、それぞれが、プライベートモジュールフラグメントに現れていないか、`P`を含むモジュールのプライベートモジュールフラグメントに現れている。
 
 [Note: 宣言がエクスポートされているかは到達可能かどうかとは関係ない]
 
@@ -1264,4 +1264,342 @@ X x;                // ill-formed: Xは被修飾名探索において可視で�
 その宣言（template-headに続くdeclaration）は、エクスポート宣言（export-declaration）であってはならない。
 
 （`export template<typename T> ...`というのができないと言っているのではなく、`template<typename T> export ...`という宣言ができないと言っている）
+
+### 12.7.4.1 Point of instantiation [temp.point]
+#### Delete paragraph 12.7.4.1/7:
+インスタンス化コンテキスト（instantiation context）の定義がモジュールの項に移り、内容も変更されたため削除。
+
+#### 1
+関数テンプレート・メンバ関数テンプレートの特殊化、クラステンプレートのメンバ関数もしくは静的メンバ変数の特殊化（1つ目）が、別のテンプレートの特殊化（2つ目）から参照されているために暗黙的にインスタンス化されており、その特殊化（1つ目）が参照されるコンテキストがテンプレートパラメータに依存しているとき、（1つ目の）特殊化のインスタンス化地点はそれを囲む特殊化（2つ目）のインスタンス化地点である。
+
+そうでない場合、そのような特殊化（1つ目）のインスタンス化地点は、その特殊化（1つ目）を参照する名前空間の宣言・定義の直後の地点。
+
+（例えば、1つ目の特殊化がある非テンプレート関数内で参照されたとき、その関数を囲む名前空間の終わりの地点がインスタンス化地点になる。また、テンプレートな関数内でも、その1つ目の特殊化がインスタンス化される際にその関数のテンプレート引数に非依存ならば同様。  
+テンプレート引数に依存している場合は、その関数テンプレートのインスタンス化地点が1つ目の特殊化のインスタンス化地点となる。）
+
+#### 2
+クラステンプレートのメンバ関数もしくはメンバ関数テンプレートが、それら関数のデフォルト引数の定義を使用する形で呼び出されたとき、そのデフォルト引数のインスタンス化地点は、そのようなメンバ関数もしくはメンバ関数テンプレートのインスタンス化地点。
+
+（デフォルト引数とはおそらく、テンプレートのデフォルト引数も含む。定義を使用する形で呼び出された時というのは、デフォルト引数を使用して呼ばれたときという事。  
+ただし、不完全型のポインタのように呼び出しに際してその定義を使用しない場合もあり得る。）
+
+#### 3
+関数テンプレートの特殊化、クラステンプレートのメンバ関数の特殊化に指定された`noexcept`指定子は、その`noexcept`指定子が別のテンプレートの特殊化で必要とされ、そのコンテキストがテンプレートパラメータに依存するために暗黙的にインスタンス化される場合、その`noexcept`指定子のインスタンス化地点はそれを必要とした特殊化（2つ目）のインスタンス化地点。
+
+（おそらく、`noexcept(cond)`の形のものの事を言っていると思う。`cond`に指定された式のインスタンス化地点が上記のように決まる、）
+
+#### 4
+クラステンプレートの特殊化、クラスのメンバテンプレートの特殊化、またはクラステンプレートの内部クラスの特殊化（1つ目）が、別のテンプレートの特殊化（2つ目）から参照されているために暗黙的にインスタンス化されるとき、特殊化（1つ目）が参照されるコンテキストがテンプレートパラメータに依存し、かつ囲むテンプレートのインスタンス化前に特殊化（1つ目）がインスタンス化されていない場合、特殊化（1つ目）のインスタンス化地点はそれを囲むテンプレートのインスタンス化地点の直前。
+
+そうでない場合、そのような特殊化（1つ目）のインスタンス化地点は、その特殊化（1つ目）を参照する名前空間スコープの宣言・定義の直前の地点。
+
+#### 5
+仮想関数が暗黙的にインスタンス化される場合、そのインスタンス化地点はそれを囲む（その仮想関数が属する）クラステンプレートの特殊化のインスタンス化地点の直後。
+
+#### 6
+明示的インスタンス化の定義は、明示的インスタンス化によって指定されたテンプレートの特殊化、又は（そこに含まれる特殊化も含めた）複数の特殊化、のためのインスタンス化地点でもある。
+
+#### 7
+関数テンプレート、メンバ関数テンプレート、クラステンプレートのメンバ関数もしくは静的メンバ変数は、上記のインスタンス化地点に加えて、翻訳単位内に複数のインスタンス化地点を持つことができる。
+- それらの特殊化が、翻訳単位のtop-level-declaration-seq内（存在する場合はプライベートモジュールフラグメントの前）にインスタンス化地点を持つ場合、そのtop-level-declaration-seqの後の点（終端の次）もそのインスタンス化地点とみなされる。
+- それらの特殊化が、プライベートモジュールフラグメント内部にインスタンス化地点を持つ場合、その翻訳単位の終端もインスタンス化地点とみなされる。
+
+クラステンプレートの特殊化は、翻訳単位内に最大1つのインスタンス化地点を持つ。  
+任意のテンプレートの特殊化は、複数の翻訳単位にインスタンス化地点を持つことがある。  
+テンプレートの特殊化の、2つの異なるインスタンス化地点がODRに従って、その特殊化に異なる意味を与える場合、プログラムはill-formd。しかし、診断は不要。
+
+### 13.7.4.2 Candidate functions [temp.dep.candidate]
+`postfix-expression`が依存名である関数呼び出しの場合、候補関数はテンプレート定義コンテキストから通常の名前探索を用いて探索される。  
+[Note:関連する名前空間を用いた探索（ADL）のパートについては、ADLの項で説明されているように、テンプレートのインスタンス化コンテキストにある関数宣言がADLによって探索される。]  
+（そのような呼び出し時の）ADLにおいて、テンプレート定義およびインスタンス化コンテキストで見つかった宣言だけでなく、すべての翻訳単位の名前空間に導入された外部リンケージをもつすべての関数宣言が考慮され、呼び出しがill-formedであるか、より良い一致が見つかった場合、プラグラムは未定義動作。
+
+#### 2
+
+```cpp
+//Source file "X.h":
+namespace Q {
+  struct X { };
+}
+
+//Source file "G.h":
+namespace Q {
+  void g_impl(X, X);
+}
+
+//Module interface unit of M1:
+module;  //グローバルモジュールフラグメント
+
+#include "X.h"  //Q::Xの定義
+#include "G.h"  //Q::g_implの宣言
+
+export module M1;
+
+export template<typename T>
+void g(T t) {
+  g_impl(t, Q::X{ });   //ここの定義コンテキストにおいてADLによってQ​::​g_­implが見つかる
+                        //Q​::​g_­impl、Q::Xは破棄されない
+}
+
+//Module interface unit of M2:
+module;
+
+#include "X.h"
+
+export module M2;
+import M1;
+
+void h(Q::X x) {
+   g(x);                // OK
+}
+```
+
+#### 3
+
+```cpp
+//Module interface unit of Std:
+export module Std;
+
+export template<typename Iter>
+void indirect_swap(Iter lhs, Iter rhs)
+{
+  swap(*lhs, *rhs);     // このswapは被修飾名探索では見つからない、見つかるとしたらADLでのみ
+}
+
+//Module interface unit of M:
+export module M;
+import Std;
+
+struct S { /* ...*/ };
+void swap(S&, S&);      // #1
+
+void f(S* p, S* q)
+{
+  indirect_swap(p, q);  // インスタンス化コンテキストを探索するADLを介して、 #1が見つかる
+                        //indirect_swapはインスタンス化コンテキストにこの点とモジュール内の定義点を含む
+                        //ここの点においてSに対するswapは可視であるのでindirect_swap内からのADLにおいても可視
+}
+```
+
+#### 4
+
+```cpp
+//Source file "X.h":
+struct X { /* ... */ };
+X operator+(X, X);
+
+//Module interface unit of F:
+export module F;
+
+export template<typename T>
+void f(T t) {
+  t + t;
+}
+
+//Module interface unit of M:
+module;
+
+#include "X.h"  //クラスXの定義とXに対する2項+の宣言
+
+export module M;
+import F;
+
+void g(X x) {
+  f(x);             // OK: モジュールFのf()がインスタンス化される
+                    // Xのoperator+はインスタンス化コンテキストで可視である
+                    // この場合はここのf(x)と呼びだしている点で可視
+}
+```
+
+#### 5
+
+```cpp
+//Module interface unit of A:
+export module A;
+
+export template<typename T>
+void f(T t) {
+  cat(t, t);         // #1
+  dog(t, t);         // #2
+}
+
+//Module interface unit of B:
+export module B;
+import A;
+
+export template<typename T, typename U>
+void g(T t, U u) {
+  f(t);
+}
+
+//Source file "foo.h", インポート可能なヘッダではない:
+struct foo {
+  friend int cat(foo, foo);
+};
+int dog(foo, foo);
+
+//Module interface unit of C1:
+module;
+
+#include "foo.h" // dog()は参照されないため破棄される
+
+export module C1;
+import B;
+
+export template<typename T>
+void h(T t) {
+  g(foo{ }, t);  // g()の呼び出しはテンプレートパラメータTに依存している
+                 // そのため、g()の呼び出しに際してのdog()の呼び出し（catも？）は参照されているとみなされない
+}
+
+//Translation unit:
+import C1;
+
+void i() {
+  h(0);       // error: #2のdog()が見つからない
+              // モジュールC1内でdog()は参照されなかったため、宣言は破棄された
+}
+
+//インポート可能なヘッダ "bar.h":
+struct bar {
+  friend int cat(bar, bar);
+};
+
+int dog(bar, bar);
+
+//Module interface unit of C2:
+module;
+
+#include "bar.h" // "bar.h"をヘッダーユニットとしてインポート
+
+export module C2;
+import B;
+
+export template<typename T>
+void j(T t) {
+  g(bar{ }, t);
+}
+
+//Translation unit:
+import C2;
+
+void k() {
+   j(0);        // OK, dog()はインスタンス化コンテキスト内で見つかる:
+                // C2のモジュールインターフェース単位の終端において、dog()の宣言は可視
+}
+```
+
+### 15 Preprocessing directives [cpp]
+
+__プリプロセッシングディレクティブ__（*preprocessing directive*）は次の制約を満たすプリプセッシングトークンのシーケンスで構成される。
+
+- シーケンスの最初のトークンは、ソースファイルの最初の文字（任意で、改行（new-line）文字を含まないホワイトスペースの後）または、少なくとも１つの改行（new-line）文字を含むホワイトスペースに続く、（翻訳フェーズ4の開始時に）#プリプセッシングトークンの形で現れる。
+- シーケンスの最後の文字は、そのシーケンスの最初の文字に続く最初の改行（new-line）文字  
+（そのため、プリプロセッシングディレクティブは一般に「行」とよばれる。プリプロセス中の特定処理を除いて、全てのホワイトスペースは同等であるため、これらの「行」には他の構文上の意味はない）
+- 改行（new-line）文字は、意図せずに関数形式マクロ等の呼び出しの中に現われたとしても、プリプセッシングディレクティブを終了させる
+
+#### 5
+実装は、ソースファイルのセクションを条件付きで処理・スキップしたり、他のソースファイルをincludeしたり、ヘッダーユニットからマクロをインポートしたり、マクロを置換したりできる。  
+これらの（プリプロセッサで）出来ることは、概念的には翻訳単位の翻訳（コンパイル処理）前に行われるため、__プリプセッシング__（前処理 : *preprocessing*）と呼ばれる。
+
+### 15.1 Conditional inclusion [cpp.cond]
+
+- header-name-tokens:
+	- string-literal
+	- < h-pp-tokens >
+- has-include-expression:
+	- _­_­has_­include ( header-name )
+	- _­_­has_­include ( header-name-tokens )
+
+（string-literalは`#include "ヘッダ名"`の形式（`L, R`等の接頭辞を使用可能）、h-pp-tokensは各種リテラルを使用できるヘッダ名、`#include <iostream>`の形式）
+
+#### 2
+defined-macro-expressionは識別子がその時点でマクロとして定義されている場合に`1`（つまり、定義済みの場合、またはアクティブなマクロ定義（active macro definitions）がある場合。例えば、同じ識別子名を指定された`#undef`ディレクティブが介在していない`#define`ディレクティブに指定された識別子名であった場合など）、そうでない場合は`0`に評価されます。
+
+（defined-macro-expressionは、`defined マクロ名`、`defined(マクロ名)`のこと）
+
+#### 3
+has-include-expressionの2番目の形式は、最初の形式が一致しない場合にのみ考慮される。その場合、プリプセッシングトークンは通常のテキストと同じように処理される。
+
+### 15.2 Source file inclusion [cpp.include]
+
+#### 7
+header-nameで識別されるヘッダーがインポート可能なヘッダであるとき、そのプリプロセッサディレクティブは、次のプリプロセッシングトークンで置き換えられる。
+- `import` header-name ;
+
+（header-nameとは""か<>で囲まれた文字列の事、ここでのプリプロセッサディレクティブは`#include header-name`を指す。すなわち、`#include`を`import`に置き換えることを意味する。置き換えても良い、ではないことに注意）
+
+### 15.3 Global module fragment [cpp.glob.frag]
+- pp-global-module-fragment:
+	- `module ;` pp-balanced-token-seq `module`
+
+翻訳フェーズ4の開始前に、最初の2つのプリプロセッシングトークンが`module ;`の場合、プリプロセッシングの結果は、pp-balanced-token-seq内の全てのプリプロセッシングトークンがソースファイルのインクルードによって直接・間接的に生成されたpp-global-module-fragmentで始まり、2つ目の`module`プリプロセッシングトークンは、ソースファイルのインクルードもしくはマクロの置換によって生成されなかったものである（2つ目の`module`は`#include`やその他マクロによって生成されたものであってはならない）。  
+そうではない場合、翻訳フェーズ4の終了時の最初の2つのプリプロセッシングトークンは`module ;`ではない。
+
+[参考](https://twitter.com/tetzrom/status/1145236250007232512
+)
+
+### 15.4 Header units [cpp.module]
+
+- import-seq:
+	- top-level-token-seq(opt) `export`(opt) `import`
+- top-level-token-seq:
+	- any pp-balanced-token-seq ending in `;` or `}`
+  - （pp-balanced-token-seqのうち`;`か`}`で終わる物）
+- pp-import:
+	- `import` header-name pp-import-suffix(opt)`;`
+	- `import` header-name-tokens pp-import-suffix(opt)`;`
+- pp-import-suffix:
+	- pp-import-suffix-token
+	- pp-import-suffix pp-import-suffix-token
+- pp-import-suffix-token:
+	- any pp-balanced-token other than `;`
+  - （`;`以外のpp-balanced-token）
+- pp-balanced-token-seq:
+	- pp-balanced-token
+	- pp-balanced-token-seq pp-balanced-token
+- pp-balanced-token:
+	- pp-ldelim pp-balanced-token-seq(opt) pp-rdelim
+	- any preprocessing-token other than a pp-ldelim or pp-rdelim
+  - （pp-ldelimまたはpp-rdelim以外のプリプセッシングトークン）
+- pp-ldelim: 次のいずれか  
+	`(`    `[`    `{`    `<:`    `<%`
+- pp-rdelim: 次のいずれか  
+	`)`    `]`    `}`    `:>`    `%>`
+
+#### 1
+pp-importの形式にマッチするプリプセッシングトークンのシーケンスは、header-nameで指定されるヘッダーユニットからマクロをインポートするように、プリプロセッサーに指示します。
+
+pp-impotは`import`トークンまでの翻訳フェーズ4によって形成されたトークンシーケンスが、import-seqを形成し、かつ`import`トークンが別のheader-name-tokensか別のpp-impot内のpp-import-suffixに無い場合のみ（pp-impotとして）認識される。
+
+pp-impotを終了する`;`プリプセッシングトークンは、マクロ置換によって生成されたものではない。
+
+pp-impotによってインポートされるマクロのインポート点は、`;`がそのpp-impotを終了した直後の点。
+
+#### 2
+
+pp-impotの2つ目の形式では、header-name-tokensが`#include`ディレクティブのpp-tokensであるかのように、header-nameトークンが生成される。  
+そして、header-name-tokensは（生成された）header-nameトークンに置き換えられる。  
+[Note:これにより、インポートはプリプロセッサ及びその後の翻訳フェーズで一貫して処理される。]
+
+#### 3
+プログラム内の各翻訳単位においてのプリプロセッシング時に現れた`#define`ディレクティブは、それぞれ異なる __マクロ定義__（*macro definition*）が得られる。  
+ヘッダーユニットからマクロをインポートすると、その翻訳単位（その翻訳単位におけるヘッダーユニット）からのマクロ定義が、他の（インポートした）翻訳単位において可視となる（使えるようになる）。
+
+それぞれのマクロ定義は、次のように各翻訳単位において最大1つの定義点及び未定義点をもつ。
+- ある翻訳単位内においてのマクロ定義の __定義点__（*point of definition*）は次のどちらか。
+  - その`#define`ディレクティブが現れる点（`#define`ディレクティブを含む翻訳単位内）
+  - マクロ名がキーワード・`module`・`import`と字句的に同一でない場合、マクロ定義の定義点があればそれを含む翻訳単位の最初のマクロのインポート地点（ヘッダーユニットをインポートした他の翻訳単位内）。
+- ある翻訳単位内においてのマクロ定義の __未定義点__（*point of undefinition*）は次のどちらか。
+  - その定義点の後にマクロを命名する`#undef`ディレクティブが現れる最初の点
+  - マクロ定義の未定義点がある場合、先に現われた未定義点を含む翻訳単位の最初のマクロのインポート地点。
+
+（どちらのケースも、1つ目の条件はマクロを直接`define・undef`する翻訳単位においての点の事を言っており、2つ目の条件はマクロを記述したヘッダーユニットをインポートする翻訳単位においての点の事を言っている。  
+定義点の2番目の条件の冒頭は、マクロ名がキーワード及び`module import`と同じではならないという事と思われる）
+
+#### 4
+マクロディレクティブがソースのある場所で __アクティブ__（*active*）となるのは、その場所より前にその翻訳単位における（そのマクロディレクティブの）定義点があり、かつ同様に未定義点が無い場合。
+
+#### 5
+マクロは置換されるか再定義され、そのマクロ名に対して複数のマクロ定義がアクティブとなっているとき、アクティブなマクロ定義は全て同じマクロの有効な再宣言でなければならない。  
+[Note: pp-import間の相対的な順序は、特定のマクロ定義がアクティブかどうかとは関係ない。]
 
