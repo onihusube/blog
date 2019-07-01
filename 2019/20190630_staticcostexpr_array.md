@@ -29,7 +29,7 @@ struct sample {
   static constexpr int m[] = {10, 20};
 };
 
-//定義、これが無いとリンカエラー
+//定義、これが無いとリンカエラー（C++17以降は非推奨）
 constexpr int sample::m[];
 ```
 [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/4Kw89DK1aARbIFpW)
@@ -87,7 +87,7 @@ int main() {
 >関数型でも配列型でもない型Tのglvalueは、同じ型のprvalueに変換できる。
 
 おわかりいただけたでしょうか、`static constexpr`な配列メンバを使用すると定義を必要とされるのはこの条文によります。  
-つまり、配列型の変数にはlvalue-rvalue変換を適用することができないため、どのように使ったとしてもodr-usedになってしまうのです。
+つまり、配列型の変数にはlvalue-rvalue変換を適用することができない（そして、他の条件にも当てはまらない）ため、どのように使ったとしてもodr-usedになってしまうのです。
 
 結果、クラス外に定義が必要になってしまいます。
 
@@ -99,7 +99,7 @@ C++17以降は、冒頭の`static constexpr`な配列メンバにおいても定
 
 [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/Tfgn5jU1vCN22bYN)
 
-これは、odr-usedの条件が変更されたわけではなく、C++17より導入されたinline変数の副作用によるものです。
+これは、odr-usedの条件が変更されたわけではなく、C++17より導入されたinline変数の効果によるものです。
 
 詳しくは → [インライン変数 - cpprefjp C++日本語リファレンス](https://cpprefjp.github.io/lang/cpp17/inline_variables.html)
 
@@ -111,6 +111,7 @@ C++17以降は、冒頭の`static constexpr`な配列メンバにおいても定
 ### 参考文献
 - [N4659 : Working Draft, Standard for Programming Language C++](https://timsong-cpp.github.io/cppwp/n4659/)
 - [定義と ODR - cppreference.com](https://ja.cppreference.com/w/cpp/language/definition)
+- [静的メンバ - cppreference.com](https://ja.cppreference.com/w/cpp/language/static)
 - [インライン変数 - cpprefjp C++日本語リファレンス](https://cpprefjp.github.io/lang/cpp17/inline_variables.html)
 
 ### 謝辞
