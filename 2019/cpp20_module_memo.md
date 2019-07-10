@@ -238,7 +238,8 @@ export import "some-header.h";  //ヘッダーユニット”some-header.h”の
 class X {}; 
 #endif
 
-// b.cc 
+// b.cc
+module;
 #include "a.h" 
 export module B; 
 X x;
@@ -251,9 +252,10 @@ import B; // not exported
 import C; 
 #include "a.h" //"semantic boundaries rule"によって、Xの定義が見えたとしても問題ない
 ```
-グローバルモジュールフラグメント内のクラスXの宣言はモジュール外で可視でも到達可能でもない
-しかし、`d.cc`では（`#include "a.h"`によって）Xの宣言が可視であり到達可能である（定義が見える）
-これは”semantic boundaries rule”によって許可される
+グローバルモジュールフラグメント内のクラスXの宣言はモジュール`B`の外で可視でも到達可能でもない。
+しかし、`d.cc`では（`#include "a.h"`によって）Xの宣言が可視であり到達可能である（定義が見える）。ここはグローバルモジュールなので（以前の提案とODRの下では）ODR違反を引き起こす。
+これは”semantic boundaries rule”によって許可される。  
+（semantic boundaries rule：以前の定義が到達可能なところで再定義されてはならない。）
 
 モジュールリンケージを持つエンティティが複数のモジュール単位で定義を持つことを許可
 
@@ -590,7 +592,7 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 
 #### 8
 ブロックスコープで宣言された関数名と、extern付きの変数名はリンケージを持つ。  
-そのような宣言が指名されたモジュールに属している場合、プログラムはill-formed。
+そのような宣言が名前付きのモジュールに属している場合、プログラムはill-formed。
 
 #### 11
 2つの名前が同じであり異なるスコープで宣言されているとき、次の全てを満たす場合に同じ変数・関数型、テンプレート、名前空間、を表す。
