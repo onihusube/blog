@@ -192,7 +192,7 @@ constexpr derived2 const& d2 = dynamic_cast<derived2 const&>(b1);  //compile err
 - constexpr デストラクタ
 - new式/delete式のコンパイル時実行（operator newではない）
 - `std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`のコンパイル時実行
-- コンパイル時に確保され解放されなかったメモリは静的記憶域に移行され実行時に参照可能
+- ~~コンパイル時に確保され解放されなかったメモリは静的記憶域に移行され実行時に参照可能~~
 
 ### unionのアクティブメンバの切り替え
 共用体（union）のアクティブメンバとは、ある時点の共用体のオブジェクトにおいて最後に初期化されたメンバの事です。共用体の初期化自体はconstexprに行うことが可能ですが、あるメンバの初期化後に別のメンバを初期化した場合にアクティブメンバの切り替えが発生します。アクティブメンバの切り替えはC++17までコンパイル時に行えません。
@@ -371,7 +371,141 @@ Xのテンプレート引数は`bool`の非型テンプレートパラメータ�
 そのため`f()`は実行時に実行されます。その時の`f()`内では、`int m`の初期化式の`is_constant_evaluated()`だけが`false`になります（`const int n`の初期化式は常に定数実行、つまり`true`になります）。  
 結果`m`は`17`になるので、実行時の`f()`は`30`を返します。`p`は`26`で定数初期化されているので、`q`は実行時に`56`で初期化されます。
 
+### 定数式内で、trivially default constructibleな型をデフォルト初期化する
 
+これまで、以下のように基本型の変数宣言に初期化子が無い場合は未定義動作となり、constexpr関数では未定義動作が現れてはならないことからコンパイルエラーとなってしまっていました。
+
+```cpp
+constexpr int ng() {
+  int n;  //undefined behavior!初期化子が必要
+  ++n;
+
+  return n;
+}
+
+constexpr int ok() {
+  int n{};  //ok、デフォルト初期化（0）される
+  ++n;
+
+  return n;
+}
+```
+
+こんなとても簡単なコードならば初期化子を書けばよいのですが、問題となるのはテンプレートにしたときです。
+
+```cpp
+template <typename T>
+constexpr T copy(const T& other) {
+  T t;  //デフォルト初期化（してほしい）
+  t = other;
+
+  return t;
+}
+
+struct trivial {
+  int n;
+};
+
+struct non_trivial {
+  int n = 100;
+};
+
+int main() {
+  {
+    //全てok
+    auto cp1 = copy(10);
+    auto cp2 = copy(trivial{});
+    auto cp3 = copy(non_trivial{});
+  }
+
+  {
+    constexpr auto cp1 = copy(10);            //ng
+    constexpr auto cp2 = copy(trivial{});     //ng
+    constexpr auto cp3 = copy(non_trivial{}); //ok
+  }
+}
+```
+
+`int`に代表される基本型は初期化子が無いとその変数の状態は未定義となりますが、それはテンプレートにおいても同様です。そして、それが定数式で現れてしまうとコンパイルエラーを引きおこします。
+
+また、この例の`trivial`型のように集成体でありデフォルトメンバ初期化によってメンバが初期化されていない型も基本型と同様に初期化に際して初期化子が必要になります。  
+
+これらの型のように、デフォルトコンストラクタ（に相当するもの）が全くユーザーによって定義されていないとき（メンバも何ら初期化していない時）、その型はtrivially default constructibleといいます。
+
+trivially default constructibleな型はデフォルト初期化されると、その値は（ユーザー定義型の場合そのメンバが）`0`に相当する値によって初期化されます。  
+ただし、初期化子が無い場合の初期化状態は未定義になります。
+
+C++20からはこのようなtrivially default constructibleな型は定数式に限って初期化子が無くてもデフォルト初期化されるようになります。  
+従って、先ほどのコードは全てのケースでコンパイルできるようになります。
+
+```cpp
+template <typename T>
+consteval T copy(const T& other) {
+  T t;  //デフォルト初期化される
+  t = other;
+
+  return t;
+}
+
+struct trivial {
+  int n;
+};
+
+struct non_trivial {
+  int n = 100;
+};
+
+int main() {
+
+  constexpr auto cp1 = copy(10);            //ok
+  constexpr auto cp2 = copy(trivial{});     //ok
+  constexpr auto cp3 = copy(non_trivial{}); //ok
+}
+```
+
+ただし、その値を読み出すことは相変わらず未定義とされます。  
+あくまで、実行時とコンパイル時でコンパイル出来たりできなかったりする一貫しない挙動の修正が目的です（例えば、読み取りを出来るようにすると変数領域を確実に初期化するオーバーヘッドが入ってしまう）。
+
+```cpp
+consteval int ng() {
+  int n;  //デフォルト初期化されるけど・・・
+
+  return n; //undefined behavior!コンパイルエラーとなる
+}
+```
+
+### constexpr関数内でasm宣言が書けるように
+
+なるのですが、書けるだけです。
+
+`std::is_constant_evaluated()`の導入によって`constexpr`関数内で`if`文によって実行時とコンパイル時の処理を分けることができます。その場合、実行時の処理はコンパイル時に実行されることはなく逆も然りです。
+
+そのため、実行時のブロックではコンパイル時に現われてはいけないものが現れていたとしても問題はないはずです。  
+例えば、`asm`宣言はC++17までは定数式に現われることができず書いてあるだけでコンパイルエラーになります。
+
+しかし、C++20からは`constexpr`関数内で`asm`宣言を書くことができるようになります。ただし、実行は出来ないため定数式で`asm`宣言に到達しないようにしなければなりません。つまり`std::is_constant_evaluated()`とセットで用いる必要があります。
+
+提案文書よりサンプルコードを引用。
+
+```cpp
+constexpr double fma(double b, double c, double d) {
+  if (std::is_constant_evaluated()) {
+    return b * c + d;
+  } else {
+    asm("vfmadd132sd %0 %1 %2"
+      : "+x"(b)
+      : "x" (c), "x" (d)
+    );
+    return b;
+  }
+}
+
+int main() {
+  //両方ok
+  volatile double fma1 = fma(10, 20, 30); //volatileは実行時に評価してもらうため
+  constexpr double fma2 = fma(10, 20, 30);
+}
+```
 
 ### consteval（immediate function : 即時関数）
 constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行可能であることを表明します。  
@@ -559,6 +693,26 @@ constexpr int test_vector() {
 constexpr auto sum = test_vector(); //ok. sum == 35
 ```
 
+#### string
+そしてさらに、`std::string`（`char, char8_t char16_t, char32_t`に対して）の全てのメンバも`constexpr`対応を果たし、コンパイル時利用が可能になります。
+
+```cpp
+constexpr std::string is_cpp_file(const std::string& filename) {
+  return filename.end_with(".cpp") || filename.end_with(".hpp");
+}
+
+constexpr std::string is_cpp_file(const std::u8string& filename) {
+  return filename.end_with(u8".cpp") || filename.end_with(u8".hpp");
+}
+
+
+constexpr std::string src_name{"main.cpp"};          //ok
+constexpr std::u8string header_name{u8"header.cpp"}; //ok
+
+static_assert(is_cpp_file(src_name));     //ok、エラーにならない
+static_assert(is_cpp_file(header_name));  //ok、エラーにならない
+```
+
 #### cmathとcstdlib
 一部の数学関数にconstexprが付加されるようになります。とはいえ、std::sin等の特殊関数がconstexpr実行可能になるわけではありません。  
 絶対値（`abs`）や丸め（`ceil, floor, round, trunc`）、剰余（`fmod, remainder, remquo`）等の一部の関数がconstexpr指定されるようになります（[一覧](https://wg21.link/P0533)）。
@@ -583,6 +737,7 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 
 #### 全てのメンバ関数のconstexpr化を達成したクラス
 - `std::vector`
+- `std::string`
 - `std::allocator<T>`
 - `std::array`
 - `std::pair`
@@ -616,8 +771,11 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 - [P1002R1 : Try-catch blocks in constexpr functions
 ](https://wg21.link/P1002)
 - [P0595 : std::is_constant_evaluated()](https://wg21.link/P0595)
+- [P1331R1 : Permitting trivial default initialization in constexpr contexts](https://wg21.link/P1331)
+- [P1668R1 : Enabling constexpr Intrinsics By Permitting Unevaluated inline-assembly in constexpr Functions](https://wg21.link/P1668)
 - [P1073 : Immediate functions](https://wg21.link/P1073)
 - [P1004R1 : Making std::vector constexpr](https://wg21.link/P1004)
+- [P0980R0 : Making std::string constexpr](https://wg21.link/P0980)
 - [P0533R4 : constexpr for `<cmath>` and `<cstdlib>`](https://wg21.link/P0533)
 - [P0202R3 : Add Constexpr Modifiers to Functions in `<algorithm>` and `<utility>` Headers](https://wg21.link/P0202)
 - [P0415R1 : Constexpr for std::complex](https://wg21.link/P0415)

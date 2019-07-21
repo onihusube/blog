@@ -384,6 +384,7 @@ constexpr sample<char> str{"Hello."};
 - [P0784R3 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r3.html)
 - [P0784R4 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r4.html)
 - [P0784R5 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0784r5.html)
+- [P0784R6 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0784r6.html)
 
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190302_cpp20_constexpr_allocate.md)
