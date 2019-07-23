@@ -25,7 +25,7 @@ int main()
 ```
 [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/JdEDNJA358m99Y12)
 
-とても簡単な方法ではありますが、一々コピーが発生するのと、変更可能な`std::string`等でしか使えないのが少し残念なところです。
+とても簡単な方法ではありますが、一々コピーが発生するのと変更可能な`std::string`等でしか使えないのが少し残念なところです。
 
 ### std::sub_match::second
 頑張ってずらしてもう一回searchだ！という方法を頑張らないでやる方法です。
@@ -135,7 +135,10 @@ int main() {
 - [std::sub_match - cpprefjp](https://cpprefjp.github.io/reference/regex/sub_match.html)
 - [std::regex_iterator - cpprefjp](https://cpprefjp.github.io/reference/regex/regex_iterator.html)
 
+
 ### 謝辞
 この記事の7割は以下の方によるご指摘によって成り立っています。
 
 - [@hotwatermorning さん](https://twitter.com/hotwatermorning/status/1153505071407063042)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190723_regex_matches.md)
