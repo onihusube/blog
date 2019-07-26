@@ -71,21 +71,23 @@ g<"<=> Awesome!">();
 ある型`T`がstrong structural equalityであるとは以下のどちらかを満たしているときです。
 
 - `T`がクラス型でない場合
-    - `cosnt T`の値`a, b`について`a <=> b`が呼び出し可能であり
-    - その比較カテゴリ型が`std::strong_­ordering`か`std::strong_­equality`のどちらかである
+    - `cosnt T`の値`a`について`a <=> a`が呼び出し可能
+    - その結果となる比較カテゴリ型が`std::strong_­ordering`か`std::strong_­equality`のどちらか
 
 - `T`がクラス型の場合
-    - default実装の`operator==`を持ち  
-    - `cosnt T`の値`a, b`について`a == b`が呼び出し可能かつ戻り値型が`bool`に暗黙変換可能であり
-    - Tのすべての基底型及び非staticメンバ変数がstrong structural equalityであり
+    - `T`のすべての基底型及び非staticメンバ変数がstrong structural equalityである
     - mutable及びvolatileなメンバ変数を持たない
+    - `T`の定義の末尾の点で、`cosnt T`の値`a`について`a == a`のオーバーロード解決が成功し、`=default`で定義された`public`か`frined`の`==`が見つかる
 
 `T`がクラス型でない場合というのは組み込み型の場合の事で、組み込みの宇宙船演算子の比較カテゴリ型が`std::strong_­equality`に変換可能であればいいわけです。  
-浮動小数点型およびvoid以外のすべての型がstrong structural equalityになります。
+浮動小数点型および`void`以外のすべての型がstrong structural equalityになります。
 
-任意のクラス型の場合はpublicなdefaultの`operator==`を持っていて、すべての非staticメンバ変数がstrong structural equalityで（mutable、volatileはng）、基底クラスもそのようになっていればstrong structural equalityになります。
+任意のクラス型の場合は`public`か`frined`なdefault実装の`operator==`を持っていて、すべての非staticメンバ変数がstrong structural equalityで（mutable、volatileはng）、基底クラスもそのようになっていればstrong structural equalityになります。
 
-浮動小数点型をメンバに持たずに`operator==`をdefault実装していれば、おおよそのケースでこれを満たすことができると思います。
+オーバーロード解決が成功し`==`が見つかる、という遠回りな言い回しになっているのは、この`==`はあくまでstrong structural equalityであることの表明のために必要なだけで実際に比較をするわけではなく、また実際の比較結果によってstrong structural equalityであるかどうか決定されるわけではない、ということを意味しています。  
+また、クラス外に定義された`==`演算子は全くこの決定に関与しないこともわかります。
+
+これらの諸条件は、浮動小数点型をメンバに持たずに`operator==`をdefault実装していれば、おおよそのケースで満たすことができるはずです。
 
 その上で、非型テンプレートパラメータとして利用するためには`T`はリテラル型である必要があります。  
 C++17基準ならば、コンパイル時に構築可能（初期化が定数式で可能）でなくてはなりません。
