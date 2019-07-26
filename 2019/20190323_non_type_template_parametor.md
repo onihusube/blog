@@ -73,7 +73,6 @@ g<"<=> Awesome!">();
 - `T`がクラス型でない場合
     - `cosnt T`の値`a`について`a <=> a`が呼び出し可能
     - その結果となる比較カテゴリ型が`std::strong_­ordering`か`std::strong_­equality`のどちらか
-
 - `T`がクラス型の場合
     - `T`のすべての基底型及び非staticメンバ変数がstrong structural equalityである
     - mutable及びvolatileなメンバ変数を持たない
@@ -137,6 +136,7 @@ strong structural equalityなクラス型を非型テンプレートパラメー
 ### 参考文献
 - [P0732R2 Class Types in Non-Type Template Parameters](http://wg21.link/p0732)
 - [P1185R2 <=> != ==](http://wg21.link/p1185)
+- [P1630R1 Spaceship needs a tune-up](http://wg21.link/p1630)
 - [テンプレートの実体化の実装方法とODR違反について - 本の虫](https://cpplover.blogspot.com/2013/12/odr.html)
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190323_non_type_template_parametor.md)
