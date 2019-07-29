@@ -1,0 +1,67 @@
+# ［C++］constinit？🤔
+
+`constinit`指定子はC++20より変数に付けることができるようになるものです。  
+しかし、`constexpr`とどう違うのか、なにが嬉しいのか、などは中々理解しづらいものがあります。
+
+提案文書より、サンプルコード。
+```cpp
+const char *g() { return "dynamic initialization"; }
+constexpr const char *f(bool p) { return p ? "constant initializer" : g(); }
+  
+constinit const char *c = f(true);  // OK.
+constinit const char *d = f(false); // ill-formed
+```
+
+一見すれば、初期化式が定数式で実行可能ではない時にエラーを起こしているように見えます。とするとやはり、`constexpr`指定との差がよくわかりません・・・
+
+`constinit`指定子は、`constexpr`変数がコンパイル時に初期化される事を保証するように、`constinit`変数が __定数初期化__ される事を保証します。
+
+### 静的変数の初期化
+
+グローバル（名前空間スコープの）変数やクラスの静的メンバ変数、関数ローカルの`static`変数のように静的ストレージにあるものはプログラムの開始前に、スレッドローカルストレージにあるものはスレッドの開始前に、それぞれ初期化が完了しています。
+
+それらの変数はまずコンパイル時に __静的初期化__ され、実行時（プログラムロード時、スレッド起動時）に __動的初期化__ されます。結果として、プログラム開始時もしくはスレッド開始時には初期化が完了しているように見えているわけです。
+
+動的初期化はその初期化式が定数式で実行できない場合に実行時に行われるものです。ここでは重要では無いので深掘りしません。
+
+静的初期化はコンパイル完了時までになんらかの値で初期化しておくもので、定数初期化と __ゼロ初期化__ の2段階で行われます。
+
+静的初期化においてはまず、定数初期化が可能であるならば変数は定数初期化されます。これによってその変数の初期値は確定し、以降の初期化はスキップされます。  
+次に、定数初期化できなかった残り全ての変数をゼロ初期化します。ゼロ初期化は変数をゼロに相当する値によって初期化するものです（例えば、浮動小数点型の`0.0`、ポインタ型の`nullptr`等）。この時、クラス型のコンストラクタは無視され、その型を構成する全ての型が再帰的にゼロ初期化されます。  
+これにより、静的ストレージ・スレッドローカルストレージにある変数は全てとりあえずはなんらかの値で初期化されている状態でコンパイルが終了します。
+
+静的初期化された値はプログラムイメージ（実行ファイルバイナリ、アセンブリ）の一部としてプログラム内のどこかに埋め込まれています。
+
+動的初期化はこのように初期化されている変数に対して、実行時に実際の初期化式によって初期化を行います。
+
+### 定数初期化（constant initialization）
+
+先程さらっと出現していましたが、定数初期化は静的初期化の中で、他のあらゆる初期化に先行して行われます。
+
+#### 定数初期化コンストラクタ
+
+
+### 動的初期化の静的初期化への切り替え
+
+ここまでで紹介した定数初期化は可能ならば必ず行われます。  
+そして追加で、コンパイラは次の条件を満たす場合に動的初期化を静的初期化に切り替えることが許されています。
+
+- 動的初期化で実行される予定の初期化式は副作用を持たない
+- 動的初期化した場合と全く同じ値で初期化できることが保証できる
+  - 他の静的変数の初期化式に依存している・されている場合でも結果が同じになる必要がある
+
+すなわち、通常の初期化順序に沿って動的初期化を行った結果と全く同じ結果になることがコンパイル時に保証できる場合に、動的初期化を定数初期化に切り替えることが許されます。
+
+この初期化タイミングの切り替えは可能であっても必ず行われるとは限りません。コンパイラによります。
+
+### `constinit`指定子
+
+
+
+### 参考文献
+- [P1143R1 Adding the `constinit` keyword](https://wg21.link/P1143)
+- [6.6.2 Static initialization [basic.start.static] - ISO/IEC 14882:2017 N4659](https://timsong-cpp.github.io/cppwp/n4659/basic.start.static)
+- [初期化 - cppreference.com](https://ja.cppreference.com/w/cpp/language/initialization#Non-local_variables)
+- [定数初期化 - cppreference.com](https://ja.cppreference.com/w/cpp/language/constant_initialization)
+- [Constant initialization - Andrzej's C++ blog ](https://akrzemi1.wordpress.com/2012/05/27/constant-initialization/)
+- [`[[clang::require_constant_initialization]]` - Clang 10 documentation](https://clang.llvm.org/docs/AttributeReference.html#require-constant-initialization)
