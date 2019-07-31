@@ -4,7 +4,8 @@
 
 ### `constinit`指定子
 
-`constinit`指定子はC++20より変数に付けることができるようになるものです。  
+`constinit`指定子はC++20より変数に付けることができるようになるもので、`constexpr`変数がコンパイル時に初期化される事を保証するように、`constinit`変数が静的初期化、特に __定数初期化__ されている事を保証します。
+
 しかし、`constexpr`とどう違うのか、なにが嬉しいのか、などは中々理解しづらいものがあります。
 
 提案文書より、サンプルコード。
@@ -18,11 +19,9 @@ constinit const char *d = f(false); // ill-formed
 
 一見すれば、初期化式が定数式で実行可能ではない時にエラーを起こしているように見えます。とするとやはり、`constexpr`指定との差がよくわかりません・・・
 
-`constinit`指定子は、`constexpr`変数がコンパイル時に初期化される事を保証するように、`constinit`変数が __定数初期化__ されている事を保証します。
-
 ### 静的変数の初期化
 
-グローバル（名前空間スコープの）変数やクラスの静的メンバ変数、関数ローカルの`static`変数のように静的ストレージにあるものはプログラムの開始前に、スレッドローカルストレージにあるものはスレッドの開始前に、それぞれ初期化が完了しています。
+グローバル（名前空間スコープの）変数やクラスの静的メンバ変数、関数ローカルの`static`変数など静的ストレージにあるものはプログラムの開始前に、スレッドローカルストレージにあるものはスレッドの開始前に、それぞれ初期化が完了しています。
 
 それらの変数はまずコンパイル時に __静的初期化__ され、実行時（プログラムロード時、スレッド起動時）に __動的初期化__ されます。結果として、プログラム開始時もしくはスレッド開始時には初期化が完了しているように見えているわけです（正確には実装は変数が使用される直前まで初期化を遅延させることが許可されています）。
 
@@ -45,7 +44,56 @@ constinit const char *d = f(false); // ill-formed
 定数初期化を行うためには、変数が静的ストレージかスレッドローカルストレージにあり、その初期化式が定数式で実行可能でなくてはなりません。  
 それを満たせば全ての変数は定数初期化できます。`constexpr`が付いていなくてもいいですし、`const`がなくても大丈夫です。初期化式が`constexpr`関数を呼び出していても、初期化に当たって一時オブジェクトを生成しても構いません。
 
+ただし、定数初期化されていても他の定数式で使えるわけではありません。定数初期化されている`const`な整数型と列挙型だけは定数式で利用できます。
+
 #### 定数初期化コンストラクタ
+
+定数初期化はもちろん任意のクラス型に対しても行えます。  
+そのクラスがリテラル型でなかったとしても、`constexpr`コンストラクタを持ち、そのコンストラクタからメンバ変数を全て定数式で初期化できれば、そのクラスのオブジェクトは定数初期化できます。
+
+これを利用しているクラスはSTLにも存在しており、`std::mutex`のデフォルトコンストラクタ、`std::unique_ptr`のデフォルトおよび`nullptr`を受けるコンストラクタなどが定数初期化コンストラクタを持っています。
+
+上でも述べていますが、定数初期化（静的初期化）は静的ストレージかスレッドローカルストレージにあるものが対象で、ローカル変数に対しては適用されません。
+
+```cpp
+#include <mutex>
+#include <memory>
+#include <thread>
+
+struct C {
+  C() = default;
+
+  C(int n) : m(n) {}
+
+  operator int() const noexcept {
+    return m;
+  }
+
+private:
+  int m;
+};
+
+//全て定数初期化される
+std::mutex m{};
+std::unique_ptr<int> p1; 
+std::unique_ptr<int> p2 = nullptr;
+C c1{};
+
+//これは動的初期化になる
+C c2{10};
+
+int main() {
+  std::lock_guard lock{m};
+
+  int n = c1;
+  int m = c2;
+
+  std::unique_ptr<int> p3;
+}
+```
+[出力アセンブリ例 - Compiler Explorer](https://godbolt.org/z/ZevUtd)
+
+コンパイル結果を見ても静的初期化されてるのか動的初期化されてるのかはよくわからないですね・・・。gccの方は`__static_initialization_and_destruction_0(int, int):`なるセクションに突っ込まれているのはわかりますが・・・
 
 
 ### 動的初期化の静的初期化への切り替え
@@ -73,10 +121,10 @@ constinit const char *d = f(false); // ill-formed
 通常の静的初期化は少なくともゼロ初期化が行われている事は間違い無いのですが、定数初期化が行なわれたかどうか、つまり変数が動的初期化されるのかどうかをコンパイル後に知る事は困難です。  
 前項の動的初期化からの切り替えも必ず行われるとは限りませんし、思わぬ変更から定数初期化しているつもりの初期化式が動的初期化になってしまっている事もありえます。本当に定数初期化されたかを見るのはアセンブリを確認するしかありません・・・
 
-これは`constexpr`変数が導入された理由の一つと同じ問題です。つまり、定数伝搬の結果としてコンパイル時に初期化されていることを期待している変数が本当にコンパイル時に初期化されているかは容易には分からなかったのです。
-
+これは`constexpr`変数が導入された理由の一つと同じ問題です。つまり、定数伝搬の結果としてコンパイル時に初期化されていることを期待している変数が本当にコンパイル時に初期化されているかは容易には分からなかったのです。  
 `constexpr`変数がそうであるように、`constinit`変数は変数が静的初期化されなかった時、すなわち動的初期化される場合にコンパイルエラーを起こします。  
-別の言い方をすると、`constinit`指定子は`constinit`変数が動的初期化されないことを保証します。そして、`constinit`変数は確実に静的初期化によってコンパイル時に初期化が完了します。
+
+別の言い方をすると、`constinit`指定子は`constinit`変数が動的初期化されないことを保証します。そして、`constinit`変数は確実に静的初期化によってコンパイル時に初期化が完了します。  
 
 
 ### 参考文献
@@ -85,4 +133,5 @@ constinit const char *d = f(false); // ill-formed
 - [初期化 - cppreference.com](https://ja.cppreference.com/w/cpp/language/initialization#Non-local_variables)
 - [定数初期化 - cppreference.com](https://ja.cppreference.com/w/cpp/language/constant_initialization)
 - [Constant initialization - Andrzej's C++ blog ](https://akrzemi1.wordpress.com/2012/05/27/constant-initialization/)
+- [mutexのconstexprコンストラクタ - yohhoyの日記](http://d.hatena.ne.jp/yohhoy/20120621/p1)
 - [`[[clang::require_constant_initialization]]` - Clang 10 documentation](https://clang.llvm.org/docs/AttributeReference.html#require-constant-initialization)
