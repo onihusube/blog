@@ -165,9 +165,10 @@ struct S {
   static constexpr int z = 56;
 };
 
-const int S::x = 12;            //ok、constinit変数の初期化
-constinit const int S::y = 34;  //ok
+const int S::x = 12;            //ok、constinit変数なので定数初期化される
+constinit const int S::y = 34;  //ok、constinit変数なので定数初期化される
 constinit constexpr int S::z;   //エラーにはならないと思われるが意味がなく、インライン変数に対する多重定義
+                                //constexpr静的メンバ変数に対するクラス外定義はC++17以降非推奨
 
 int main() {
   constinit static std::unique_ptr<int> ptr = nullptr;                //ok、静的ローカル変数
@@ -177,15 +178,18 @@ int main() {
 }
 ```
 
-`constinit`指定は変数宣言に指定でき、その効果はその変数の初期化宣言に対して適用されます。`extern`変数や静的メンバ変数のように宣言と定義が別れる場合、初期化宣言から`constinit`宣言が到達不可能となると未定義動作（診断不要）です。
+`constinit`指定は変数宣言に指定でき、その効果はその変数の初期化宣言に対して適用されます。通常の変数はその2つを分かつことができませんが、`extern`変数や静的メンバ変数のように宣言と定義（初期化宣言）が別れる場合、定義から`constinit`宣言が到達不可能となると未定義動作（診断不要）です。
+
+なお、名前に`const`が付いているので紛らわしいかもしれませんが、`constinit`変数は暗黙`const`ではなく`const`変数にしか付けられないわけでもありません。  
+`constinit`変数は`constexpr`変数とは異なり、明示的に`const`修飾されていなければ実行時に値を変更することができます。
 
 ### `const`一族
 
 ||`const`|`constexpr`|`consteval`|`constinit`|
 |:---|:---:|:---:|:---:|:---:|
 |誕生時期|神代の頃|C++11|C++20|C++20|
-|変数に付加|○|○|×|△|
-|関数に付加|△|○|○|×|
+|変数に付加|⭕|⭕|❌|🔺|
+|関数に付加|🔺|⭕|⭕|❌|
 |変数への効果|immutable化|定数式でも使用可能<br/>実行時に`const`化|コンパイルエラー|静的初期化保証|
 |関数への効果|`const`変数からのみ呼出可能|定数式でも使用可能|定数式でのみ使用可能|コンパイルエラー|
 
