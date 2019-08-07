@@ -735,6 +735,32 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 //no == std::end(cvec)
 ```
 
+#### `std::invoke`とそれを用いるもの
+
+C++17までは`constexpr`関数をどこで実行すべきかが明確に規定されていなかったために、その実行に関しては処理系に一任されていました。  
+そのため、処理系によっては貪欲な定数実行の結果、意図しない文脈で`constexpr`関数が実行され、不明確なコンパイルエラーを引き起こしていました。
+
+`std::invoke`はSTL内での呼び出し可能コンセプトの表現や関数呼び出しの`noexcept`指定、戻り値型推論に広く用いられており、`constexpr`関数の実行コンテキストが明確でないままに`std::invoke`を`constexpr`にしてしまうとそれらの関数利用時に意図しないコンパイルエラーを引き起こす可能性がありました。  
+そのため、`std::apply`等`constexpr`関数の定義でも使用されているにも関わらず`std::invoke`は`constexpr`関数ではありませんでした。
+
+C++20より、`constexpr`関数をどこで評価・実行すべきかを明確にしたこと（P0859R0）によってそれらの問題は払拭され、`std::invoke`は`constexpr`指定されました。  
+そしてそしてそれに伴い、`std::invoke`を定義に利用するいくつかのSTL関数も`constexpr`指定されます。
+
+[P0859R0 評価されない文脈でconstexpr関数が定数式評価されることを規定](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0859r0.html)について↓
+[https://onihusube.hatenablog.com/entry/2019/03/19/011249:embed:cite]
+
+C++20より`constexpr`指定される関連関数
+
+- `std::invoke`
+- `std::reference_wrapper<T>`
+  - 全メンバ関数
+- `std::ref()`
+- `std::cref()`
+- `std::not_fn()`
+- `std::bind_front()`
+- `std::bind()`
+- `std::mem_fn()`
+
 #### 全てのメンバ関数のconstexpr化を達成したクラス
 - `std::vector`
 - `std::string`
@@ -778,6 +804,7 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 - [P0980R0 : Making std::string constexpr](https://wg21.link/P0980)
 - [P0533R4 : constexpr for `<cmath>` and `<cstdlib>`](https://wg21.link/P0533)
 - [P0202R3 : Add Constexpr Modifiers to Functions in `<algorithm>` and `<utility>` Headers](https://wg21.link/P0202)
+- [P1065R2 : constexpr INVOKE](https://wg21.link/p1065)
 - [P0415R1 : Constexpr for std::complex](https://wg21.link/P0415)
 [P1006R1 : Constexpr in std::pointer_traits](https://wg21.link/P1006)
 - [C++20 - cpprefjp](https://cpprefjp.github.io/lang/cpp20.html)
