@@ -502,7 +502,7 @@ constexpr double fma(double b, double c, double d) {
 
 int main() {
   //両方ok
-  volatile double fma1 = fma(10, 20, 30); //volatileは実行時に評価してもらうため
+  double fma1 = fma(10, 20, 30);
   constexpr double fma2 = fma(10, 20, 30);
 }
 ```
@@ -740,7 +740,7 @@ constexpr auto no = std::find(std::begin(cvec), std::end(cvec), `w`);
 C++17までは`constexpr`関数をどこで実行すべきかが明確に規定されていなかったために、その実行に関しては処理系に一任されていました。  
 そのため、処理系によっては貪欲な定数実行の結果、意図しない文脈で`constexpr`関数が実行され、不明確なコンパイルエラーを引き起こしていました。
 
-`std::invoke`はSTL内での呼び出し可能コンセプトの表現や関数呼び出しの`noexcept`指定、戻り値型推論に広く用いられており、`constexpr`関数の実行コンテキストが明確でないままに`std::invoke`を`constexpr`にしてしまうとそれらの関数利用時に意図しないコンパイルエラーを引き起こす可能性がありました。  
+`std::invoke`はSTL内での呼び出し可能コンセプトの表現や関数呼び出しの`noexcept`指定、戻り値型推論等に広く用いられており、`constexpr`関数の実行コンテキストが明確でないままに`std::invoke`を`constexpr`にしてしまうとそれらの関数利用時に意図しないコンパイルエラーを引き起こす可能性がありました。  
 そのため、`std::apply`等`constexpr`関数の定義でも使用されているにも関わらず`std::invoke`は`constexpr`関数ではありませんでした。
 
 C++20より、`constexpr`関数をどこで評価・実行すべきかを明確にしたこと（P0859R0）によってそれらの問題は払拭され、`std::invoke`は`constexpr`指定されました。  
