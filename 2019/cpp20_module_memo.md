@@ -8,9 +8,13 @@
 ※内容へのツッコミ歓迎します、issueでもプルリクでも好きにしてください
 
 P1103R3以降の変更も反映しています（C++20正式策定までは永遠に作業中）
+- [[module.interface] Use 'namespace-definition', #2916 - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/2916)
+- [Typo fixes for sample code comments related to modules. #2951 - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/2951)
+- [[basic.lookup.argdep]/5 Added export to `apply(T t, U u)` #2973 - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/2973)
 - [P1811R0 : Relaxing redefinition restrictions for re-exportation robustness](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1811r0.html)
+- [P1766R1 : Mitigating minor modules maladies](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1766r1.html)
 
-# 以下本文
+## 以下本文
 
 - module unit : モジュール単位  
 モジュールを構成する翻訳単位  
@@ -628,7 +632,25 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 - 名前付きのモジュールに属しているグローバルスコープで`main`という名前の関数を宣言している
 - Cリンケージを使用して`main`という名前の関数を宣言している
 
-### 9.1.6 The inline speciﬁer [dcl.inline] 
+### 9.1.3 The typedef specifier[dcl.typedef]
+
+#### 10
+リンケージ目的で`typedef`名を持つ無名クラスは次のものを含んではならない。
+
+- 非静的データメンバ、メンバ列挙型、メンバ型（入れ子クラス）以外のメンバ
+- 基底クラス
+- データメンバに対するデフォルト初期化子
+- ラムダ式
+
+そして、この規則はそのメンバとなっているクラスにも再帰的に適用される。
+
+```cpp
+typedef struct {
+  int f() {}
+} X;  //error: リンケージのためにtypedef名を持つクラスがメンバ関数を持っている
+```
+
+### 9.1.6 The inline speciﬁer [dcl.inline]
 
 #### 6
 inline変数・関数がある翻訳単位でodr-usedされているとき、その翻訳単位の末尾からその定義が到達可能でなければならず、全ての（odr-usedされている）翻訳単位で同様かつ、全く同じ定義を持っていなければならない。（inline変数の使用、inline関数の呼び出しはその定義が（翻訳単位内で）現れる前に行われる可能性がある）
@@ -653,6 +675,21 @@ inline変数・関数がある翻訳単位でodr-usedされているとき、そ
 #### 10
 プレースホルダ型（`auto, decltype(auto)`とそれのコンセプト付き）を戻り値型に使用する宣言を持つエクスポートされた関数は、そのエクスポートされた宣言を含む翻訳単位内で、かつ（存在している場合は）プライベートモジュールフラグメントの外側で定義されなければならない。  
 [Note: 推論される戻り値型のリンケージに制限はない]
+
+### 9.2.3.6 Default arguments[dcl.fct.default]
+テンプレートでない関数は、同じスコープの後の宣言でデフォルト引数を追加できる。  
+異なるスコープの宣言には完全に異なるデフォルト引数の集合がある。つまり、より内側のスコープの宣言はそれより外側のスコープの宣言からデフォルト引数を取得しない、その逆も同様。
+
+特定の関数宣言では、デフォルト引数を持つ引数の後の各引数には以前の宣言、もしくはその宣言で導入されたデフォルト引数が指定されていなければならない。  
+ただし、そのような（デフォルト引数の後の）引数がパラメータパックから展開された場合、もしくは関数パラメータパックである場合を除く。
+
+[Note: デフォルト引数はたとえ同じ値であっても後の宣言で再定義することはできない。]
+
+[Example省略]
+
+異なる翻訳単位で定義された特定の`inline`関数では、それぞれの翻訳単位の終端での累積となるデフォルト引数の集合は同一でなければならない。ただし、この診断は不要。
+
+`friend`宣言でデフォルト引数式が指定されている場合、その宣言は定義であり、かつその翻訳単位における唯一の関数・関数テンプレートの宣言でなければならない。
 
 ### 9.7 Namespaces [basic.namespace]
 
@@ -1733,4 +1770,37 @@ module *m1;         // ill-formed;（モジュール宣言とみなされる）�
 class import {};
 import j1;          // 以前は変数宣言、現在はインポート宣言
 ::import j2;        // 変数宣言
+```
+
+### C.5.4 [dcl.dcl]: declarations[diff.cpp17.dcl.dcl]
+#### 1
+Affected subclause: [dcl.typedef]  
+Change: リンケージ目的で`typedef`名を持つ無名クラスには、C互換の構成のみを含めることができる。  
+Rationale: 実装可能性のために必要  
+Effect on original feature: C++17では有効だったコードが、この国際標準（C++20）では正しくない場合がある。
+
+```cpp
+typedef struct {
+  void f() {} // ill-formed; 以前はwell-formed
+} S;
+```
+
+#### 2
+Affected subclause: [dcl.fct.default]  
+Change: 関数は異なる翻訳単位で異なるデフォルト引数を持つことができない。
+Rationale: モジュールサポートのために必要  
+Effect on original feature: C++17では有効だったコードが、この国際標準（C++20）では正しくない場合があり、それについての診断は不要。
+
+```cpp
+// 翻訳単位1
+int f(int a = 42);
+int g() { return f(); }
+
+// 翻訳単位2
+int f(int a = 76) { return a; } // ill-formed (診断は不要); 以前はwell-formed
+int g();
+
+int main() {
+  return g(); // 42を返すために使用
+}
 ```
