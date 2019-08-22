@@ -453,7 +453,7 @@ Atom提案では`export`と`module`は文脈依存キーワードとされてい
       - ~~これまでに処理された一連のプリプロセッシングトークンが翻訳フェーズ4までコンパイル可能であり、結果として`import`宣言になる場合、プリプロセッシングディレクティブの外側では翻訳フェーズ4を適用する。~~
 
 #### 4
-import-keywordはインポートディレクティブを処理することで生成され、直接記述するための文法は無い。
+import-keywordは`import`ディレクティブを処理することで生成され、直接記述するための文法は無い。
 
 ### 6.2 One-deﬁnition rule [basic.def.odr]
 1  
@@ -1055,9 +1055,9 @@ export namespace N {
 ### 10.3 Import declaration [module.import]
 
 - module-import-declaration:
-  - `export`(opt) importimport-keyword module-name attribute-specifier-seq(opt);
-  - `export`(opt) importimport-keyword module-partition attribute-specifier-seq(opt);
-  - `export`(opt) importimport-keyword header-name attribute-specifier-seq(opt);
+  - `export`(opt) import-keyword module-name attribute-specifier-seq(opt);
+  - `export`(opt) import-keyword module-partition attribute-specifier-seq(opt);
+  - `export`(opt) import-keyword header-name attribute-specifier-seq(opt);
 
 #### 1
 モジュール単位におけるすべてのモジュールインポート宣言（module-import-declaration）は、その翻訳単位及び（存在する場合は）プライベートモジュールフラグメントにおけるtop-level-declaration-seq内にあり、かつそこに含まれる他の全てのtop-level-declarationsよりも前に宣言されなければならない。  
@@ -1720,10 +1720,12 @@ pp-importを終了する`;`プリプロセッシングトークンは、マク�
 pp-importによってインポートされるマクロのインポート点は、pp-importの最初の2つの形式ではそのpp-importを終了する改行（new-line）の直後の点。
 
 pp-importの最後の形式は、最初の2つの形式がマッチしなかった時にのみ考慮される。  
-（この形式は、ヘッダ名が別のプリプロセッサによって生成される場合のもの）
+（この形式には、名前付きモジュールの`import`宣言がマッチする。それは次の規則によってimport-keywordに置換され、`import`宣言としてプリプロセス後に処理される。）
 
 #### 2
 pp-importの3つの形式全てで、`import`トークンはimport-keywordトークンに置換される。  
+（これにより、モジュールとしての処理はプリプロセス後にヘッダーユニット等の区別なく実行される。）
+
 さらに、pp-importの2つ目の形式では、header-name-tokensが`#include`ディレクティブのpp-tokensであるかのように、header-nameトークンが生成される。  
 そして、header-name-tokensは（生成された）header-nameトークンに置き換えられる。  
 [Note:これにより、インポートはプリプロセッサ及びその後の翻訳フェーズで（１つ目の形式として）一貫して処理される。]
