@@ -234,7 +234,7 @@ namespace std {
 
 ちなみに、類似の`std::destroy()`、`std::destroy_n()`、及びRangeの追加に伴って`std::range`名前空間に追加される同名の関数も同様にされ、定数式で実行できます（`std::construct_at()`関連も同様）。
 
-瑣末な注意点ですが、`std::construct_at()`/`std::destroy_at()`の第一引数`T*`は`std::allocator<T>::allocate()`によって確保された領域を指すポインタでなければなりません（当然、new式で確保されたものであってもダメ）。  
+瑣末な注意点ですが、定数式での`std::construct_at()`/`std::destroy_at()`の呼び出し時の第一引数`T*`は`std::allocator<T>::allocate()`によって確保された領域を指すポインタでなければなりません（当然、new式で確保されたものであってもダメ）。  
 また、それぞれの関数内で呼び出される`T`のコンストラクタおよびデストラクタが定数式で実行可能でなければconstexpr実行不可となります。
 
 ```cpp
@@ -284,7 +284,10 @@ constexpr bool b1 = allocate_test1();  //ok
 constexpr bool b2 = allocate_test2();  //compile error!
 ```
 
-プログラマから見た扱いはnew/delete式とほぼ同じになるわけです。
+`std::allocator<T>`と`std::construct_at()`/`std::destroy_at()`の組み合わせで、プログラマから見た扱いはnew/delete式とほぼ同じになるわけです。
+
+また、`std::allocator_traits`の確保と解放・構築と破棄に関わるメンバが全て同様にconstexpr関数として定数式で実行可能になっているので、メモリ確保周りに関して標準コンテナは追加の作業無しでconstexpr対応をすることができます（他の部分で考慮が必要ではあります）。  
+C++20では、`std::vector`と`std::string`がこれらの変更によってconstexpr対応を果たします。
 
 これらの多大なる努力によってコンパイル時メモリ確保に関する障害はほぼ取り除かれ、全人類の夢であったコンパイル時動的メモリ確保が可能になります。
 
