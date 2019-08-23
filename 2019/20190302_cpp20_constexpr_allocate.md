@@ -10,22 +10,23 @@
 C++17まではデストラクタにconstexprを付けることはおろか、リテラル型として振舞えるクラスにデストラクタを定義することができず、デストラクタのコンパイル時実行もできませんでした。  
 STLコンテナは例外なくデストラクタがtrivialでない（定義してある）ので、STLコンテナをconstexpr対応させるためにもこの制限は撤廃されます。
 
-デストラクタにconstexpr指定が可能になり、そのデストラクタはコンパイル時に実行可能になります。ただし、そのようなクラスは仮想基底を持っては（仮想継承しては）ならず、デストラクタの中身はconstexpr実行可能である必要があります。  
-`= default`なデストラクタはメンバや基底クラスのデストラクタが全てconstexprであれば、暗黙的にconstexprとなります。  
-また、trivialなデストラクタも暗黙的にconstexprです。これは主に既存の組み込み型が該当します。
+C++20より、デストラクタにconstexpr指定が可能になり、そのデストラクタはコンパイル時に実行可能になります。ただし、そのようなクラスは仮想基底を持っては（仮想継承しては）ならず、デストラクタの中身は定数式で実行可能である必要があります。
+
+`= default;`なデストラクタやtrivialなデストラクタは、メンバや基底クラスのデストラクタが全てconstexprであれば、暗黙的にconstexprとなります。
 
 #### リテラル型の要件変更
 そして、この変更に伴ってリテラル型となるクラスの条件が変更となります。
 
-これまでは（メンバ変数は全てリテラル型であることを前提として）、
-constexprコンストラクタとtrivialなデストラクタを要求していましたが、constexprコンストラクタとconstexprデストラクタを持つこと、という要求に少し緩和されます。  
-つまり、リテラル型のオブジェクトはコンパイル時に構築・破棄可能でなければなりません。
+C++17までは（メンバ変数および基底型は全てリテラル型であることを前提として）、
+constexprコンストラクタとtrivialなデストラクタを要求していました。  
+C++20からは、constexprコンストラクタとconstexprデストラクタを持つこと、という要求に少し緩和されます。  
+つまり、リテラル型のオブジェクトはコンパイル時に構築・破棄可能である必要があります。
 
 ```cpp
-//これまでの、リテラル型の例
+//C++17でのリテラル型の例
 struct literal17 {
   //constexprなコンストラクタが少なくとも一つ必要
-  //かつ、メンバをすべてconstexprに初期化できなければならない
+  //かつ、そこからメンバをすべて定数式で初期化できなければならない
   constexpr literal17()
     : m{}
     , d{}
@@ -39,13 +40,14 @@ struct literal17 {
   double d;
 };
 
-//これからの、リテラル型の例
+//C++20でのリテラル型の例
 struct literal20 {
   //constexprなコンストラクタが少なくとも一つ必要
-  //かつ、メンバをすべてconstexprに初期化できなければならない
+  //かつ、そこからメンバをすべて定数式で初期化できなければならない
   constexpr literal20()
     : m{}
     , d{}
+    , str{"constexpr string"}
   {}
 
   //constexprであればデストラクタを書ける
@@ -53,16 +55,23 @@ struct literal20 {
       //しかしこの例では意味のある処理を書くのがムズカシイ・・・
       m = 0;
       d = 0;
+      str.clear();
   }
+
+  //もちろんこう書いてもok
+  //~literal20() = default;
 
   //メンバは全てリテラル型
   int m;
   double d;
+  std::string str;  //!?
 };
 ```
 
+`std::string`はこれから説明する変更に伴って全メンバ`constexpr`指定されるようになるので、リテラル型として扱うことができるようになります。
+
 #### virtual constexpr destructor
-すでにconstexprな仮想関数呼び出しは可能になっていますが、それはあくまで自動変数のリテラル型のアドレスをその基底クラスのポインタに移して呼び出すもので、デストラクタがvirtualである必要はないのでリテラル型の要件（デストラクタを書けない）に変更はありませんでした。  
+すでにconstexprな仮想関数呼び出しは可能になっていますが、それはあくまでリテラル型自動変数のアドレスをその基底クラスのポインタ/参照に移して呼び出すもので、デストラクタがvirtualである必要はありませんでした。  
 しかし、constexprデストラクタの導入とそれに伴うリテラル型の要件変更、そしてconstexprなメモリアロケーションによってその前提は崩れます。
 
 つまり、コンパイル時にnewによって確保されたオブジェクトが基底クラスのポインタからdeleteされたとき、実行時と同じようにデストラクタ呼び出しの問題が発生します。  
@@ -73,6 +82,7 @@ virtualでconstexprなデストラクタは（この後の変更のためにも�
 ```cpp
 struct base {
   virtual int f() const = 0;
+
   //virtual constexprと書ける！
   virtual constexpr ~base() = default;
 };
@@ -83,16 +93,33 @@ struct derived : base {
   }
 };
 
-//この様なことが可能だったとして
-constexpr base* d = new derived{};
-//derived::~derived()がコンパイル時にも正しく呼ばれる！
-delete base;
+
+constexpr int new_sample() {
+  //この様なことが可能だったとして
+  base* d = new derived{};
+
+  int n = d->f();
+
+  delete_func(d);
+
+  return n;
+}
+
+constexpr void delete_func(base* ptr) {
+  //derived::~derived()がコンパイル時にも正しく呼ばれる！
+  delete ptr;
+}
+
+int main() {
+  constexpr n = new_sample(); //定数式で実行
+}
 ```
 
 ### constexprなnew式/delete式
-STLコンテナをconstexpr対応させるとなると一番問題となるのが動的なメモリアロケーションです。これをconstexprの文脈で認めなければSTLコンテナはコンパイル時に利用できません。そこで、一定の制限の下でコンパイル時の動的メモリ確保が認められるようになります。
+STLコンテナをconstexpr対応させるとなると一番問題となるのが動的なメモリアロケーションです。これを定数式で認めなければSTLコンテナはコンパイル時に利用できません。そこで、一定の制限の下でコンパイル時の動的メモリ確保が認められるようになります。
 
-constexpr関数等をコンパイル時に実行する際、未定義動作が検出された場合にはコンパイル時実行不可能になります。そのため、コンパイラはそれを可能な限り検出しようとします。  
+constexpr関数等をコンパイル時に実行する際、未定義動作が検出された場合にはコンパイル時実行不可能
+になります。そのため、コンパイラはそれを可能な限り検出しようとします。  
 ところが、動的なメモリ確保につきものなのがvoidポインタから別のポインタへのキャストです。
 ```cpp
 //operator new / operator delete のうちの一つ
@@ -105,9 +132,9 @@ void  free(void* ptr);
 ```
 通常メモリ確保に使われるこれらは、見てわかるように`void*`からのキャストが必要です。
 
-ポインタのキャストという行為が容易に未定義動作を踏み得る（ strict aliasing rules）上にそれを検出しづらいこともあって、現在定数式でそれは許可されていません。そして、C++20でも許可されません。
+ポインタのキャストという行為が容易に未定義動作を踏み得る（strict aliasing rulesなど）上にそれを検出しづらいこともあって、現在定数式でそれは許可されていません。そして、C++20でも許可されません。
 
-しかしそれではコンパイル時にメモリ確保のしようがありません。しかし、C++には見た目上再解釈を必要としないメモリ確保を行う式があります。つまり、new/delete式です。
+しかしそれではコンパイル時にメモリ確保のしようがありません。しかし、C++には見た目上再解釈を必要としないメモリ確保を行う式があります。つまり、`new`/`delete`式です。
 
 （new式（new expression）とnew演算子（operator new）の違いについて → [動的メモリ確保 - 江添亮の入門C++](https://ezoeryou.github.io/cpp-intro/#動的メモリ確保)）
 
@@ -115,13 +142,13 @@ new式は任意の型のメモリ領域の確保と構築、delete式は（new�
 
 このnew/delete式であれば確実に不正なポインタの再解釈は行われない事が分かるため、これらの式に限ってconstexprでコンパイル時実行可能になります。
 
-ただし、呼び出せるのグローバルなoperator newを利用するようなnew式のみです。クラススコープにoperator newのオーバーロードがある場合はグローバルスコープ解決を行う必要があるかと思われます（::new T()の形で呼び出し）。  
-そうでないnew式の呼び出しは、コンパイル時には単に省略されます。この省略はC++14より許可されているnew式の最適化の一環として行われます。省略された場合、別の領域をあてがわれるか、別のnew式の確保したメモリを拡張して補われます。  
+ただし、呼び出せるのグローバルな`operator new`を利用するようなnew式のみです（クラススコープの`operator new`オーバーロードがある場合などはこの条件に引っかかる）。  
+そうでないnew式の呼び出しはコンパイル時には常に省略されます。この省略はC++14より許可されているnew式の最適化の一環として行われます。省略された場合、別の領域をあてがわれるか別のnew式の確保したメモリを拡張して補われます。  
 省略とはいっても何もなされなくなるわけではありません。
 
-また、コンパイル時に割り当てたメモリはコンパイル時に確実にdeleteされるか、後述する`Non-transient allocation`の要求を満たす必要があります。そうでないnew式の呼び出しはコンパイル時実行不可となります。
+また、コンパイル時に割り当てたメモリはコンパイル時に確実にdeleteされる必要があり、そうなっていないnew式の呼び出しはコンパイル時実行不可となります。
 
-delete式についても、コンパイル時に確保されたメモリを開放するもの以外はコンパイル時実行不可となります。
+delete式についても、コンパイル時にnew式で確保されたメモリを開放するもの以外はコンパイル時実行不可となります。
 
 ```cpp
 struct base {
@@ -159,57 +186,53 @@ constexpr bool b2 = allocate_test2();  //compile error!
 
 delete忘れるとコンパイルエラー！誰もが望んだことが可能になります。
 
-### `std::allocator<T>`
-ところで、C++にはもう一つ見かけ上ポインタの再解釈をする事無く任意の型のメモリ領域を確保/解放する手段があります。それが、`std::allocator<T>`です。（ただし、`std::allocator_traits<std::allocator<T>>`も同様ですので、以下`std::allocator<T>`にまつわる話は暗黙的にそれを含みます。）
+### `std::allocator<T>`、`std::allocator_traits`
+ところで、C++にはもう一つポインタの危険な再解釈をする事無く任意の型のメモリ領域を確保/解放する手段があります。それが、`std::allocator<T>`と`std::allocator_traits<std::allocator<T>>`です。
 
-`std::allocator<T>`は殆どのSTLコンテナで使われているデフォルトのアロケータで、そのメンバ関数によってメモリの確保、解放を行うことができます。それも、その式の入力と出力に際してユーザー側から見てポインタの再解釈は行われません。
+`std::allocator<T>`は殆どの標準コンテナで使われているデフォルトのアロケータで、そのメンバ関数によってメモリの確保、解放を行うことができます。それも、その式の入力と出力に際してユーザー側から見てポインタの再解釈は行われません。
 そこで、この`std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`によるメモリの確保と解放もconstexprに行うことができるようになります。
 
-それに伴って`std::allocator<T>`のすべてのメンバがconstexpr指定されます（とはいえ、allocate/deallocate以外のメンバ関数はちょうど削除されたので、残ったのは代入演算子とコンストラクタ、デストラクタくらいですが）。
+それに伴って`std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`のすべてのメンバがconstexpr指定されます（とはいえ、`std::allocator<T>`の`allocate()/deallocate()`以外のメンバ関数はちょうど削除されたので、残ったのは代入演算子とコンストラクタ、デストラクタくらいですが）。
 
-new/delete式と同じように、`std::allocator<T>::allocate`で確保したメモリはコンパイル時に確実に解放されるか後述する`Non-transient allocation`の要求を満たす必要があり、  
-`std::allocator<T>::deallocate`はコンパイル時に確保されたメモリの解放のみを行う必要があります。  
+new/delete式と同じように、`std::allocator<T>::allocate()`で確保したメモリはコンパイル時に確実に解放される必要があり、`std::allocator<T>::deallocate()`はコンパイル時に`std::allocator<T>::allocate()`によって確保されたメモリの解放のみを行う必要があります。  
 そうでない場合はコンパイル時実行不可となります。
 
-<!-- 
-これらのことに関する記述を見る限り、コンパイル時のメモリ確保と解放に関して、new/deleteとallocate/deallocateは必ずしもペアになっている必要はないようです。  
-つまり、newで確保したメモリを`std::allocator<T>::deallocate`することや、`std::allocator<T>::allocate`したメモリをdeleteすることができるようです。
--->
-
 #### `std::construct_at`と`std::destroy_at`
-詳しい人はご存知かもしれませんが、`std::allocator<T>`はnew/delete式とは違ってメモリの確保と解放しか行いません。オブジェクトの構築・破棄を行ってくれないのです。
+詳しい人はご存知かもしれませんが、`std::allocator<T>`は`new/delete`式とは違ってメモリの確保と解放しか行いません。オブジェクトの構築・破棄を行ってくれないのです。
 
-`std::allocator<T>::allocate`で確保したメモリを利用するにはplaccement newが、`std::allocator<T>::deallocate`でメモリの解放を行う前にはpseudo-destructor call（T型のオブジェクトaに対して `a.~T()`のような形のデストラクタ呼び出し）が必要になります。
+`std::allocator<T>::allocate()`で確保したメモリを利用するにはplaccement newが、`std::allocator<T>::deallocate()`でメモリの解放を行う前にはpseudo-destructor call（T型のオブジェクトaに対して `a.~T()`のような形のデストラクタ呼び出し）もしくは`std::destroy_at()`の呼び出しが必要になります。
 
-placement new式はvoidポインタの受け入れに伴って再解釈が発生します。また、両方とも定数式では現在許可されておらず、C++20でも許可されません。
+placement new式はvoidポインタの受け入れに伴って再解釈が発生します。また、両方とも定数式では現在許可されておらず、C++20でも許可されません。  
+`std::destroy_at()`もconstexpr関数ではなく定数式で実行できません。
 
-これを解決するために、既存の`std::destroy_at`とそれの対となる `std::construct_at`を追加し、それらにconstexprを付加したうえで新たな役割を与えます。
+これを解決するために、既存の`std::destroy_at()`の対となる `std::construct_at()`を追加し、それらにconstexprを付加します。
 
 ```cpp
-//それぞれの宣言
+//C++20からのそれぞれの宣言
+namespace std {
+  template<class T, class... Args>
+  constexpr T* construct_at(T* location, Args&&... args);
 
-template<class T, class... Args>
-constexpr T* construct_at(T* location, Args&&... args);
-
-template<class T>
-constexpr void destroy_at(T* p);
+  template<class T>
+  constexpr void destroy_at(T* location);
+}
 ```
 
-`std::construct_at`はその呼び出しが、`return ::new (location) T(std::forward<Args>(args)...);`という式と同じ効果を持つように  
-`std::destroy_at`はその呼び出しが`p->~T()`と同じ効果を持つように  
-それぞれ変更されます（正確には`std::destroy_at`は効果が変わってません）。そしてそれらはコンパイル時実行可能です。
+`std::construct_at()`はその呼び出しが、`return ::new (location) T(std::forward<Args>(args)...);`という式（つまりplacement new）と同じ効果を持つように定義されます。  
+`std::destroy_at()`はその呼び出しが`location->~T()`（つまりpseudo-destructor call）と同じ効果を持つと定義されており、特に変更はありません。
+そして、両方ともconstexprが付加されコンパイル時実行可能になります。
 
-そして現在、placement new及びpseudo-destructor callを使用している`std::allocator_traits<std::allocator<T>>`のconstruct/destroy関数の効果をこれらを使って定義しなおします。
+そして現在、placement new及びpseudo-destructor callを使用している`std::allocator_traits<std::allocator<T>>`の`construct()/destroy()`両関数の効果をこれらを使って定義しなおします（`std::allocator<T>`は`std::allocator_traits`を通して使われることを前提とするため、構築・破棄に関わるこれらの関数を持ちません）。
 
-これで何が変わるんじゃいという感じですが、placement new及びpseudo-destructor callの呼び出しを避け、`std::construct_at`と`std::destroy_at`をコンパイラに特別扱いしてもらう事で、それぞれの問題を解決しています。そしてついでにこれらはconstexpr関数です。  
-「同じ効果を持つ」という所がキモです。
+これで何が変わるんじゃいという感じですが、placement new及びpseudo-destructor callの呼び出しを避け、`std::construct_at`と`std::destroy_at`をコンパイラに特別扱いしてもらって定数式で実行してもらうことで、それぞれの問題を解決しています。「同じ効果を持つ」という所がキモです。
 
-このなんとも納得のいかない（コンパイラの）努力によって、`std::allocator<T>`を用いてコンパイル時にメモリの確保と解放をする事の障害が取り除かれました。
+このような機能実現方法のことをコンパイラーマジックと呼んだりして、C++11以降いくつかの機能の実現において利用されています。
 
-ちなみに、類似の`std::destroy`、`std::destroy_n`、及びRangeの追加に伴ってstd::range名前空間に追加される同名の関数（`std::construct_at`も含む）にも同じ変更が適用されます。
+この涙なしには語れない（コンパイラの）努力によって、`std::allocator<T>`を用いてコンパイル時にメモリの確保と解放をする事の障害が取り除かれました。
 
-`std::construct_at`/`std::destroy_at`の第一引数は`std::allocator<T>`によって確保された`T`のポインタでなければなりません。また、`T`のコンストラクタおよびデストラクタが定数式で呼び出し可能でなければコンパイル実行不可となります。
+ちなみに、類似の`std::destroy()`、`std::destroy_n()`、及びRangeの追加に伴って`std::range`名前空間に追加される同名の関数も同様にされ、定数式で実行できます（`std::construct_at()`関連も同様）。
 
+瑣末な注意点ですが、`std::construct_at()`/`std::destroy_at()`の第一引数は`std::allocator<T>`によって確保された`T`のポインタでなければなりません。また、`T`のコンストラクタおよびデストラクタが定数式で呼び出し可能でなければコンパイル実行不可となります。
 
 ```cpp
 struct base {
