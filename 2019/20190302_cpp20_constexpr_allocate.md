@@ -260,6 +260,8 @@ constexpr bool b2 = allocate_test2();  //compile error!
 
 プログラマから見た扱いはnew/delete式とほぼ同じになるわけです。
 
+これらの多大なる努力によってコンパイル時メモリ確保に関する障害はほぼ取り除かれ、全人類の夢であったコンパイル時動的メモリ確保が可能になります。
+
 ### コンパイル時確保メモリの解放タイミング
 
 #### Transient allocation（一時的な割り当て）
@@ -269,6 +271,13 @@ Transient allocationとは、コンパイル時に動的に確保されたメモ
 これはほとんど問題ないでしょう。
 
 #### Non-transient allocation（非一時的な割り当て）
+
+C++20における最終的な仕様では、Non-transient allocationは認められないことになりました（P0784R6で削除されました）。従って、コンパイル時に確保したメモリはコンパイル時に解放されなければなりません。
+
+#### Non-transient allocationに関する以前の仕様
+
+※以下の記述は、以前の仕様を記したものです。参考に残しておきます・・・・
+
 Non-transient allocationはその名の通り、コンパイル時に確保されたメモリ領域のうち、コンパイル時には解放されない物の事です。  
 コンパイル時に確保したメモリ領域を実行時に参照したいことがある事からこの様な場合分けがなされています。
 
@@ -322,8 +331,9 @@ constexpr sample<char> str{"Hello."};
 
 まどろっこしいですが、この様な規則を導入することで前項の確保・解放関数のコンパイル時実行条件の修正や、コンパイル時動的メモリ→実行時動的メモリの変換、などのさらに煩わしいことを考えなくて済むようになります。
 
-#### `std::mark_immutable_if_constexpr()`
-前項でコンパイル時に解放され切らないメモリについての扱いは分かりました。しかしそこにはまだ問題があります。
+##### `std::mark_immutable_if_constexpr()`
+
+ここまでで、コンパイル時に解放され切らないメモリについての扱いは分かりました。しかしそこにはまだ問題があります。
 
 先のsampleクラスがNon-transient allocationとなる場合にはそのデストラクタは見た目だけのもので、それは呼ばれることはありません。そしてそのコンパイル時動的メモリ領域は静的記憶域へ昇格されます。  
 では、そのメモリの内容はどの時点で決まるのでしょうか？
@@ -377,14 +387,13 @@ constexpr sample<char> str{"Hello."};
 ```
 この様にしておけば、`str`はその後どう弄繰り回されても実行時から見たら`Hello`を保持するようになります。
 
-これらの多大なる努力によってコンパイル時メモリ確保に関する障害がほぼ取り除かれ、全人類の夢であったコンパイル時動的メモリ確保が可能になることになります（予定）。
-
 ### 参考文献
 - [P0784R2 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r2.html)
 - [P0784R3 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r3.html)
 - [P0784R4 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0784r4.html)
 - [P0784R5 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0784r5.html)
 - [P0784R6 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0784r6.html)
+- [P0784R7 : More constexpr containers](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0784r7.html)
 
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190302_cpp20_constexpr_allocate.md)
