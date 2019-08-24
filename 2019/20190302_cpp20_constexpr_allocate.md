@@ -132,9 +132,8 @@ void  free(void* ptr);
 ```
 通常メモリ確保に使われるこれらは、見てわかるように`void*`への/からのキャストが必要です。
 
-ポインタのキャストという行為が容易に未定義動作を踏み得る（strict aliasing rulesなど）上にそれを検出しづらいこともあって、現在定数式でそれは許可されていません。そして、C++20でも許可されません。
-
-しかしそれではコンパイル時にメモリ確保のしようがありません。しかし、C++には見た目上再解釈を必要としないメモリ確保を行う式があります。つまり、`new`/`delete`式です。
+ポインタのキャストという行為が容易に未定義動作を踏み得る（strict aliasing rulesなど）上にそれを検出しづらいこともあって、現在定数式でそれは許可されていません。そして、C++20でも許可されません。  
+しかし、C++には見た目上ポインタのキャストを必要とせずにメモリ確保と解放を担う式があります。つまり、`new`/`delete`式です。
 
 （new式（new expression）とnew演算子（operator new）の違いについて → [動的メモリ確保 - 江添亮の入門C++](https://ezoeryou.github.io/cpp-intro/#動的メモリ確保)）
 
@@ -142,8 +141,8 @@ new式は任意の型のメモリ領域の確保と構築、delete式は（new�
 
 このnew/delete式であれば確実に不正なポインタの再解釈は行われない事が分かるため、これらの式に限ってconstexprでコンパイル時実行可能になります。
 
-ただし、呼び出せるのグローバルな`operator new`を利用するようなnew式のみです（クラススコープの`operator new`オーバーロードがある場合などはこの条件に引っかかる）。  
-そうでないnew式の呼び出しはコンパイル時には常に省略されます。この省略はC++14より許可されているnew式の最適化の一環として行われます。省略された場合、別の領域をあてがわれるか別のnew式の確保したメモリを拡張して補われます。  
+ただし、呼び出せるのグローバルな`operator new`を利用するようなnew式のみで、そうでないnew式の呼び出しはコンパイル時には常に省略されます（クラススコープの`operator new`オーバーロードがある場合など）。  
+この省略はC++14より許可されているnew式の最適化の一環として行われます。省略された場合、別の領域をあてがわれるか別のnew式の確保したメモリを拡張して補われます。  
 省略とはいっても何もなされなくなるわけではありません。
 
 また、コンパイル時に割り当てたメモリはコンパイル時に確実にdeleteされる必要があり、そうなっていないnew式の呼び出しはコンパイル時実行不可となります。
@@ -187,17 +186,19 @@ constexpr bool b2 = allocate_test2();  //compile error!
 delete忘れるとコンパイルエラー！誰もが望んだことが可能になります。
 
 ### `std::allocator<T>`、`std::allocator_traits`
-ところで、C++にはもう一つポインタの危険な再解釈をする事無く任意の型のメモリ領域を確保/解放する手段があります。それが、`std::allocator<T>`と`std::allocator_traits<std::allocator<T>>`です。
+ところで、C++にはもう一つポインタの危険な再解釈を必要とせずに任意の型のメモリ領域を確保/解放する手段があります。それが、`std::allocator<T>`と`std::allocator_traits<std::allocator<T>>`です。
 
 `std::allocator<T>`は殆どの標準コンテナで使われているデフォルトのアロケータで、そのメンバ関数によってメモリの確保、解放を行うことができます。それも、その式の入力と出力に際してユーザー側から見てポインタの再解釈は行われません。
-そこで、この`std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`によるメモリの確保と解放もconstexprに行うことができるようになります。
+そこで、この`std::allocator<T>`及び`std::allocator_traits`によるメモリの確保と解放もconstexprに行うことができるようになります。
 
-それに伴って`std::allocator<T>`及び`std::allocator_traits<std::allocator<T>>`のすべてのメンバがconstexpr指定されます（とはいえ、`std::allocator<T>`の`allocate()/deallocate()`以外のメンバ関数はちょうど削除されたので、残ったのは代入演算子とコンストラクタ、デストラクタくらいですが）。
+それに伴って`std::allocator<T>`及び`std::allocator_traits`のすべてのメンバがconstexpr指定されます（とはいえ、`std::allocator<T>`の`allocate()/deallocate()`以外のメンバ関数はちょうど削除されたので、残ったのは代入演算子とコンストラクタ、デストラクタくらいですが）。
 
 `std::allocator<T>`の`allocate()/deallocate()`は実際には定数式で呼び出し可能ではない`new/delete`演算子を呼び出してしまうのですが、言語機能として特別扱いすることでconstexprに呼び出しができるようになります。
 
-new/delete式と同じように、`std::allocator<T>::allocate()`で確保したメモリはコンパイル時に確実に解放される必要があり、`std::allocator<T>::deallocate()`はコンパイル時に`std::allocator<T>::allocate()`によって確保されたメモリの解放のみを行う必要があります。  
+new/delete式と同じように、コンパイル時に`std::allocator<T>::allocate()`で確保したメモリはコンパイル時に`std::allocator<T>::deallocate()`によって確実に解放される必要があり、`std::allocator<T>::deallocate()`はコンパイル時に`std::allocator<T>::allocate()`によって確保されたメモリの解放のみを行う必要があります。  
 そうでない場合はコンパイル時実行不可となります。
+
+少し注意点ですが、`new`式で確保したメモリを`std::allocator<T>::deallocate()`で解放する、`std::allocator<T>::allocate()`で確保したメモリを`delete`式で解放する、等といったことは定数式ではできません。コンパイルエラーです。
 
 #### `std::construct_at`と`std::destroy_at`
 詳しい人はご存知かもしれませんが、`std::allocator<T>`は`new/delete`式とは違ってメモリの確保と解放しか行いません。オブジェクトの構築・破棄を行ってくれないのです。
@@ -224,7 +225,7 @@ namespace std {
 `std::destroy_at()`はその呼び出しが`location->~T()`（つまりpseudo-destructor call）と同じ効果を持つと定義されており、特に変更はありません。
 そして、両方ともconstexprが付加されコンパイル時実行可能になります。
 
-そして現在、placement new及びpseudo-destructor callを使用している`std::allocator_traits<std::allocator<T>>`の`construct()/destroy()`両関数の効果をこれらを使って定義しなおします（`std::allocator<T>`は`std::allocator_traits`を通して使われることを前提とするため、構築・破棄に関わるこれらの関数を持ちません）。
+そして現在、placement new及びpseudo-destructor callを使用している`std::allocator_traits`の`construct()/destroy()`両関数の効果をこれらを使って定義しなおします（`std::allocator<T>`は`std::allocator_traits`を通して使われることを前提とするため、構築・破棄に関わるこれらの関数を持ちません）。
 
 これで何が変わるんじゃいという感じですが、placement new及びpseudo-destructor callの呼び出しを避け、`std::construct_at`と`std::destroy_at`をコンパイラに特別扱いしてもらって定数式で実行してもらうことで、それぞれの問題を解決しています。「同じ効果を持つ」という所がキモです。
 
@@ -235,7 +236,7 @@ namespace std {
 ちなみに、類似の`std::destroy()`、`std::destroy_n()`、及びRangeの追加に伴って`std::range`名前空間に追加される同名の関数も同様にされ、定数式で実行できます（`std::construct_at()`関連も同様）。
 
 瑣末な注意点ですが、定数式での`std::construct_at()`/`std::destroy_at()`の呼び出し時の第一引数`T*`は`std::allocator<T>::allocate()`によって確保された領域を指すポインタでなければなりません（当然、new式で確保されたものであってもダメ）。  
-また、それぞれの関数内で呼び出される`T`のコンストラクタおよびデストラクタが定数式で実行可能でなければconstexpr実行不可となります。
+また、それぞれの関数内で呼び出される`T`のコンストラクタおよびデストラクタが定数式で実行可能でなければconstexpr実行不可となります、これは`new/delete`式でも同様です。
 
 ```cpp
 struct base {
@@ -301,7 +302,7 @@ Transient allocationとは、コンパイル時に動的に確保されたメモ
 
 #### Non-transient allocation（非一時的な割り当て）
 
-C++20における最終的な仕様では、Non-transient allocationは認められないことになりました（P0784R6で削除されました）。従って、コンパイル時に確保したメモリはコンパイル時に解放されなければなりません。
+C++20における最終的な仕様では、Non-transient allocationは認められないことになりました（P0784R6で削除されました）。従って、コンパイル時に確保したメモリは確実にコンパイル時に解放されなければなりません。
 
 #### Non-transient allocationに関する以前の仕様
 
