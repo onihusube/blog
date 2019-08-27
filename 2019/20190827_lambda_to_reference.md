@@ -1,6 +1,6 @@
-# ［C++］ラムダ式から関数参照への変換（単項*演算子の作用について）
+# ［C++］ラムダ式から関数参照への変換（単項*演算子）
 
-状態を持たないラムダ式は単項+演算子を頭につけると明示的に対応する関数ポインタに変換することができます。では、そこから関数への参照に変換した時はどうすれば良いのでしょうか？  
+状態を持たないラムダ式は単項+演算子を頭につけると明示的に対応する関数ポインタに変換することができます。では、ポインタではなく関数への参照に変換したい時はどうすれば良いのでしょうか？  
 `+`をつけないだけでは関数参照にはなってくれません・・・
 
 ```cpp
@@ -99,11 +99,11 @@ int main()
 ```
 [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/J6VMUH5z6EqnIdB3)
 
-残念ながら、`+`を複数繋げるとインクリメントになってしまうので間にスペースが必要です。`*`の連続適用は関数ポインタへ暗黙変換されるので問題ない様子です。
+残念ながら、`+`を複数繋げるとインクリメントになってしまうので間にスペースが必要です。`*`の連続適用は関数ポインタへ暗黙変換されるので問題ありません。
 
 ## 参考文献
 - [8.3.1 Unary operators [expr.unary.op] - N4659](https://timsong-cpp.github.io/cppwp/n4659/expr.unary.op#1)
 - [Stateless lambdas can be converted to a function pointer, but not a function reference? - reddit](https://www.reddit.com/r/cpp/comments/cvcle8/stateless_lambdas_can_be_converted_to_a_function/)
-- [［C++］ラムダ式と単項+演算子 - ](https://onihusube.hatenablog.com/entry/2019/04/19/204552)
+- [［C++］ラムダ式と単項+演算子 - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2019/04/19/204552)
 
-[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190419_lambda_operator_plus.md)
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190827_lambda_to_reference.md)
