@@ -334,6 +334,78 @@ using common_comparison_category_t = typename common_comparison_category<Ts>::ty
 -それ以外の場合はvoid
 -->
 
+**比較カテゴリ型と==,<を利用した宇宙船演算子のdfault実装
+上で説明した宇宙船演算子のデフォルト実装は素晴らしいものですが、少し足りていないところがあります。それは、C++17以前に作成され、宇宙船演算子を持たない型に対してはデフォルト実装を提供できないことです。
+そのような型をメンバに含んでいるクラスは宇宙船演算子のデフォルト実装の恩恵を受けることができません。
+
+>|cpp|
+//C++17以前から使用されてきた秘伝の型、従来の比較演算子は実装されているが・・・
+struct old_type {
+   int n = 10;
+
+   //共に実装は省略
+   bool operator==(const old_type&) const noexcept;
+   bool operator< (const old_type&) const noexcept;
+};
+
+//C++20環境で定義された新しい型
+struct new_type {
+   int m = 10;
+   old_type old = {20};
+
+   //old_typeは<=>を持たないため、実装不可、暗黙delete
+   auto operator<=>(const new_type&) const = default;
+
+   //==があるため実装可能（明示的な宣言は実は不要）
+   bool operator== (const new_type&) const = default;
+};
+||<
+
+このような型に対して変更を加えることができればいいのですが、ライブラリの中にあったりして自分で手を出せない事もあるでしょう・・・
+宇宙船演算子を手で実装すれば実装はできますが、やはりdefault実装に任せたいものです。
+
+このような時、宇宙船演算子の戻り値型を明示的に書くことでdefault実装で済ます事ができます。
+
+>|cpp|
+struct new_type {
+   int m = 10;
+   old_type old = {20};
+
+   //指定した戻り値型とold_typeの持つ比較演算子を用いて実装してもらう
+   std::strong_ordering operator<=>(const new_type&) const = default;
+};
+
+new_type n1{}, n2 = {20, {30}};
+auto comp = n1 <=> n2;  //ok!
+||<
+
+戻り値型を明示的に指定する事で比較の実装をどのように行えば良いのかが明確になり、< ==を使って<=>と同等の比較を構成できるようになります。
+このようなdefault実装は以下のような実装になります。
+
+>|cpp|
+struct new_type {
+   int m = 10;
+   old_type old = {20};
+
+   //std::strong_ordering operator<=>(const new_type&) const = default;
+   std::strong_ordering operator<=>(const new_type&) const = default {
+      if (auto comp = m <=> that.m; comp !=0) return comp;
+
+      //<=>の合成
+      if (old == that.old) return std::strong_ordering::equal;
+      if (old <  that.old) return std::strong_ordering::less;
+      return std::strong_ordering::greator;
+   }
+};
+||<
+
+この場合は、上で説明した<=>のデフォルト実装ルールに加えてこのような実装を行います。
+これによって、<=>を持たないレガシーな型をメンバに持つ際にも<=>のデフォルト実装を提供できるようになります。
+
+*** なぜ戻り値型を指定する必要が・・・？
+
+
+
 **組み込み型の宇宙船演算子
 ここまで当たり前のように前提にしていましたが、C++20からはvoid以外の基本型（Fundamental types）にはもれなく宇宙船演算子が導入されます。そして、その比較カテゴリは以下のようになります。
 -bool型 → std::strong_ordering
@@ -545,6 +617,8 @@ g<"<=> Awesome!">();
 [http://wg21.link/p0732:title=P0732R2 "Class Types in Non-Type Template Parameters"]
 [http://wg21.link/p1120:title=P1120R0 "Consistency improvements for <=> and other comparison operators"]
 [http://wg21.link/p1185:title=p1185R2 "<=> != =="]
+[http://wg21.link/p1186:title=p1185R2 "When do you actually use <=>?"]
+[http://wg21.link/p1630:title=p1185R2 "Spaceship needs a tune-up"]
 [http://eel.is/c++draft/expr.spaceship:title]
 [https://en.cppreference.com/w/cpp/language/operator_comparison#Three-way_comparison:title]
 [https://ja.cppreference.com/w/cpp/language/default_comparisons:title]

@@ -73,7 +73,7 @@ call function reference.
 ## 組み込みの単項*演算子
 C++17規格の組み込み単項`*`演算子について見てみると次のようにあります。
 
->he unary * operator performs *indirection*: the expression to which it is applied shall be a pointer to an object type, or a pointer to a function type and the result is an lvalue referring to the object or function to which the expression points. 
+>The unary * operator performs *indirection*: the expression to which it is applied shall be a pointer to an object type, or a pointer to a function type and the result is an lvalue referring to the object or function to which the expression points. 
 
 なんとなく訳すと（powered by google翻訳）
 
