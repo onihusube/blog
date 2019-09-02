@@ -485,27 +485,95 @@ consteval int ng() {
 
 しかし、C++20からは`constexpr`関数内で`asm`宣言を書くことができるようになります。ただし、実行は出来ないため定数式で`asm`宣言に到達しないようにしなければなりません。つまり`std::is_constant_evaluated()`とセットで用いる必要があります。
 
-提案文書よりサンプルコードを引用。
+提案文書のサンプルコードを基にした例
 
 ```cpp
-constexpr double fma(double b, double c, double d) {
-  if (std::is_constant_evaluated()) {
-    return b * c + d;
+#include <iostream>
+#include <type_traits>
+
+constexpr double fma(double a, double b, double c) {
+  if (std::is_constant_evaluated()) {
+    return a*b+c;
   } else {
-    asm("vfmadd132sd %0 %1 %2"
-      : "+x"(b)
-      : "x" (c), "x" (d)
-    );
-    return b;
+    //GCC拡張のインラインアセンブラ構文なのでVC++では動かないかも・・・
+    asm volatile ("vfmadd213sd %0,%1,%2" : "+x"(a) : "x"(b),"x"(c));
+    return a;
   }
 }
 
-int main() {
-  //両方ok
-  double fma1 = fma(10, 20, 30);
-  constexpr double fma2 = fma(10, 20, 30);
+int main()
+{
+  constexpr double fma1 = fma(2.0, 8.0, 1.0);
+  double fma2 = fma(2.0, 9.0, 2.0);
+  
+  std::cout << fma1 << "\n" << fma2 << std::endl;
 }
 ```
+`vfmadd213sd`はFMA命令でIntelのCPUではHaswell以降のものしか対応していません（そのためWandboxで試せません・・・）
+
+動くサンプル、二次元ベクトルの内積計算。
+
+```cpp
+#include <iostream>
+#include <iomanip>
+#include <type_traits>
+
+constexpr double inner_product_v2(const double (&v1)[2], const double (&v2)[2]) {
+  double dp{};
+
+  if (std::is_constant_evaluated()) {
+    for (int i = 0; i < 2; ++i) dp += v1[i]*v2[i];
+  } else {
+    constexpr int imm8 = 0b110001;
+    asm volatile (
+      "movlpd %%xmm0, %1;"
+      "movhpd %%xmm0, %2;"
+      "movlpd %%xmm1, %3;"
+      "movhpd %%xmm1, %4;"
+      "dppd %%xmm0, %%xmm1, %5;"
+      "movlpd %0, %%xmm0"
+      : "=m"(dp)
+      : "m"(v1[0]), "m"(v1[1]), "m"(v2[0]), "m"(v2[1]), "N"(imm8)
+    );
+  }
+
+  return dp;
+}
+
+
+int main()
+{
+  {
+    constexpr double v1[2] = { 2.0, 2.0 }; 
+    constexpr double v2[2] = { 2.0, -2.0 };
+  
+    constexpr double dp1 = inner_product_v2(v1, v2);
+    double  dp2 = inner_product_v2(v1, v2);
+
+    std::cout << std::setprecision(16);
+    std::cout << dp1 << "\n" << dp2 << std::endl;
+  }
+  {
+    constexpr double v1[2] = { 0.0, 1.0 }; 
+    constexpr double v2[2] = { 1.0, 1.4142135623730950488016887242097 };
+  
+    constexpr double dp1 = inner_product_v2(v1, v2);
+    double  dp2 = inner_product_v2(v1, v2);
+
+    std::cout << dp1 << "\n" << dp2 << std::endl;
+  }
+}
+
+/*
+出力
+0
+0
+1.414213562373095
+1.414213562373095
+*/
+```
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/LIIfCl56mxIPUW6K)
+
 
 ### consteval（immediate function : 即時関数）
 constexprを指定した関数は定数実行可能であり、定数式の文脈でコンパイル時に実行可能であることを表明します。  
