@@ -334,7 +334,7 @@ using common_comparison_category_t = typename common_comparison_category<Ts>::ty
 -それ以外の場合はvoid
 -->
 
-**比較カテゴリ型と==,<を利用した宇宙船演算子のdfault実装
+**比較カテゴリ型と==,<を利用した宇宙船演算子のdefault実装
 上で説明した宇宙船演算子のデフォルト実装は素晴らしいものですが、少し足りていないところがあります。それは、C++17以前に作成され、宇宙船演算子を持たない型に対してはデフォルト実装を提供できないことです。
 そのような型をメンバに含んでいるクラスは宇宙船演算子のデフォルト実装の恩恵を受けることができません。
 
@@ -389,7 +389,7 @@ struct new_type {
 
    //std::strong_ordering operator<=>(const new_type&) const = default;
    std::strong_ordering operator<=>(const new_type&) const = default {
-      if (auto comp = m <=> that.m; comp !=0) return comp;
+      if (auto comp = static_cast<std::strong_ordering>(m <=> that.m); comp !=0) return comp;
 
       //<=>の合成
       if (old == that.old) return std::strong_ordering::equal;
@@ -399,8 +399,29 @@ struct new_type {
 };
 ||<
 
-この場合は、上で説明した<=>のデフォルト実装ルールに加えてこのような実装を行います。
+このように、上で説明した通常の<=>デフォルト実装に加えて必要ならこのような実装を行います。
 これによって、<=>を持たないレガシーな型をメンバに持つ際にも<=>のデフォルト実装を提供できるようになります。
+
+*** 宇宙船演算子の合成の詳細
+
+ある型Tの値a,bと比較カテゴリ型Rを用いて、<=>は次のように合成されます。
+
+まずa &lt;=&gt; bのオーバーロード解決を行い、使用可能な&lt;=&gt;が見つかった場合は、static_cast<R>(a &lt;=&gt; b)で定義。
+見つかったが、使用できない場合（アクセスできない、削除されている等）は定義されない。
+
+いかなる形の&lt;=&gt;も見つからない時
+Rがstd::strong_orderingならば、
+Rがstd::weak_orderingならば、
+Rがstd::partial_orderingならば、
+Rがstd::strong_equality
+Rがstd::weak_equality
+上記のケースに当てはまらない場合、定義されない
+
+この様に合成された&lt;=&gt;を用いて、上で説明したようなdefault実装を行います。戻り値型がautoの時はこの合成は行われません。
+
+合成された結果となる<=>が定義されない場合はdefault<=>は暗黙的にdeleteされます。
+ill-formedとなる場合も同様にdeleteされていますが、コンパイルエラーを引きおこします。
+ill-formedとなる場合とは、戻り値型をRに変換できない場合や==,<の戻り値型がbool出ない場合なとです。
 
 *** なぜ戻り値型を指定する必要が・・・？
 
