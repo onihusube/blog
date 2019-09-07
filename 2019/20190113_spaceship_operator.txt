@@ -40,7 +40,7 @@ class C {
 public:
    auto operator<=>(const C&) const = default;
    //もしくは
-   //friend auto operator<=>(const C&, const C&) = default;
+   //friend auto operator<=>(const C&) = default;
    //自前定義でもok
    //std::strong_ordering operator<=>(const C&, const C&) {/*実装略*/};
 };
@@ -407,7 +407,7 @@ struct new_type {
       std::strong_ordering comp = (a == b) ? std::strong_ordering::equal :
          (a < b) ? std::strong_ordering::less :
          std::strong_ordering::greater;
-      if (comp !=0) return comp;
+      if (comp != 0) return comp;
 
       return n <=> that.n;
    }
@@ -421,7 +421,7 @@ struct new_type {
 
 ある型Tの値a,bと比較カテゴリ型Rを用いて、&lt;=&gt;は次のように合成されます。
 
-まず、a &lt;=&gt; bのオーバーロード解決を行い使用可能な&lt;=&gt;が見つかった場合は、static_cast<R>(a &lt;=&gt; b)のように合成され、見つかったけれど使用できない（アクセスできない、削除されている等の）場合は合成されません。
+まず、a &lt;=&gt; bのオーバーロード解決を行い使用可能な&lt;=&gt;が見つかった場合は、static_cast&lt;R&gt;(a &lt;=&gt; b)のように合成され、見つかったけれど使用できない（アクセスできない、削除されている等の）場合は合成されません。
 
 次に、いかなる形の&lt;=&gt;も見つからない時はRによって以下のように合成されます。
 
