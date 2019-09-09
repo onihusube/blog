@@ -75,37 +75,66 @@ g<"<=> Awesome!">();
     - その結果となる比較カテゴリ型が`std::strong_­ordering`か`std::strong_­equality`のどちらか
 - `T`がクラス型の場合
     - `T`のすべての基底型及び非staticメンバ変数がstrong structural equalityである
-    - mutable及びvolatileなメンバ変数を持たない
-    - `T`の定義の末尾の点で、`cosnt T`の値`a`について`a == a`のオーバーロード解決が成功し、`=default`で定義された`public`か`frined`の`==`が見つかる
+    - mutable及びvolatileな非staticメンバ変数を持たない
+    - `T`の定義の終了点で、`cosnt T`の値`a`について`a == a`のオーバーロード解決が成功し、`default`実装の`public`か`frined`の`==`が見つかる
 
 `T`がクラス型でない場合というのは組み込み型の場合の事で、組み込みの宇宙船演算子の比較カテゴリ型が`std::strong_­equality`に変換可能であればいいわけです。  
 浮動小数点型および`void`以外のすべての型がstrong structural equalityになります。
 
-任意のクラス型の場合は`public`か`frined`なdefault実装の`operator==`を持っていて、すべての非staticメンバ変数がstrong structural equalityで（mutable、volatileはng）、基底クラスもそのようになっていればstrong structural equalityになります。
+任意のクラス型の場合は`public`か`frined`なdefault実装の`operator==`を持っていて、すべての非staticメンバ変数がstrong structural equalityで（mutable、volatileはng）、基底クラスもそのようになっていればstrong structural equalityになります。  
+ただし、この`==`はあくまでstrong structural equalityであることの表明のために必要なだけで実際に比較をするわけではなく、また実際の比較結果によってstrong structural equalityであるかどうか決定されるわけではありません。
 
-オーバーロード解決が成功し`==`が見つかる、という遠回りな言い回しになっているのは、この`==`はあくまでstrong structural equalityであることの表明のために必要なだけで実際に比較をするわけではなく、また実際の比較結果によってstrong structural equalityであるかどうか決定されるわけではない、ということを意味しています。  
-また、クラス外に定義された`==`演算子は全くこの決定に関与しないこともわかります。
-
-これらの諸条件は、浮動小数点型をメンバに持たずに`operator==`をdefault実装していれば、おおよそのケースで満たすことができるはずです。
+これらの諸条件は、浮動小数点型をメンバに持たずに`operator==`をdefault実装していれば、おおよそのケースで満たすことができるはずです。  
+ただし、参照型がメンバにある時とUnion-likeな型では`default`の`operator==`は暗黙`delete`されているので注意です。
 
 その上で、非型テンプレートパラメータとして利用するためには`T`はリテラル型である必要があります。  
 C++17基準ならば、コンパイル時に構築可能（初期化が定数式で可能）でなくてはなりません。
 
-#### 左辺値参照メンバについて
-一見するとstrong structural equalityな型が左辺値参照メンバを持つことに問題は無いように見えますが、実際には許可されません（おそらく）。
+#### クラス型の場合の言い回し
 
-参照型はクラス型ではないのでstrong structural equalityであるためには`<=>`による比較の結果を考えなければなりませんが、参照型そのものの比較は不可能です。そのため、参照型はstrong structural equalityな型ではありません。  
-従ってstrong structural equalityな型はいかなる参照型も含んではいけません。
+オーバーロード解決が成功し使用可能な`==`が見つかる、という遠回りな言い回しになっているのは、`default`で定義されていても削除されていたりアクセスできないケースのためです。
+例えば任意の型を保持するようなクラステンプレートでは、その型次第で`operator==`は削除されている可能性があります。
 
-また、非型テンプレートパラメータとなれる型についての記述を見ても、C++17→C++20で整数型やポインタ型等はstrong structural equalityで纏められているのに左辺値参照型だけは独立して書かれているため、やはり参照型はstrong structural equalityでは無いようです。
+そのような型には例えば`std::pair`があります。そして、`std::pair`は参照型を保持することができます。
 
-提案文書（P0732R2）には参照型メンバの比較をどう行うかについて決定できないために参照型メンバを認めない事にする、というようなことが書かれています。  
-どういう事かというと、現在C++には参照型の比較に関して2つの方法が用いられており、strong structural equalityの文脈でそのどちらの方法を取るかを簡単には決められないためです。  
+```cpp
+//std::pairの参考用簡易実装
+template <typename T, typename U>
+struct pair {
+    T first;
+    U second;
 
-そのような比較方法の1つは`<=>`による比較も含めた通常の比較処理における扱い、つまり参照先のオブジェクトの比較演算子を用いる比較であり、  
-もう1つはC++17までの非型テンプレートパラメータで行われている、参照とポインタを同一視した上で格納しているアドレスの比較によるものです。
+    //デフォルト実装のみを提供すると・・・
+    friend constexpr bool operator==(const pair&, const pair&) = default;
+};
 
-strong structural equalityなクラス型を非型テンプレートパラメータで扱うという時、そのどちらを選んでも非型テンプレートパラメータの等値比較に関するセマンティクスの一貫性が失われてしまうことから、これを決めることを避けたようです。
+int i = 42, j = 42;
+pair<int&, int> p(i, 17);
+pair<int&, int> q(j, 17);
+assert(p == q);   //C++17までは有効なコード、しかし上記実装だと==はdeleteされているため比較不可能
+```
+このような場合には`operator==`のデフォルト実装はもはや出来ず、参照型用の実装を追加で提供する必要があります。
+
+```cpp
+template <typename T, typename U>
+struct pair {
+    T first;
+    U second;
+
+    friend constexpr bool operator==(const pair&, const pair&) = default;
+    
+    //参照型用の実装、T,Uのどちらかが参照型ならばより特殊化されているこちらが優先される
+    friend constexpr bool operator==(const pair& lhs, const pair& rhs)
+       requires (is_reference_v<T> || is_reference_v<U>)
+    {
+       return lhs.first == rhs.first && lhs.second == rhs.second;
+    }
+};
+```
+
+このようにしておけば参照型に対しても`==`による比較を提供できますが、同時に`default`な`operator==`も存在はしています。
+このような場合に、オーバーロード解決を用いて使用可能な`operator==`をチェックすることで非型テンプレートパラメータとして使用されてしまうことを防止しています。
+
 
 ### なぜstrong structural equalityなリテラル型なのか？
 それは、二つのインスタンス化されたテンプレートがあるとき、その等価性を判断するためです。
