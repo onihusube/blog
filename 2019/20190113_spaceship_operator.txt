@@ -40,7 +40,7 @@ class C {
 public:
    auto operator<=>(const C&) const = default;
    //もしくは
-   //friend auto operator<=>(const C&) = default;
+   //friend auto operator<=>(const C&, const C&) = default;
    //自前定義でもok
    //std::strong_ordering operator<=>(const C&, const C&) {/*実装略*/};
 };
