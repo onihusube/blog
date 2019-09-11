@@ -114,7 +114,7 @@ auto comp2 = 2.0 <=> a;     //こっちも出来てほしい、comp2 > 0
 
 等値比較演算子の場合も同様に、a==b(a!=b)と書いてもb==a(b!=a)がオーバーロードの候補に入れられるのでどちらか片方があればよくなります。
 
-異種比較の演算子の場合、宇宙船演算子（とoperator==）の利用によって最大12個の演算子をたった2つの演算子の定義から生成してもらうことが可能になります。
+この結果、異種比較の演算子を定義する時でも宇宙船演算子（とoperator==）の利用によって最大12個の演算子をたった2つの演算子の定義から生成してもらうことが可能になります。
 
 結局、それぞれの演算子を書いたときに考慮される候補は以下のようになります。
 |呼び出す演算子 a@b|オーバーロード候補|
@@ -126,10 +126,8 @@ auto comp2 = 2.0 <=> a;     //こっちも出来てほしい、comp2 > 0
 |a &gt; b|a &gt; b<br> (a &lt;=&gt; b) &gt; 0<br> 0 &gt; (b &lt;=&gt; a)|
 |a &gt;= b|a &gt;= b<br> (a &lt;=&gt; b) &gt;= 0<br> 0 &gt;= (b &lt;=&gt; a)|
 
-この時、使用する<=> ==演算子が使用可能でない（削除されている、アクセスできない）場合は単に候補から外されますが、使用可能であっても戻り値型が比較カテゴリ型・boolを返さない場合はコンパイルエラーとなります。
-
-生成される候補の式内で使用される&lt;=&gt;及び==演算子は、型T1,T2それぞれのメンバ・非メンバ・組み込み、のものが考慮され、見つかった演算子ごとにオーバーロード候補に入れられます。
-すなわち、表内のオーバーロード候補1つに対して複数の候補が見つかることがあり得るため、a@bのオーバーロード候補は3つよりも多くなることがあります。
+生成される候補の式内で使用される&lt;=&gt;及び==演算子は、型T1,T2それぞれのメンバ・非メンバ・組み込み、のものが考慮されます。
+この時、使用する<=> ==演算子が使用可能でない（定義されていない、削除されている、2つ以上の候補がマッチする、アクセスできない）場合は単に候補から外されますが、使用可能であっても戻り値型が比較カテゴリ型・boolを返さない場合はコンパイルエラーとなります。
 
 **default実装
 宇宙船演算子が非テンプレートの非staticメンバ関数であり、そのクラスのconst参照を引数にとる宣言のみdefault指定することができ、コンパイラ様に実装して頂くことが可能です。
@@ -371,7 +369,7 @@ struct old_type {
 //C++20環境で定義された新しい型
 struct new_type {
    int m = 10;
-   old_type old = {20};
+   old_type l = {20};
    int n = 30;
 
    //old_typeは<=>を持たないため、実装不可、暗黙delete
@@ -394,7 +392,7 @@ bool eq   = n1 == n2;   //ok!
 >|cpp|
 struct new_type {
    int m = 10;
-   old_type old = {20};
+   old_type l = {20};
    int n = 30;
 
    //指定した戻り値型とold_typeの持つ比較演算子を用いて実装してもらう
@@ -412,20 +410,20 @@ bool eq   = n1 == n2;   //ok!
 >|cpp|
 struct new_type {
    int m = 10;
-   old_type old = {20};
+   old_type l = {20};
    int n = 30;
 
    //std::strong_ordering operator<=>(const new_type&) const = default;
    std::strong_ordering operator<=>(const new_type&) const = default {
-      if (auto comp = static_cast<std::strong_ordering>(m <=> that.m); comp !=0) return comp;
+      if (auto comp = static_cast<std::strong_ordering>(m <=> that.m); comp != 0) return comp;
 
       //<=>の合成
-      std::strong_ordering comp = (a == b) ? std::strong_ordering::equal :
-         (a < b) ? std::strong_ordering::less :
-         std::strong_ordering::greater;
+      std::strong_ordering comp = (l == that.l) ? std::strong_ordering::equal :　
+                                  (l <  that.l) ? std::strong_ordering::less
+                                                : std::strong_ordering::greater;
       if (comp != 0) return comp;
 
-      return n <=> that.n;
+      return static_cast<std::strong_ordering>(n <=> that.n);
    }
 };
 ||<
@@ -443,7 +441,7 @@ struct new_type {
 
 |指定された戻り値型R|合成結果|
 |std::strong_ordering|return a == b ? std::strong_ordering::equal :<br/> a &lt; b  ? std::strong_ordering::less :<br/> std::strong_ordering::greater;|
-|std::weak_ordering|return a == b ? std::weak_ordering::equal :<br/>a &lt; b  ? std::weak_ordering::less :<br/>std::weak_ordering::greater;|
+|std::weak_ordering|return a == b ? std::weak_ordering::equivalent :<br/>a &lt; b  ? std::weak_ordering::less :<br/>std::weak_ordering::greater;|
 |std::partial_ordering|return a == b ? partial_ordering::equivalent :<br/>a &lt; b  ? partial_ordering::less :<br/>b &lt; a  ? partial_ordering::greater :<br/>partial_ordering::unordered;|
 |std::strong_equality|return a == b ? strong_equality::equal : strong_equality::nonequal;|
 |std::weak_equality|return a == b ? weak_equality::equivalent : weak_equality::nonequivalent;|
