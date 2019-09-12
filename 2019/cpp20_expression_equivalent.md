@@ -61,13 +61,15 @@ Rangeライブラリ利用ユーザーはCPOの持つ効果のどれかに引っ
 
 >The name ranges​::​begin denotes a customization point object. The expression ranges​::​​begin(E) for some subexpression E is expression-equivalent to: 
 >
->- E + 0 if E is an lvalue of array type ([basic.compound]).
->- Otherwise, if E is an lvalue, decay-copy(E.begin()) if it is a valid expression and its type I models input_­or_­output_­iterator.
->- Otherwise, decay-copy(begin(E)) if it is a valid expression and its type I models input_­or_­output_­iterator with overload resolution performed in a context that includes the declarations: 
+>- `E + 0` if E is an lvalue of array type ([basic.compound]).
+>- Otherwise, if E is an lvalue, `decay-copy(E.begin())` if it is a valid expression and its type I models input_­or_­output_­iterator.
+>- Otherwise, `decay-copy(begin(E))` if it is a valid expression and its type I models input_­or_­output_­iterator with overload resolution performed in a context that includes the declarations: 
+>
 > ```cpp
 >template<class T> void begin(T&&) = delete;
 >template<class T> void begin(initializer_list<T>&&) = delete;
 > ```
+>
 > and does not include a declaration of ranges​::​begin.
 >- Otherwise, ranges​::​begin(E) is ill-formed.
 
@@ -84,6 +86,8 @@ Rangeライブラリ利用ユーザーはCPOの持つ効果のどれかに引っ
 2つ目の形式にアダプトした場合、`std::ranges::begin(a)`の呼び出しが`constexpr`となるかは（あなたが書いた）`a.begin()`の定義によって決まり、例外を投げるかも（あなたが書いた）`a.begin()`によって決まるという事です。
 
 同様に、3つ目の形式にアダプトした場合も、ユーザーが定義した（あなたが書いた）フリー関数の`begin(a)`が`constexpr`なのか`noexcept`なのかでそれらが決定される訳です。
+
+さらに、どちらの場合も結果となるイテレータは`decay_copy`されて返されますが、この`decay_copy`の処理が同様に`constexpr`なのか`noexcept`なのかも（おそらくあなたが定義しているであろう）返されたイテレータ型によるわけです。
 
 ~~つまりはとっても他力本願な定義の仕方なのです。~~
 
