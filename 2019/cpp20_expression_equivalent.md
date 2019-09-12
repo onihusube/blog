@@ -59,19 +59,15 @@ Rangeライブラリ利用ユーザーはCPOの持つ効果のどれかに引っ
 なにいってんだこいつという感じなので例として、[`std::ranges::begin()`](http://eel.is/c++draft/range.access.begin)を見てみましょう。  
 `std::begin()`は関数ですが、これはカスタマイゼーションポイントオブジェクトです。その効果は次のようにあります。
 
->The name ranges​::​begin denotes a customization point object. The expression ranges​::​​begin(E) for some subexpression E is expression-equivalent to: 
+>The name `ranges​::​begin` denotes a customization point object. The expression `ranges​::​​begin(E)` for some subexpression `E` is expression-equivalent to: 
 >
->- `E + 0` if E is an lvalue of array type ([basic.compound]).
->- Otherwise, if E is an lvalue, `decay-copy(E.begin())` if it is a valid expression and its type I models input_­or_­output_­iterator.
->- Otherwise, `decay-copy(begin(E))` if it is a valid expression and its type I models input_­or_­output_­iterator with overload resolution performed in a context that includes the declarations: 
->
-> ```cpp
->template<class T> void begin(T&&) = delete;
->template<class T> void begin(initializer_list<T>&&) = delete;
-> ```
->
-> and does not include a declaration of ranges​::​begin.
->- Otherwise, ranges​::​begin(E) is ill-formed.
+>- `E + 0` if `E` is an lvalue of array type ([basic.compound]).
+>- Otherwise, if `E` is an lvalue, `decay-copy(E.begin())` if it is a valid expression and its type I models `input_­or_­output_­iterator`.
+>- Otherwise, `decay-copy(begin(E))` if it is a valid expression and its type I models `input_­or_­output_­iterator` with overload resolution performed in a context that includes the declarations:
+> `template<class T> void begin(T&&) = delete;`   
+> `template<class T> void begin(initializer_list<T>&&) = delete;`  
+> and does not include a declaration of `ranges​::​begin`.
+>- Otherwise, `ranges​::​begin(E)` is ill-formed.
 
 引数の式を`E`として`std::ranges::begin(E)`のように呼び出したとき、その効果は`E`に応じてその下に書かれている4つのいずれかと等価（*expression-equivalent*）、という事を言っています。
 
