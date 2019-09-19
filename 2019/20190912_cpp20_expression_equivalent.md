@@ -13,9 +13,9 @@
 - 例外を投げるかどうかが同一
   - 全ての式は例外を投げない
   - もしくは、全ての式は例外を投げうる
-- 式の1部もしくは全部が定数式で実行可能であるかも同一
-  - 全ての式は、1部もしくは全部が定数実行可能である
-  - もしくは、全ての式はその1部も含めて定数実行不可
+- 式が定数式で実行可能であるかも同一
+  - 全ての式は、（部分式としても）定数実行可能である
+  - もしくは、全ての式は（部分式としても）定数実行不可
 
 これは要するに、式の効果と例外を投げるかどうか、および定数式で実行可能かどうか、が全く同一である時に*expression-equivalent*の関係にある、という事です。
 
@@ -90,6 +90,7 @@ Rangeライブラリ利用ユーザーはCPOの持つ効果のどれかに引っ
 ## 参考文献
 - [16.3.11 expression-equivalent [defns.expression-equivalent]](http://eel.is/c++draft/defns.expression-equivalent)
 - [Use expression-equivalent in definitions of CPOs - Github](https://github.com/ericniebler/stl2/issues/262)
+- [Customization Point Object - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20190403/p1)
 
 ## 謝辞
 
