@@ -17,6 +17,8 @@ include_dir = include_directories('include', 'oher/include')
 executable('test_project', 'test.cpp', include_directories : include_dir)
 ```
 
+公式のリファレンスとか
+
 - [Mesonの基本構文](https://mesonbuild.com/Syntax.html)
 - [Mesonの関数リファレンス](https://mesonbuild.com/Reference-manual.html)
 - [アレはMesonでどうやるの？的なtips](https://mesonbuild.com/howtox.html)
@@ -64,7 +66,8 @@ executable('test_project', 'test.cpp', include_directories : include_dir, cpp_ar
 （ただし、デフォルトオプションとして指定している言語バージョンもそのままになってしまうので、MSVC等では警告が出ます・・・）
 
 以下のページにこれらの関数で取得できるコンパイラ文字列の一覧があります。
-- [Reference tables](https://mesonbuild.com/Reference-tables.html)
+
+- [Reference tables - The Meson Build System](https://mesonbuild.com/Reference-tables.html)
     - `Argument syntax`列は`get_argument_syntax()`によって得られる文字列
 
 ### VC++プロジェクトの癖
@@ -78,6 +81,7 @@ executable('test_project', 'test.cpp', include_directories : include_dir, cpp_ar
     - 指定したコンパイルオプション等はビルド時には渡されているが、プロパティからは見えない・・・
         - このため、インテリセンスがC++14準拠になってしまう
 - プロジェクトプロパティの変更は、ビルド時に`meson.build`が変更されていてプロジェクト再出力が自動で行われた場合にリセットされる
+    - 基本的にはこれ便利なんですけどもね・・・
 
 ### VC++プロジェクトにヘッダを含める
 
@@ -102,12 +106,14 @@ executable('test_project', files, include_directories : include_dir, cpp_args : 
 
 ### 依存ライブラリをダウンロードしてもらう
 
-- [Subprojects](https://mesonbuild.com/Subprojects.html)
+- [Subprojects - The Meson Build System](https://mesonbuild.com/Subprojects.html)
 
 依存ライブラリの指定は`subproject()`を使えば出来ます。これはインストール済みCMake（もしくはパッケージマネージャ）を検出して、そこから依存ライブラリ情報を取得してダウンロードして・・・と自動でやってくれる様子です。
 
 でもWindowsだとそんなの入ってないし、githubから引っ張ってきたリポジトリとかでもよろしくやってほしいものです。  
 そのままだとこれは出来ない様子ですが、ラップファイルを用意してやることでやってもらえます。
+
+- [Wrap dependency system manual - The Meson Build System](https://mesonbuild.com/Wrap-dependency-system-manual.html)
 
 `meson.build`があるフォルダに`subprojects`というフォルダを作り、その中に`ライブラリ名.wrap`というファイルを用意しておきます。
 
@@ -144,6 +150,8 @@ executable('test_project', files, include_directories : include_dir, cpp_args : 
 
 最後に、`executable()`に依存オブジェクトを指定してあげます。もし静的ライブラリ等の出力がある場合はここで自動的に取り込まれるようです（対象ライブラリの持つ`meson.build`が適切に書かれていれば）。
 
+この方法、git submoduleで対象のライブラリを管理していても、なんだかよろしくやってくれます。
+
 ちなみにこれらの時、ダウンロードしてきたプロジェクトのトップに`meson.build`が無いとたぶん上手くいきません・・・。
 ただ、ヘッダーオンリーライブラリならインクルードパスの指定だけしてやればいい気がします（`get_variable()`して`executable()`で依存関係指定をしないで、`subproject()`だけしておく）
 
@@ -156,3 +164,5 @@ executable('test_project', files, include_directories : include_dir, cpp_args : 
 ### 参考文献
 - [CMakeの代替 (となってほしい)、Mesonチュートリアル - Qita](https://qiita.com/turenar/items/c727834fbf701beb47ef)
 - [Reference manual - The Meson Build System](https://mesonbuild.com/Reference-manual.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190919_meson_memo.md)
