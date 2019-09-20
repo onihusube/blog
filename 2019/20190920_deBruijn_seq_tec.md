@@ -1,5 +1,7 @@
 # ［C++］de Bruijn sequenceを用いたLSB/MSB位置検出テクニック
 
+[:contents]
+
 ### de Bruijn sequence（ド・ブラウン列）
 
 de Bruijn sequenceとは、いくつかの文字である長さの文字列を作ることを考えた時、その組み合わせの全てを含んだ文字列のことを言います。
@@ -21,9 +23,9 @@ aaa
 
 文字`a, b`を`0, 1`に置き換えてやれば、2進数列のde Bruijn sequenceを考える事ができそうです。
 
-### de Bruijn sequenceによるMSB位置検出
+### de Bruijn sequenceによるLSB位置検出
 
-この2進数列のde Bruijn sequenceを用いて、高速にMSB位置を検出するアルゴリズムがあります。
+この2進数列のde Bruijn sequenceを用いて、高速にLSB位置を検出するアルゴリズムがあります。
 
 [Wikipedia](https://en.wikipedia.org/wiki/De_Bruijn_sequence#Uses)より
 ```cpp
@@ -46,7 +48,7 @@ r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -v) * 0x077CB531U)) >> 27];
 少しコードを整理してみます（ついでにC++的になおします）。
 
 ```cpp
-int msb_pos(unsigned int v) {
+int lsb_pos(unsigned int v) {
 
   //1
   static constexpr int MultiplyDeBruijnBitPosition[32] = 
@@ -56,10 +58,10 @@ int msb_pos(unsigned int v) {
   };
 
   //2
-  std::uint32_t pop_msb = (v & -v);
+  std::uint32_t pop_lsb = (v & -v);
 
   //3
-  std::uint32_t hash = std::uint32_t(pop_msb * 0x077CB531U) >> 27;
+  std::uint32_t hash = std::uint32_t(pop_lsb * 0x077CB531U) >> 27;
 
   //4
   int r = MultiplyDeBruijnBitPosition[hash];
@@ -86,7 +88,7 @@ int msb_pos(unsigned int v) {
 
 ```cpp
 //3
-std::uint32_t hash = std::uint32_t(pop_msb * 0x077CB531U) >> 27;
+std::uint32_t hash = std::uint32_t(pop_lsb * 0x077CB531U) >> 27;
 ```
 
 3番目の処理に出てくる謎の数字`0x077CB531`ですが、これが実はde Bruijn sequenceになっています。2進数に直して5文字づつ見て行くと確かに[0, 31]の数字（2進数列）がすべて含まれ、なおかつ重複がないことが確認できるでしょう（右から4ビットの所は先頭へ循環して見る必要があります）。
@@ -111,13 +113,13 @@ std::uint32_t hash = std::uint32_t(pop_msb * 0x077CB531U) >> 27;
 先ほどの3番目の処理は以下のようになります。
 
 ```cpp
-std::uint8_t hash = std::uint8_t(pop_msb * 0x1DU) >> 5;
+std::uint8_t hash = std::uint8_t(pop_lsb * 0x1DU) >> 5;
 ```
 
-当然ですが`pop_msb`はどこか1ビットだけが立った8ビット符号なし整数値であることを前提とします。  
-つまり、入力となる`pop_msb`は8個の値しかとりえません。それぞれについて処理を見てみると以下のようになります。
+当然ですが`pop_lsb`はどこか1ビットだけが立った8ビット符号なし整数値であることを前提とします。  
+つまり、入力となる`pop_lsb`は8個の値しかとりえません。それぞれについて処理を見てみると以下のようになります。
 
-| `pop_msb` | `pop_msb * 0x1D` | `hash` | `index` |
+| `pop_lsb` | `pop_lsb * 0x1D` | `hash` | `index` |
 | :-------: | :--------------: | :----: | :-----: |
 | `1`       | `0001 1101`      | `000`  | `0`     |
 | `2`       | `0011 1010`      | `001`  | `1`     |
@@ -135,7 +137,7 @@ std::uint8_t hash = std::uint8_t(pop_msb * 0x1DU) >> 5;
 constexpr int table[8] = { 1, 2, 7, 3, 8, 6, 5, 4 };
 ```
 
-上の表で得られた`index`を`table[index]`として値を取得すると、元の`pop_msb`の立っているビットの位置が得られる事が分かるでしょう。
+上の表で得られた`index`を`table[index]`として値を取得すると、元の`pop_lsb`の立っているビットの位置が得られる事が分かるでしょう。
 
 
 ### Nビット整数への一般化
@@ -145,9 +147,9 @@ Nは2のべき乗である必要がありますが、上記アルゴリズムは
 [tex:hash(x) = (x * debruijn) >> (N - log_2(N))]
 
 ここで、Nは符号なし整数型の幅、*debruijn*は`0, 1`を使った`log_2(N)`文字の組み合わせを尽くすような長さ`N`の適切なde Bruijn sequenceです。  
-そのようなde Bruijn sequenceを求める方法はいくつかあるようですが、よくわかってないので割愛します、ごめんなさい・・・
+そのようなde Bruijn sequenceを求める方法はいくつかあるようです。しかし良く分からない・・・
 
-なお、使用するde Bruijn sequenceは先頭`log_2(N)`桁が`0`で始まる必要があります。これはオーバーフロー対策と、左シフト演算によって全体が自然に循環するようにするためです。
+なお、使用するde Bruijn sequenceは先頭`log_2(N)`桁が`0`で始まる必要があります。これはオーバーフロー対策と、掛け算（左シフト演算）時に全体が自然に循環するようにするためです。
 
 ### 64ビット数値のLSB/MSB位置を求める
 
@@ -210,3 +212,5 @@ constexpr auto lsb_pos(std::uint64_t x) -> int {
 - [De Bruijn列 - Thoth Children!!](http://www.thothchildren.com/chapter/5bc89f5b51d930518902dded)
 - [組合せとグラフの理論 ( 塩田 )](http://lupus.is.kochi-u.ac.jp/shiota/graph07/euler_hamilton.pdf)
 - [de Bruijn Graph を使った de novo アセンブリの発想がすごい件 - ほくそ笑む](https://hoxo-m.hatenablog.com/entry/20100930/p1)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20190920_deBruijn_seq_tec.md)
