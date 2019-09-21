@@ -4,10 +4,10 @@
 
 ### de Bruijn sequence（ド・ブラウン列）
 
-de Bruijn sequenceとは、いくつかの文字である長さの文字列を作ることを考えた時、その組み合わせの全てを含んだ文字列のことを言います。
+de Bruijn sequenceとは、いくつかの文字である長さの文字列を作ることを考えた時、その組み合わせの全てを重複なく含んだ文字列のことを言います。
 
-例えば、文字`a, b`を使った長さ3の文字列は`aaa, aab, aba, baa, abb, bab, bbb, bba`の8通りなので、このde Bruijn sequenceは`aaababbb`になります。  
-この文字列を先頭から3文字、1文字づつ右にずらしながら見ていくと（途中で巡回する）、確かに8通りの組み合わせ全てを含んでおり、重複が無い事が分かります。
+例えば、文字`a, b`を使った長さ3の文字列は`aaa, aab, aba, baa, abb, bab, bbb, bba`の8通りなので、このde Bruijn sequenceは例えば`aaababbb`になります（通常いくつか存在します）。  
+`aaababbb`を先頭から3文字、1文字づつ右にずらしながら見ていくと（途中で巡回します）、確かに8通りの組み合わせ全てを含んでおり、重複が無い事が分かります。
 
 ```
 aaababbb
@@ -48,7 +48,7 @@ r = MultiplyDeBruijnBitPosition[((uint32_t)((v & -v) * 0x077CB531U)) >> 27];
 少しコードを整理してみます（ついでにC++的になおします）。
 
 ```cpp
-int lsb_pos(unsigned int v) {
+int lsb_pos(std::uint32_t v) {
 
   //1
   static constexpr int MultiplyDeBruijnBitPosition[32] = 

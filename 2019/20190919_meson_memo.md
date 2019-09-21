@@ -91,17 +91,19 @@ executable('test_project', 'test.cpp', include_directories : include_dir, cpp_ar
 例えばそれらのファイルを編集したくてVS上で開いたとしても、プロジェクト外のファイルに対してはインテリセンスがうまく働きません。  
 そのため、プロジェクトにそれらのヘッダを含めたいことがあるでしょう・・・
 
-その場合は、ソースファイルと同じようにヘッダファイルを指定してやれば出力プロジェクトに含めることができます。
+~~その場合は、ソースファイルと同じようにヘッダファイルを指定してやれば出力プロジェクトに含めることができます。~~
+
+`executable()`の`extra_files`にプロジェクトに含めたいファイルを指定してやると含めておくことができます。
 
 ```meson
 project('test_project', 'cpp', default_options : ['warning_level=3', 'werror=true', 'cpp_std=c++17'], meson_version : '>=0.50.0')
 cppcompiler = meson.get_compiler('cpp').get_argument_syntax()
 
-files = ['test.cpp', 'include/header1.hpp', 'include/header2.hpp']
+files = ['include/header1.hpp', 'include/header2.hpp']
 
 include_dir = include_directories('include', 'oher/include')
 
-executable('test_project', files, include_directories : include_dir, cpp_args : options)
+executable('test_project', 'test.cpp', extra_files : files, include_directories : include_dir)
 ```
 
 残念ながらあるフォルダ内ファイルを列挙する手段はなさそうなので、1つづつ指定するしかなさそうな感じがします・・・。
