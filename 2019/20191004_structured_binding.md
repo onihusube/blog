@@ -142,4 +142,4 @@ P1091R3には「構造化束縛をラムダがキャプチャできないこと�
 - [構造化束縛宣言 - cppreference.com](https://ja.cppreference.com/w/cpp/language/structured_binding)
 - [11.5 Structured binding declarations - Working Draft, Standard for Programming Language C++ (N4659)](https://timsong-cpp.github.io/cppwp/n4659/dcl.struct.bind)
 
-[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191001_structured_binding.md)
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191004_structured_binding.md)
