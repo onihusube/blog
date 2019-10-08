@@ -120,6 +120,7 @@ int main() {
 この様な事が起こりうるのも`volatile`の効果についての混乱の原因の一つであるのでしょう・・・
 
 ### 参考文献
+- [6.9 Program execution [basic.exec] - Working Draft, Standard for Programming Language C++ (N4830)](http://eel.is/c++draft/basic.exec)
 - [How are side effects and observable behavior related in C++? - stackoverflow](https://stackoverflow.com/questions/13271469/how-are-side-effects-and-observable-behavior-related-in-c)
 - [volatileが必要な場面を見つけ出す - teratail](https://teratail.com/questions/114172)
 - [ミューテックスとアトミック処理について - teratail](https://teratail.com/questions/165667)
@@ -129,6 +130,7 @@ int main() {
 - [volatile変数とマルチスレッドとの関係についての押し問答（後編） - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20140808/p1)
 - [POS03-C. volatile を同期用プリミティブとして使用しない - JPCERT CC](http://www.jpcert.or.jp/sc-rules/c-pos03-c.html)
 - [デバイスにアクセスするには | 学校では教えてくれないこと - uQuest](https://www.uquest.co.jp/embedded/learning/lecture13.html)
+- [Android のための SMP 入門](http://milkpot.sakura.ne.jp/note/smp-primer.html)
 
 ### 謝辞
 この記事の9割は以下の方によるご指摘によって成り立っています。
