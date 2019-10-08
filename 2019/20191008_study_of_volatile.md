@@ -131,7 +131,7 @@ int main() {
 - [デバイスにアクセスするには | 学校では教えてくれないこと - uQuest](https://www.uquest.co.jp/embedded/learning/lecture13.html)
 
 ### 謝辞
-この記事の９割は以下の方によるご指摘によって成り立っています。
+この記事の9割は以下の方によるご指摘によって成り立っています。
 
 - [@yohhoyさん](https://twitter.com/yohhoy/status/1181102762546712578)
 - [@yohhoyさん](https://twitter.com/yohhoy/status/1181104668413267973)
