@@ -4,7 +4,7 @@
 
 [P1152R4 : Deprecating volatile](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1152r4.html)を読み解く過程に生じた`volatile`についての調査（脱線）メモです。ほぼ文章です。
 
-### volatileってなんだろう・・・
+### C++におけるvolatileの効果
 
 C++における`volatile`指定の効果は次のように規定されています（[6.9.1 Sequential execution [intro.execution]](http://eel.is/c++draft/basic.exec#intro.execution-7)）。
 >Reading an object designated by a volatile glvalue ([basic.lval]), modifying an object, calling a library I/O function, or calling a function that does any of those operations are all side effects, which are changes in the state of the execution environment.
