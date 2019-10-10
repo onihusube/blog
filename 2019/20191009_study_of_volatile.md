@@ -4,6 +4,8 @@
 
 [P1152R4 : Deprecating volatile](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1152r4.html)を読み解く過程に生じた`volatile`についての調査（脱線）メモです。ほぼ文章です。
 
+[:contents]
+
 ### C++におけるvolatileの効果
 
 C++における`volatile`指定の効果は次のように規定されています（[6.9.1 Sequential execution [intro.execution]](http://eel.is/c++draft/basic.exec#intro.execution-7)）。
@@ -116,6 +118,28 @@ int main() {
 
 この様な事が起こりうるのも`volatile`の効果についての混乱の原因の一つであるのでしょう・・・
 
+### アウトオブオーダー実行とvolatile
+
+`volatile`オブジェクトへのアクセスはコンパイラの最適化の対象とならず、その順序が保たれたコードが出力されることが保証される、という事は分かりました。  
+しかし、このようなメモリ領域へのアクセス順はもう一つの所で変更される可能性があります。それは、CPUにおけるアウトオブオーダー実行時です。
+
+アウトオブオーダーにおいては、最終的な結果が変わらない範囲において命令順を並べ替えて効率的に実行しようとします。この時、計算の順序だけでなく、メモリアクセスの順番も変化しえます。
+
+C++抽象機械の観測可能な動作を厳密にエミュレートするのであれば、アウトオブオーダー実行においてもその順序を維持するという事は変わらないように思えます。実際、それはメモリバリア命令を挿入するなどによって実現可能です。
+
+しかしどうやら、C++標準はこれを保証しないようです。
+
+C++抽象機械としての`volatile`オブジェクトへのアクセスは観測可能な動作（*observable behavior*）として実装は厳密にエミュレートしなければならず、結果的にC++標準が定義する*sequenced before*関係が保たれたプログラムが出力されます。  
+しかし、観測可能な動作（*observable behavior*）とはあくまで抽象機械上のことであり、実際の観測可能な順序（*observable ordering*）に関してを何ら規定していません。
+
+従って、C++標準はアウトオブオーダー実行によって実行時に命令が並べ替えられて`volatile`アクセスの順序が変更されないことを保証していません。  
+もやもやしますが、これがC++の現在の見解のようです・・・・
+
+この様な場合に命令順序を入れ替えられたくない場合、適切なメモリバリア命令を明示的に利用するか、`std::atomic`を利用することができます。  
+デフォルトの`std::atomic`変数の各種オペレーションはマルチスレッドにおける逐次一貫性（*sequential consistency*）を保証します。  
+このため、シングルスレッドにおいてもメモリバリアがその読み書きにおいて適切に利用されるため、アウトオブオーダー実行においても順序関係が維持されるようになります。
+
+
 ### 参考文献
 - [6.9 Program execution [basic.exec] - Working Draft, Standard for Programming Language C++ (N4830)](http://eel.is/c++draft/basic.exec)
 - [How are side effects and observable behavior related in C++? - stackoverflow](https://stackoverflow.com/questions/13271469/how-are-side-effects-and-observable-behavior-related-in-c)
@@ -128,6 +152,8 @@ int main() {
 - [POS03-C. volatile を同期用プリミティブとして使用しない - JPCERT CC](http://www.jpcert.or.jp/sc-rules/c-pos03-c.html)
 - [デバイスにアクセスするには | 学校では教えてくれないこと - uQuest](https://www.uquest.co.jp/embedded/learning/lecture13.html)
 - [Android のための SMP 入門](http://milkpot.sakura.ne.jp/note/smp-primer.html)
+- [P1152R0 : Deprecating volatile](https://wg21.link/p1152r0)
+- [Does the C++ volatile keyword introduce a memory fence? - stackoverflow](https://stackoverflow.com/questions/26307071/does-the-c-volatile-keyword-introduce-a-memory-fence)
 
 ### 謝辞
 この記事の9割は以下の方々によるご指摘によって成り立っています。
@@ -137,5 +163,6 @@ int main() {
 - [@yohhoyさん](https://twitter.com/yohhoy/status/1181101292296343552)
 - [@yohhoyさん](https://twitter.com/yohhoy/status/1181487680648957953)
 - [@yohhoyさん](https://twitter.com/yohhoy/status/1181489122600374272)
+- [@yohhoyさん](https://twitter.com/yohhoy/status/1182264372736880640)
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191009_study_of_volatile.md)
