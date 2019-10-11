@@ -30,15 +30,6 @@ C++20より、一部の`volatile`の用法が非推奨化されます。提案�
 - [P1152R1 : Deprecating volatile](https://wg21.link/p1152r1)
 - [P1152R2 : Deprecating volatile](https://wg21.link/p1152r2)
 - [P1152R4 : Deprecating volatile](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1152r4.html)
-- [How are side effects and observable behavior related in C++? - stackoverflow](https://stackoverflow.com/questions/13271469/how-are-side-effects-and-observable-behavior-related-in-c)
-- [volatileが必要な場面を見つけ出す - teratail](https://teratail.com/questions/114172)
-- [ミューテックスとアトミック処理について - teratail](https://teratail.com/questions/165667)
-- [volatile版atomic操作関数が存在する理由 - yohhoyの日記](https://yohhoy.hatenadiary.jp/entries/2012/07/01)
-- [volatile変数とマルチスレッドとの関係についての押し問答（前編） - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20121016/p1)
-- [volatile変数とマルチスレッドとの関係についての押し問答（中編） - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20131009/p1)
-- [volatile変数とマルチスレッドとの関係についての押し問答（後編） - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20140808/p1)
-- [POS03-C. volatile を同期用プリミティブとして使用しない - JPCERT CC](http://www.jpcert.or.jp/sc-rules/c-pos03-c.html)
-- [デバイスにアクセスするには | 学校では教えてくれないこと - uQuest](https://www.uquest.co.jp/embedded/learning/lecture13.html)
 
 ### 謝辞
 - [@yohhoyさん](https://twitter.com/yohhoy/status/1181102762546712578)
