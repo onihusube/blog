@@ -1,9 +1,11 @@
-# ［C++］Deprecating volatile
+# ［C++］Deprecating volatile を見つめて
 
 ※この記事は[C++20を相談しながら調べる会 #3](https://cpp20survey.connpass.com/event/147002/)の成果として書かれました。
 
 C++20より、一部の`volatile`の用法が非推奨化されます。提案文書は「[Deprecating volatile](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1152r4.html)」という壮大なタイトルなのでvolatileそのものが無くなるのかと思ってしまいますがそうではありません。  
 この提案文書をもとに何が何故無くなるのかを調べてみます・・・
+
+[:contents]
 
 ### そもそもvolatileってなんだろう・・・
 
@@ -69,7 +71,7 @@ C++における`volatile`の意味とは
 
 また、そのような間違った`volatile`の用法はC++20に対してはとりあえず非推奨としていますが、将来的にそれらを削除することを目指しています。
 
-### C++20から非推奨になるもの
+### C++20から非推奨となるコア言語の`volatile`
 
 ここから、この提案によって非推奨とされる`volatile`の用法を見て行きましょう。その際重要な事は、`volatile`メモリへのアクセスは読み込みと書き込み、およびその順序に意味があるという事です。
 
@@ -106,7 +108,7 @@ a--;
 `volatile`に対するこのような複合操作は明示的に「読み出し - 更新 - 書き込み」を分けて書くか、`volatile`なatomic操作を利用すべきです。
 
 従って、`volatile`オブジェクトに対するこれらの演算子はバグの元であり、その使用は適切ではないため、非推奨とされます。  
-ただし、非推奨となるのは算術型・ポインタ型・列挙型に対する組み込みの演算子のみです。
+ただし、非推奨となるのは算術型・ポインタ型に対する組み込みの演算子のみです。
 
 ##### 連鎖した代入演算子
 
@@ -197,26 +199,31 @@ int volatile& g6(); //ok、g5と同じ戻り値型
 また、この提案では、`const`修飾も同様であるとしてまとめて非推奨とする提案を行っていましたが、それは承認されなかったようです。
 
 
-#### 構造化束縛宣言のvolatile指定
+#### 構造化束縛宣言の`volatile`
 
-構造化束縛宣言にもCV修飾を指定できますが、実際の所そのCV修飾は構造化束縛宣言に指定した変数目に直接作用しているわけではありません。  
+構造化束縛宣言にもCV修飾を指定できますが、実際の所そのCV修飾は構造化束縛宣言に指定した変数名に直接作用しているわけではありません。  
 構造化束縛宣言の右辺にある式の暗黙の結果オブジェクトに対してCV修飾がなされます。
 
 構造化束縛宣言の動作の詳細については以下をお読みください。
-[https://onihusube.hatenablog.com/entry/2019/10/09/184906:embed:cite]
+[https://onihusube.hatenablog.com/entry/2019/10/04/122001:embed:cite]
 
-その結果オブジェクトが`std::tuple`の場合、`std::get`を用いて要素の参照が行われるため、そこでエラーになります（`std::get()`は`volatile tuple<...>`を受け取るオーバーロードを持たないため）。これは`std::pair`でも同様です。  
+その結果オブジェクトが`std::tuple`の場合、`std::get`を用いて要素の参照が行われるため、そこでエラーになります（`std::get()`は`volatile std::tuple<...>`を受け取るオーバーロードを持たないため）。これは`std::pair`でも同様です。  
 ただ、配列や構造体の場合は意図通りになります。
 
 ```cpp
 auto f() -> std::tuple<int, int, double>;
 
 volatile auto [a, b, c] = f();   //コンパイルエラー！！
-
+//ここでは以下の様な事が行われている
+//volatile auto tmp = f();
+//std::tuple_element_t<0, decltype(tmp)>& a = std::get<0>(tmp);
 
 int array[3]{};
 
 volatile auto [a, b, c] = array; //ok
+//ここでは以下の様な事が行われている
+//volatile int tmp[] = {array[0], array[1], array[2]};
+//volatile int a = tmp[0];
 
 static_assert(std::is_volatile_v<decltype(a)>); //ok
 ```
@@ -237,12 +244,12 @@ static_assert(std::is_volatile_v<decltype(b)>); //ok
 static_assert(std::is_volatile_v<decltype(c)>); //ok
 ```
 
-### 標準ライブラリ内のvolatile
+### C++20より非推奨となる標準ライブラリ内の`volatile`
 
 当初の提案は標準ライブラリ内にある`volatile`に関する所も非推奨とする提案を含んでいましたが、のちにそれは別の提案（[P1831R0 Deprecating volatile: library](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1831r0.html)）として分離されました。  
 まだ採択されていませんが、合意は取れているようなのでC++20に入ることは確実でしょう。その場合、DRとしてC++20に追加される可能性があります。
 
-#### 標準ライブラリ内テンプレートのvolatileなオーバーロード
+#### 標準ライブラリ内テンプレートの`volatile`なオーバーロード
 
 標準ライブラリ内で提供されているクラステンプレートには`volatile`用にオーバーロード（部分特殊化）が明示的に提供されているものがあります・
 
@@ -262,15 +269,16 @@ static_assert(std::is_volatile_v<decltype(c)>); //ok
 
 #### `std::atomic`の`volatile`メンバ関数
 
-`volatile`オブジェクトの操作はアトミックではなく、その順序も変更される可能性がります（非`volatile`オブジェクト間やCPUのアウトオブオーダー実行）。しかし、そのようなアクセスは確実に実行され、最適化の対象とはなりません。
+`volatile`オブジェクトの操作はアトミックではなく、その順序も変更される可能性がります（非`volatile`オブジェクトとの間やCPUのアウトオブオーダー実行）。しかし、そのようなアクセスは確実に実行され、最適化の対象とはなりません。
 
 `std::atomic`オブジェクトへの操作は分割されることは無く、完全なメモリモデルを持ち、それらは最適化の対象となります。
 
 `volatile std::atomic`はこれらを合わせた性質を持つことが期待されますが、現在の実装はそうなってはいません。
 
-提案文書によれば、ロックフリーではないアトミック操作（の実装）は`volatile`オブジェクトに対して行われたときに、その原子性が失われることがある（アクセス順序の変更ができないことから？）。とされています。
+提案文書によれば、ロックフリーではないアトミック操作（の実装）は`volatile`オブジェクトに対して行われたときに、その原子性が失われることがある（アクセス順序や回数の変更ができないことから？）。とされています。
 
-さらに、複合代入のような「読み出し - 更新 - 書き込み」操作の実装には、再試行ループ、ロック命令、トランザクショナルメモリ、メモリコントローラの操作等の実装方法がありますが、`volatile`領域に正確に1度だけアクセスするという事を達成できるのはメモリコントローラの操作という実装だけで、この様なハードウェアでの実装を指定することはC++標準の範囲から逸脱しています。
+さらに、複合代入のような「読み出し - 更新 - 書き込み」操作の実装は特に指定されておらず、実装としては、再試行ループ、ロック命令、トランザクショナルメモリ、メモリコントローラの操作等の実装方法がありますが、`volatile`領域に正確に1度だけアクセスするという事を達成できるのはメモリコントローラの操作という実装だけです。  
+`volatile`の効果を適切に再現するためにはこうした実装を指定する必要がありますが、この様なハードウェアでの実装を指定することはC++標準の範囲から逸脱しています。
 
 このように、現状の`volatile`と`std::atomic`の同時利用は必ずしも両方の特性を合わせたものにはなっておらず、場合によってはどちらかの性質が失われていることがあります。
 
@@ -288,8 +296,8 @@ static_assert(std::is_volatile_v<decltype(c)>); //ok
 
 クラスが`volatile`修飾されているとき、そのオブジェクトは外部から変更されうる領域に置かれていることになります。しかし果たして、あるクラスが`volatile`としてもそうでない場合も使えるように設計される必要は本当にあるのでしょうか？そしてその場合、`volatile`修飾されたメンバ関数とそうでない関数の違いとは一体何でしょうか・・・・
 
-また、あるオブジェクトに対する`const`修飾の効果が表れるのは、そのオブジェクトの最派生コンストラクタの呼び出しが完了したときです。  
-これは`volatile`でも同様ですが、`volatile`の場合はその領域は外部から変更されうる場所であり、その領域へのアクセス順序や回数には意味がある場合があります。その時、`volatile`性なしでオブジェクトの構築を行う事は適切ではありません。
+また、あるオブジェクトに対する`const`修飾の効果が表れるのは、そのオブジェクトの最派生コンストラクタの呼び出しが完了したときであり、コンストラクタ内ではそのメンバに対するアクセスでも`volatile`性はありません（これはデストラクタも同様）。  
+これは`volatile`でも同様ですが、`volatile`の場合はその領域は外部から変更されうる場所であり、その領域へのアクセス順序や回数には意味がある場合があります。その時、`volatile`性なしでオブジェクトの構築・破棄を行う事は適切ではありません。
 
 このように、`volatile`修飾メンバ関数は実質的に無意味であるため、非推奨とする事が提案されていました。
 
@@ -300,10 +308,35 @@ static_assert(std::is_volatile_v<decltype(c)>); //ok
 2. 例えば`struct volatile`のように、`volatile`で使用される集成体の宣言を追加する
 3. 集成体では`volatile`を禁止する（PODクラスとフリー関数を使用するようにする）
 
-いずれの場合でも、メンバ変数の`volatile`修飾を禁止しません。
+いずれの場合でも、メンバ変数の`volatile`修飾を禁止しません。　　
+提案文書の著者は3番目の方法を押している雰囲気でした。
 
 他にも共用体やビットフィールドの扱いなど考慮すべきところはあったようですが、結局これはC++20では見送られました。  
 `std::atomic`の`volatile`メンバ関数の意味合いについて検討する必要があったためのようです。ただ、`volatile`メンバ関数の非推奨については合意を得られていたようなので将来的には非推奨とされる可能性があります。
+
+### `volatile_load<T>` / `volatile_store<T>`
+
+正確に言えばこの提案には含まれていませんでしたが、この提案から派生した提案として、`volatile`な値の読み書きを行う特別な関数の提案が出されています。
+
+```cpp
+namespace std {
+  template<typename T>
+  constexpr T volatile_load(const T* p);
+
+  template<typename T>
+  constexpr void volatile_store(T* p, T v);
+}
+```
+
+この`std::volatile_load<T>`と`std::volatile_store<T>`は引数として渡されたメモリ領域から値を読み込み、また書き込みます。  
+そこでは引数が`volatile`かどうかに関わらず、`volatile`セマンティクスが適用されます。すなわち、1回のアクセスは正確に1回だけ`p`の指すメモリ領域へアクセスし、この関数は最適化対象外となりその順序の入れ替えも行われません。  
+また、単なる`volatile`オブジェクトへのアクセス以上の保証を与えているようです（可能な限りアクセスを分割しない等）。
+
+これは、`volatile`なのはデータ（変数）ではなくコードであるという考え方を体現したものといえ、Linuxカーネルで使用される`READ_ONCE()/WRITE_ONCE()`マクロや、D言語の`peek()/poke()`、Rustの`std::ptr::read_volatile()/std::ptr::write_volatile()`と同様のアプローチです。
+
+ここまで見てきた（そしてこの後紹介する）ような、`volatile`修飾の間違った用例を見ると、このアプローチの方が正しいのでは？という気もしてきます・・・
+
+合意は取れているようなので将来的にC++に入ることは間違い無いと思われますが、C++20に入るかは不透明です。
 
 ### 不適切と思われる`volatile`の用例
 
@@ -404,10 +437,12 @@ volatile device dev; //初期化（コンストラクタ内）、破棄（デス
 - [P1152R2 : Deprecating volatile](https://wg21.link/p1152r2)
 - [P1152R4 : Deprecating volatile](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1152r4.html)
 - [P1831R0 : Deprecating volatile: library](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1831r0.html)
+- [P1382R0 : volatile_load<T> and volatile_store<T>](https://wg21.link/p1382r0)
 - [Time of check to time of use - Wikipedia](https://ja.wikipedia.org/wiki/Time_of_check_to_time_of_use)
 - [setjmp - cppreference.com](https://ja.cppreference.com/w/cpp/utility/program/setjmp)
 - [Memory corruption due to word sharing. - Linus Torvalds. GCC mailing list](https://gcc.gnu.org/ml/gcc/2012-02/msg00027.html)
 - [C++0xのメモリバリアをより深く解説してみる - yamasaのネタ帳](https://yamasa.hatenablog.jp/entry/20090929/1254237835)
+- [C++20 を相談しながら調べる会 #3 共有ドキュメント](https://docs.google.com/document/d/163DDT73-ccWJY8khoX2wOS6tiYYsJ2mvPdkLlIZXywk/edit)
 
 ### 謝辞
 この記事の7割は以下の方々によるご指摘によって成り立っています。
@@ -415,3 +450,5 @@ volatile device dev; //初期化（コンストラクタ内）、破棄（デス
 - [@kariya_mitsuruさん](https://twitter.com/kariya_mitsuru/status/1183334836989120512)
 - [@mokamukurugaさん](https://twitter.com/mokamukuruga/status/1183340276733005825)
 - [@mokamukurugaさん](https://twitter.com/mokamukuruga/status/1183380975335559169)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191014_deprecated_volatile.md)
