@@ -1,8 +1,10 @@
-# ［C++］どう書いたらいいの？コンセプトの4景
+# ［C++］コンセプトの5景
 
+C++20にてついに導入されたコンセプト、書け方にムラがあるので少し整理してみます。
 
+[:contents]
 
-### `typename`の代わりに
+### 1. `typename`の代わりに
 
 まず、従来`template<typename T>`と書いていたところの`typename`の代わりにコンセプト名を書けます。
 
@@ -118,9 +120,9 @@ void f(T&&);
 
 以降、この`f()`と`wrap`だけを見ていくことにします。
 
-### 前置`requires`節
+### 2. 前置`requires`節
 
-`requires`節というものを利用してテンプレートパラメータの宣言の後、関数戻り値型/クラス名の前に制約を書きます。
+`requires`節というものを利用してテンプレートパラメータの宣言のすぐ後に制約を書きます。
 
 ```cpp
 //関数
@@ -157,7 +159,7 @@ struct wrap<T>;
 - デメリット
   - 関数宣言が複雑になりうる
 
-### 後置`requires`節 ※関数のみ
+### 3. 後置`requires`節 ※関数のみ
 
 先ほどの`requires`節、関数の後ろにも置けます。
 
@@ -165,17 +167,13 @@ struct wrap<T>;
 //関数
 template<typename T>
 void f(T&&) requires ring<T>;
-
-//クラス
-template<typename T>
-struct wrap<T> requires ring<T>;
 ```
 
 [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/gvlBmYQnugYj2uBa)
 
 ただし、クラスではこの書き方はできません。関数のみになります。
 
-また、この形式ではクラステンプレートの非テンプレートメンバ関数に対して制約をかけることができます。
+この書き方ではクラステンプレートの非テンプレートメンバ関数に対して制約をかけることができます。
 
 ```cpp
 template<typename T>
@@ -204,7 +202,7 @@ int main() {
 ```
 [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/fmTWcGgVMigL2mbK)
 
-この形式はこのような非テンプレート関数に制約をかける唯一の方法です。
+この様な非テンプレート関数に制約をかけるにはこの書き方をするしかありません。
 
 - メリット
   - `&&`や`||`で繋いで複数の制約をかけられる
@@ -213,7 +211,7 @@ int main() {
   - 関数宣言が複雑になりうる
   - クラスで使えない
 
-### `auto`による簡略構文 ※関数のみ
+### 4. `auto`による簡略構文 ※関数のみ
 
 C++20より通常の関数でもジェネリックラムダのように`auto`を使って引数を宣言できます。その際にコンセプトを添えることで制約をかけることができます。
 
@@ -229,8 +227,60 @@ void f(ring auto&&);
 - デメリット
   - 1つの型に1つの制約しかかけられない
   - クラスで使えない
-  
-### 全部盛り
+    - 非型テンプレートパラメータの時は使用可能
+
+
+### 5. 1と2(or 3)
+
+1の書き方に2の書き方を合わせて書くことで、基本制約+追加の制約みたいな気持ちを込めて書くことができます。標準ライブラリではこの形式で制約されていることが多いようです。
+
+```cpp
+//環でありデフォルト構築可能、という制約をする
+
+//関数
+template<ring T>
+requires std::default_constructible<T>
+void f(T&&);
+
+//クラス
+template<ring T>
+requires std::default_constructible<T>
+struct wrap<T>;
+```
+
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/3TDeay27AdWxAVMw)
+
+クラスでは使えませんがこの時に3の方法（関数名の後）で書いても大丈夫です。
+
+- メリット
+  - 複数の制約を少しすっきりと書ける
+  - 基本+追加のような意味を込められる
+- デメリット
+  - 1つの型に対する制約が散らばるので見辛くなりうる
+
+#### 4と3
+
+一応書けますよ、という・・・
+
+```cpp
+void f(ring auto&& x) requires std::default_constructible<decltype(x)>;
+```
+
+あえてこういう書き方をしたいことがあるのか、わかりません・・・
+
+
+#### 全部盛り
+
+2つと言わずに全部使っても構いませんよ、もちろん！
+
+```cpp
+//関数
+template<ring T>
+requires ring<T>
+void f(T&&) requires ring<T>;
+```
+
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/P9xjSqlSaIrd189D)
 
 
 ### 参考文献
@@ -240,3 +290,5 @@ void f(ring auto&&);
 この記事の9割は以下の方によるご指摘によって成り立っています
 
 - [@yohhoyさん](https://twitter.com/yohhoy/status/1174356205369610241)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191018_concept_functions.md)
