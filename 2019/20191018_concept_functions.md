@@ -266,6 +266,8 @@ struct wrap<T>;
 void f(ring auto&& x) requires std::default_constructible<decltype(x)>;
 ```
 
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/wTKFBo0D1dFLlI0h)
+
 あえてこういう書き方をしたいことがあるのか、わかりません・・・
 
 
