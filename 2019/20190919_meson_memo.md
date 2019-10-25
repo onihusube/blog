@@ -106,7 +106,14 @@ include_dir = include_directories('include', 'oher/include')
 executable('test_project', 'test.cpp', extra_files : files, include_directories : include_dir)
 ```
 
-残念ながらあるフォルダ内ファイルを列挙する手段はなさそうなので、1つづつ指定するしかなさそうな感じがします・・・。
+### あるフォルダ内のファイルの列挙、ファイル名にワイルドカードを使う、等
+
+できません。
+
+- [Why can't I specify target files with a wildcard? - Meson Frequently Asked Questions](https://mesonbuild.com/FAQ.html#why-cant-i-specify-target-files-with-a-wildcard)
+
+ビルド高速化のために、この様な曖昧な書き方ができないようになっているようです。  
+残念ながら、プロジェクトに含めるファイルは1つづつ明示的に指定する必要があります。
 
 ### 依存ライブラリをダウンロードしてもらう
 
