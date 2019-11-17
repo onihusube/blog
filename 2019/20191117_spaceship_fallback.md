@@ -263,7 +263,7 @@ struct wrap {
 };
 ```
 
-`T`が`==`を使える時はデフォルト実装を使います。この場合、もう片方の`==`は制約（`not_std::equality_compareble<T>`）を満たさないので曖昧にはなりません。  
+`T`が`==`を使える時はデフォルト実装を使います。この場合、もう片方の`==`は制約（`!std::equality_compareble<T>`）を満たさないので曖昧にはなりません。  
 そして、`T`の`==`が使えない場合は`wrap`のデフォルトな`==`は暗黙`delete`され、もう片方は制約を満たすことから使用可能になり、やはり曖昧にはなりません。
 
 #### 参照型メンバがあるとき
@@ -357,7 +357,7 @@ struct my_pair {
   //TかUの==が使えないかTかUが参照型のときはこちらを使用
   bool operator==(const my_pair& that) const
     requires (
-      (!std::equality_compareble<T> || !std::equality_compareble<T>) ||
+      (!std::equality_compareble<T> || !std::equality_compareble<U>) ||
       (std::is_reference_v<T> || std::is_reference_v<U>)
     )
   {
@@ -414,21 +414,21 @@ struct wrap {
 
   template<typename U>
   auto operator<=>(const U& other) const -> decltype(fallback_cmp_3way(v, other))
-  requires std::convertible_to<T, U>
+  requires std::convertible_to<U, T>
   {
     return fallback_cmp_3way(v, other);
   }
 
   template<typename U>
   bool operator==(const U& other) const
-  requires std::convertible_to<T, U>
+  requires std::convertible_to<U, T>
   {
     if constexpr (std::equality_compareble_with<T, U>) {
       //T, U間で==を使えるのならばそれを使う
-      return v == that.v;
+      return v == other;
     } else {
       //<=>を使って同値比較
-      retunr (*this <=> that) == 0;
+      retunr (*this <=> other) == 0;
     }
   }
 };
@@ -449,3 +449,5 @@ struct wrap {
 - [`<concpet>` - cppreference](https://ja.cppreference.com/w/cpp/header/concepts)
 - [P1186R3 When do you actually use <=>?](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1186r3.html)
 - [P1614R2 The Mothership has Landed (Adding <=> to the Library)](http://wg21.link/p1614)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191117_spaceship_fallback.md)
