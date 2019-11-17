@@ -142,7 +142,7 @@ requires less_than_compareble<T>
   if constexpr (std::three_way_comparable<T>) {
     //<=>が使えるならそれを使う
     return a <=> b;
-  } else if constexpr (less_than_compareble<T> && std::equality_compareble<T>) {
+  } else if constexpr (less_than_compareble<T> && std::equality_comparable<T>) {
     //==と<を使って三方比較
     if (a == b) return std::weak_ordering::equivalent;
     if (b < a) return std::weak_ordering::less;
@@ -158,7 +158,7 @@ requires less_than_compareble<T>
 
 またこんなマジックアイテムを用意して、これを利用して`<=>`を定義します。
 
-ちなみに、`std::equality_compareble`というのはC++20から標準で用意されてるコンセプトで、その名の通り`==`による比較が可能であることを表明します。
+ちなみに、`std::equality_comparable`というのはC++20から標準で用意されてるコンセプトで、その名の通り`==`による比較が可能であることを表明します。
 
 ```cpp
 template<typename T>
@@ -196,7 +196,7 @@ requires less_than_compareble_with<T, U>
   if constexpr (std::three_way_comparable_with<T, U>) {
     //<=>が使えるならそれを使う
     return a <=> b;
-  } else if constexpr (less_than_compareble_with<T, U> && std::equality_compareble_with<T, U>) {
+  } else if constexpr (less_than_compareble_with<T, U> && std::equality_comparable_with<T, U>) {
     //==と<を使って三方比較
     if (a == b) return std::weak_ordering::equivalent;
     if (b < a) return std::weak_ordering::less;
@@ -213,7 +213,7 @@ requires less_than_compareble_with<T, U>
 `< ==`演算子が利用可能かを調べる両コンセプトは`T, U`の順番に関わらず比較可能である事をチェックするために、引数順を入れ替えて両方向から比較可能かをチェックしておきます。  
 ただし、`==`演算子だけは片方しか使わないので、この用途だけを目的とするならばチェックするのは片方だけでよいかもしれません。
 
-`std::three_way_comparable_with`はC++20より標準で用意されるコンセプトで、2つの型の間で`<=>`による比較が使用可能であることを表明します。`std::equality_compareble_with`も`==`について同様のものです。
+`std::three_way_comparable_with`はC++20より標準で用意されるコンセプトで、2つの型の間で`<=>`による比較が使用可能であることを表明します。`std::equality_comparable_with`も`==`について同様のものです。
 
 
 ### 同値比較演算子の導出
@@ -255,7 +255,7 @@ struct wrap {
 
   //Tの==が使えないときにこちらを使用
   bool operator==(const wrap& that) const
-    requires (!std::equality_compareble<T>)  //==演算子が使用可能でない
+    requires (!std::equality_comparable<T>)  //==演算子が使用可能でない
   {
     //<=>を使って同値比較
     retunr (*this <=> that) == 0;
@@ -263,7 +263,7 @@ struct wrap {
 };
 ```
 
-`T`が`==`を使える時はデフォルト実装を使います。この場合、もう片方の`==`は制約（`!std::equality_compareble<T>`）を満たさないので曖昧にはなりません。  
+`T`が`==`を使える時はデフォルト実装を使います。この場合、もう片方の`==`は制約（`!std::equality_comparable<T>`）を満たさないので曖昧にはなりません。  
 そして、`T`の`==`が使えない場合は`wrap`のデフォルトな`==`は暗黙`delete`され、もう片方は制約を満たすことから使用可能になり、やはり曖昧にはなりません。
 
 #### 参照型メンバがあるとき
@@ -287,7 +287,7 @@ struct wrap {
 
   //Tの==が使えないかTが参照型のときはこちらを使用
   bool operator==(const wrap& that) const
-    requires (!std::equality_compareble<T> || std::is_reference_v<T>)
+    requires (!std::equality_comparable<T> || std::is_reference_v<T>)
   {
     //<=>を使って同値比較
     retunr (*this <=> that) == 0;
@@ -314,9 +314,9 @@ struct wrap {
 
   //Tの==が使えないかTが参照型のときはこちらを使用
   bool operator==(const wrap& that) const
-    requires (!std::equality_compareble<T> || std::is_reference_v<T>)
+    requires (!std::equality_comparable<T> || std::is_reference_v<T>)
   {
-    if constexpr (std::equality_compareble<T>) {
+    if constexpr (std::equality_comparable<T>) {
       //Tが==を使えるのならばそれを使う
       return v == that.v;
     } else {
@@ -327,7 +327,7 @@ struct wrap {
 };
 ```
 
-`if constexpr`と`std::equality_compareble`でさらに分岐させます。  
+`if constexpr`と`std::equality_comparable`でさらに分岐させます。  
 オーバーロードにしてしまうのも良いかもしれませんが、コンセプトのオーバーロードの半順序は複雑なのでお勧めしません・・・
 
 実は、union-likeな型（共用体そのものか匿名共用体をメンバに持つ型）でも同じ問題が起きますが、それを解決することは難しいので触れないでおきます・・・
@@ -357,11 +357,11 @@ struct my_pair {
   //TかUの==が使えないかTかUが参照型のときはこちらを使用
   bool operator==(const my_pair& that) const
     requires (
-      (!std::equality_compareble<T> || !std::equality_compareble<U>) ||
+      (!std::equality_comparable<T> || !std::equality_comparable<U>) ||
       (std::is_reference_v<T> || std::is_reference_v<U>)
     )
   {
-    if constexpr (std::equality_compareble<T> && std::equality_compareble<U>) {
+    if constexpr (std::equality_comparable<T> && std::equality_comparable<U>) {
       //==を使えるのならばそれを使う
       return first == that.first && second == that.second;
     } else {
@@ -399,9 +399,9 @@ struct wrap {
 
   //Tの==が使えないかTが参照型のときはこちらを使用
   bool operator==(const wrap& that) const
-    requires (!std::equality_compareble<T> || std::is_reference_v<T>)
+    requires (!std::equality_comparable<T> || std::is_reference_v<T>)
   {
-    if constexpr (std::equality_compareble<T>) {
+    if constexpr (std::equality_comparable<T>) {
       //Tが==を使えるのならばそれを使う
       return v == that.v;
     } else {
@@ -423,7 +423,7 @@ struct wrap {
   bool operator==(const U& other) const
   requires std::convertible_to<U, T>
   {
-    if constexpr (std::equality_compareble_with<T, U>) {
+    if constexpr (std::equality_comparable_with<T, U>) {
       //T, U間で==を使えるのならばそれを使う
       return v == other;
     } else {
