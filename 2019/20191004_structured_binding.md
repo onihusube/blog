@@ -108,7 +108,7 @@ N4659で規定されている構造化束縛宣言では、tuple-likeの場合�
 
 ### C++20での構造化束縛宣言の拡張
 
-しかし、その後の構造化束縛の扱いを通常の変数宣言に近づける提案[P1091R3 : Extending structured bindings to be more like variable declarations](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1091r3.html)の採択によって、構造化束縛宣の`[identifier-list]`内の識別子名をラムダ式がキャプチャできるようになりました。  
+しかし、その後の構造化束縛の扱いを通常の変数宣言に近づける提案[P1091R3 : Extending structured bindings to be more like variable declarations](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1091r3.html)の採択によって、構造化束縛宣言の`[identifier-list]`内の識別子名をラムダ式がキャプチャできるようになりました。  
 この結果、P0588R1で明記されたラムダは構造化束縛宣の導入する名前をキャプチャできない、という文章は削除されました。
 
 P1091R3には「構造化束縛をラムダがキャプチャできないことを禁止する技術的な理由はないようだ」のように書かれています。確かに、参照している名前をそのままラムダ内部までもっていけばいいだけなので最初からこうなってほしかった感があります・・・  
