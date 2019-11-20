@@ -2,6 +2,8 @@
 
 この3つの言葉はどれも、あるコンセプトもしくは制約を満たすという意味で使われているのですが、同じ意味のように思えますが標準ライブラリ中では明確な使い分けがなされています。
 
+[:contents]
+
 ### old conceptに対する*meet*
 
 *meet*が使われるのはC++17までの名前付き要件を使用しているところです。それはC++20からは`Cpp17CopyConstructible`のような名前になっています。
@@ -9,7 +11,7 @@
 これらの名前付き要件はコンセプトのように構文的にチェックされるわけではなく、満たすべき要件は規格書に記述されており、それを使用する所に入ってくる型は暗黙にそれを満たしているものとして扱います。  
 この制約には型が満たすべき静的なものと、実際の値が満たすべき動的なものの2種類が含まれます。
 
-特にイテレータが絡む所での`InputIterator`などがお馴染みでしょうか。
+特にイテレータが絡む所での`ForwardIterator`などがお馴染みでしょうか。
 
 この制約を仮に満たさなかった場合、プログラムはill-formdとなりますが必ずしもそれはコンパイルエラーになるとは限りません。ひょっとしたら実行時にすらエラーとはならないかもしれません。未定義動作の世界です。
 
@@ -88,6 +90,7 @@ template<class B>
 さて、次にその下のだ書に目を向けると次のように書かれています。
 
 >For some type `B`, let `b1` and `b2` be lvalues of type `const remove_­reference_­t<B>`. `B` *models* `boolean` only if
+>
 >- `bool(b1) == !bool(!b1)`.
 >- `(b1 && b2)`, `(b1 && bool(b2))`, and `(bool(b1) && b2)` are all equal to `(bool(b1) && bool(b2))`, and have the same short-circuit evaluation.
 >- `(b1 || b2)`, `(b1 || bool(b2))`, and `(bool(b1) || b2)` are all equal to `(bool(b1) || bool(b2))`, and have the same short-circuit evaluation.
@@ -97,6 +100,7 @@ template<class B>
 なんとなく訳せば
 
 >型`B`に対して`const remove_­reference_­t<B>`の左辺値として定義する値`t, u`について、次の条件をすべて満たしている場合に限って型`B`は`boolean`のモデルである
+>
 >- `(b1 && b2)`, `(b1 && bool(b2))`, `(bool(b1) && b2)`の式は全て `(bool(b1) && bool(b2))`と等値であり、短絡評価されるかどうかも一致する。
 >- `(b1 || b2)`, `(b1 || bool(b2))`, `(bool(b1) || b2)`の式は全て `(bool(b1) || bool(b2))`と等値であり、短絡評価されるかどうかも一致する。
 >- `bool(b1 == b2)`, `bool(b1 == bool(b2))`, `bool(bool(b1) == b2)` の式は全て `(bool(b1) == bool(b2))`と等値である
@@ -161,3 +165,5 @@ template<class Out, class... Args>
 この記事の9割は以下の方々によるご指摘によって成り立っています。
 
 - [yohhoyさん](https://twitter.com/yohhoy/status/1177578518164561922)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191120_concept_model.md)
