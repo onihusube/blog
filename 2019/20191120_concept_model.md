@@ -145,7 +145,7 @@ template<class Out, class... Args>
 >Preconditions: `Out` *models* `output_­iterator<const charT&>`,  
 >and `formatter<Ti, charT>` *meets* the *Formatter requirements* ([formatter.requirements]) for each `Ti` in `Args`.
 
-型`Out`は`output_­iterator<const charT&>`のモデルであり、引数型`Args...`内の各型`Ti`は*Formatter*要件を満たしていること、みたいな意味です。  
+型`Out`は`output_­iterator<const charT&>`のモデルであり、引数型`Args...`内の各型`Ti`について`formatter<Ti, charT>`は*Formatter*要件を満たしていること、みたいな意味です。  
 
 これによって結局、型`Out`は`output_­iterator<const charT&>`コンセプトの構文的、意味論的な制約の両方を満たしていることが要求されていることが分かります。ただし、意味論的な制約はチェックされず暗黙に満たしているものとして扱われます。満たしていなければ未定義動作です・・・
 
