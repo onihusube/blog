@@ -172,4 +172,24 @@ C++標準化委員会における「委員会による設計（より正確に�
 
 全ての設計には長所、短所、および制限がある。可能性のある問題や代替案について真剣かつ誠実に議論しないまま設計を提示してはならない。可能性のある問題について調査するのは提案者の仕事の一つであり、「販売するだけの仕事」は知的に誠実ではない。
 
-「対立陣営」の人々によって書かれたコルーチンに関する「賛否両方の立場からの論文」は非常に有益だった（[Coroutines: Use-cases and Trade-offs](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1493r0.pdf)、[Coroutines: Language and Implementation Impact ](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1492r0.pdf)）。
+「対立陣営」の人々によって書かれたコルーチンに関する「賛否両方の立場からの論文」は非常に有益だった（[Coroutines: Use-cases and Trade-offs](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1493r0.pdf)、[Coroutines: Language and Implementation Impact](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1492r0.pdf)）。  
+理想的な提案はいくつかの理論といくつかの実経験の両方を反映したものであり、関連する文献（多くの場合学術的なもの）の考慮もより慎重にならねばならない。主要な提案には常にいくつかの関連文献が記されている。
+
+設計という作業には、様々な懸念事項と原則とのバランスを取ることが伴う。盲目的に従うことのできる絶対的で破ることのできない原則などは存在しない。これが、「D&E」において数十の「経験則」をリストアップしている理由だ。  
+ただ残念なことに、最終的には必ず「嗜好」になり、群衆にはそれがない。しかし、この文書には隠されたチェックリストが（嗜好によって解釈される）含まれているように見えるかもしれない。
+
+### モチベーション
+
+この文書を書くきっかけとなった最近の議論には次のものがある
+
+- 主要機能 : [コンセプト](https://cpprefjp.github.io/lang/cpp20/concepts.html)、[静的例外](https://wg21.link/p0709)、[契約プログラミング](https://cpprefjp.github.io/lang/cpp23/contract-based_programming.html)
+- 小さな機能 : 統一的な関数呼び出し、[宇宙船演算子](https://cpprefjp.github.io/lang/cpp20/consistent_comparison.html)、[`if/switch`文内の初期化式](https://cpprefjp.github.io/lang/cpp17/selection_statements_with_initializer.html)
+
+### なぜ**あなたは**そんなに確信が持てるのか？
+
+誰かが合理的に指摘するかもしれない：「あなたはしばしば強い主張を表明をしており、他の人々があなたの意見を受け入れなかった時には腹を立てていることさえあった」
+
+もちろん、私も怒りを見せるべきではない。申し訳ない。
+それが露になるとき、それは通常、長年の仕事の後の焦りか、全ての人や議論が同じ基準に立っているわけではないという感覚の結果である。また、長年の仕事の後では、
+
+
