@@ -141,15 +141,16 @@ int main() {
 #include <memory>
 #include <random>
 
-constinit const int N = 1;    //ok
-constinit unsigned int M = N; //ok、constな整数型は定数式で利用可能
+constinit const int N = 1;      //ok
+constinit unsigned int M = N;   //ok、constな整数型は定数式で利用可能
+constinit constexpr int L = 1;  //ng、constinitとconstexprを同時に指定できない
 
 constinit thread_local static int Counter = 0; //ok
 
 constinit const double PI = 3.1415; //ok
 constinit double PI2 = PI + PI;     //ng、変数PIは定数式で利用不可
 
-constinit static int L; //ok、ゼロ初期化される
+constinit static int O; //ok、ゼロ初期化される
 constinit int Array[3]; //ok、ゼロ初期化される
 
 constinit std::mutex m{};           //ok、定数初期化コンストラクタ呼び出し
@@ -167,7 +168,7 @@ struct S {
 
 const int S::x = 12;            //ok、constinit変数なので定数初期化される
 constinit const int S::y = 34;  //ok、constinit変数なので定数初期化される
-constinit constexpr int S::z;   //エラーにはならないと思われるが意味がなく、インライン変数に対する多重定義
+constinit constexpr int S::z;   //ng、インライン変数に対する多重定義
                                 //constexpr静的メンバ変数に対するクラス外定義はC++17以降非推奨
 
 int main() {
@@ -177,6 +178,8 @@ int main() {
   constinit int local = 0;  //ng、ローカル変数
 }
 ```
+
+[[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/emN1qtddAcN2wWwK)
 
 `constinit`指定は変数宣言に指定でき、その効果はその変数の初期化宣言に対して適用されます。通常の変数はその2つを分かつことができませんが、`extern`変数や静的メンバ変数のように宣言と定義（初期化宣言）が別れる場合、定義から`constinit`宣言が到達不可能となると未定義動作（診断不要）です。
 
