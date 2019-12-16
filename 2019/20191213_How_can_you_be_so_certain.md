@@ -9,6 +9,13 @@
 私の英語力はひよこ以下なので訳の正確性には全く保証がありません。特に、細部のニュアンスの解釈は大いに間違っている可能性があります（修正してやる！という方がいましたら、[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191213_How_can_you_be_so_certain.md)からお願いします）。
 
 
+##### 以下の方に修正を賜りました
+
+- [k-satodaさん](https://github.com/onihusube/blog/pull/1)
+
+
+なお、翻訳の公開についてBjarne Stroustrupさんに連絡を取った所、問題ないとのお返事をいただいております。
+
 以下本文
 
 ## How can you be so certain? - Bjarne Stroustrup
