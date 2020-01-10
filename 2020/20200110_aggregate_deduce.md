@@ -1,6 +1,6 @@
 # ［C++］ 集成体のテンプレート引数推論
 
-### C++17のクラステンプレートのテンプレート引数推論とテンプレートな集成体
+### C++17のテンプレートな集成体とテンプレートパラメータ推論
 
 C++17から、クラステンプレートのコンストラクタ引数からそのテンプレート引数を推論出来るようになりました。これによって、クラステンプレートを扱う際にとても便利に書けます。
 
@@ -121,3 +121,5 @@ D d2 = {1, 2, 3}; // ok、{}省略可能
 - [C++17 クラステンプレートのテンプレート引数推論 - cpprefjp](https://cpprefjp.github.io/lang/cpp17/type_deduction_for_class_templates.html)
 - [P1816R0 : Wording for class template argument deduction for aggregates](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1816r0.pdf)
 - [P1021R4 : Filling holes in Class Template Argument Deduction](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1021r4.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200110_aggregate_deduce.md)
