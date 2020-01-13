@@ -23,11 +23,18 @@ Wroding Changeの項では変更点のみを翻訳するのではなく関連す
     - [[basic.lookup.argdep] Inline the definition of 'interface'. - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/3390)
 - [GB 078 10.01 Harmonize "digits" referring to reserved namespace/module names](https://github.com/cplusplus/nbballot/issues/77)
     - [[namespace.future,diff.cpp14.library] Properly refer to grammar 'digit'](https://github.com/cplusplus/draft/pull/3345)
-- [GB079 10.01 Add example for private-module-fragment](https://github.com/cplusplus/nbballot/issues/78)
 - [P1971R0 : Core Language Changes for NB Comments at the November, 2019 (Belfast) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1971r0.html)
-- [US086 10.03 Treatment of non-exported imports](https://github.com/cplusplus/nbballot/issues/85)
+    - [GB079 10.01 Add example for private-module-fragment](https://github.com/cplusplus/nbballot/issues/78)
+    - [US087 10.03 p9 Header unit imports cannot be cyclic, either](https://github.com/cplusplus/nbballot/issues/86)
+    - [US132 15.03 Macros from the command-line not exported by header units](https://github.com/cplusplus/nbballot/issues/131)
+    - [US367 6-15 Instead of header inclusion, also permit header unit import](https://github.com/cplusplus/nbballot/issues/363)
+      - `new`とか`<=>`とか対応するヘッダのインクルードが必要なものについて、`import`を明示的に許可する。以下では省略
 - [P1979R0 : Resolution to US086](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1979r0.html)
-
+    - [US086 10.03 Treatment of non-exported imports](https://github.com/cplusplus/nbballot/issues/85)
+- [US088 10.04 [module.global] Harmonize labels referring to the global module fragment](https://github.com/cplusplus/nbballot/issues/87)
+    - [[module.global,cpp.glob.frag] Rename labels to ...global.frag.](https://github.com/cplusplus/draft/pull/3351)
+- [GB089 10.06 [module.reach] Mark translation unit boundaries in example](https://github.com/cplusplus/nbballot/issues/88)
+  - [[module.reach] Clearly separate translation units in example.](https://github.com/cplusplus/draft/pull/3331)
 
 ## 以下本文
 
@@ -1119,10 +1126,11 @@ import M;               // error: Mをそれ自身のモジュール単位でイ
 ```
 
 #### 9
-次のいずれかの場合に、ある翻訳単位はあるモジュール単位`U`に __インターフェース依存関係__（*interface dependency*）を持つ。  
+次のいずれかの場合に、ある翻訳単位はある翻訳単位`U`に __インターフェース依存関係__（*interface dependency*）を持つ。  
 ただし、翻訳単位は自分自身に対してインターフェース依存関係を持たない。
   1. `U`を（暗黙的に）インポートするモジュール宣言、又はモジュールインポート宣言が含まれている場合
-  2. `U`にインターフェース依存関係を持つモジュール単位にインターフェース依存関係を持つ場合
+  2. `U`にインターフェース依存関係を持つ翻訳単位にインターフェース依存関係を持つ場合
+
 ```cpp
 //Interface unit of M1:
 export module M1;
@@ -1137,7 +1145,7 @@ export module M3;
 import M1;              // error: 循環的なインターフェース依存関係 M3→M1→M2→M3
 ```
 
-### 10.4 Global module fragment [module.global]
+### 10.4 Global module fragment [module.global.frag]
 - global-module-fragment:
 	- `module;` top-level-declaration-seq(opt)
 
@@ -1445,13 +1453,13 @@ void g() { f(); }               // error: クラスBの定義は到達可能で�
 エンティティは名前探索で可視でなくても、到達可能な宣言を持つことができる。
 
 ```cpp
-//モジュールA
+//Translation unit #1:モジュールA
 export module A;
 
 struct X {};
 export using Y = X;
 
-//モジュールB
+//Translation unit #2:モジュールB
 module B;
 import A;
 
@@ -1736,6 +1744,14 @@ __プリプロセッシングディレクティブ__（*preprocessing directive*
 	- `export`(opt) `import` pp-tokens new-line
   - （以下略）
 
+#### 3
+
+プログラム内各翻訳単位をプリプロセスするときに検出される各`#define`ディレクティブは、個別のマクロ定義（*macro definition*）である。
+
+[Note: 事前定義されるマクロ名は`#define`ディレクティブで導入されない。追加で任意のマクロを事前定義する方法（コマンドライン引数など）を提供する処理系は、それらを`#define`で導入されたものとして扱わない事が推奨される。（すなわち、ヘッダーユニットからのマクロのエクスポートにおいて、それらの事前定義マクロはエクスポートされない。もしくはしない事が推奨される）]
+
+（以下略）
+
 #### 4
 プリプロセッシングディレクティブ内（ディレクティブ導入トークンの直後から終端改行文字の直前までの間）のプリプロセッシングトークン間に現れる空白文字は、半角スペースと水平タブのみである。
 
@@ -1850,7 +1866,7 @@ int a = Y;      // OK, アクティブなマクロ定義#2と#4、#4はYの有�
 int c = Z;      // error: クティブなマクロ定義#3と#5、#5はZの有効な再定義ではない
 ```
 
-### 15.4 Global module fragment [cpp.glob.frag]
+### 15.4 Global module fragment [cpp.global.frag]
 - pp-global-module-fragment:
 	- `module ;` pp-balanced-token-seq `module`
 - pp-balanced-token-seq:
