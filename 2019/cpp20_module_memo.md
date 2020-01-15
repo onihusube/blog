@@ -679,6 +679,28 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 #### 11
 宣言が、別のモジュールに属した到達可能な宣言を再宣言する場合、プログラムはill-formd
 
+```cpp
+///ヘッダファイル "decls.h":
+int f();            // #1, グローバルモジュールに属している
+int g();            // #2, グローバルモジュールに属している
+
+
+///Module interface of M:
+module;
+#include "decls.h"
+export module M;
+export using ::f;   // OK: エンティティを宣言していない、#1をエクスポートする
+int g();            // error: #2と同じエンティティの再宣言、Mに属する宣言になるためエラー
+export int h();     // #3
+export int k();     // #4
+
+
+///Other translation unit:
+import M;
+static int h();     // error: #3と同じエンティティの再宣言、同じモジュールに属していない
+int k();            // error: #4と同じエンティティの再宣言、同じモジュールに属していない
+```
+
 この規則によって、エンティティのすべての宣言は同じモジュールに所属していなければならない、という帰結が得られる。
 そのようなエンティティはモジュールに ***属している（attached）*** と言われる
 
@@ -694,7 +716,7 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 - 名前付きのモジュールに属しているグローバルスコープで`main`という名前の関数を宣言している
 - Cリンケージを使用して`main`という名前の関数を宣言している
 
-### 9.1.3 The typedef specifier[dcl.typedef]
+### 9.2.3 The typedef specifier[dcl.typedef]
 
 #### 10
 リンケージ目的で`typedef`名を持つ無名クラスは次のものを含んではならない。
@@ -712,7 +734,7 @@ typedef struct {
 } X;  //error: リンケージのためにtypedef名を持つクラスがメンバ関数を持っている
 ```
 
-### 9.1.6 The inline speciﬁer [dcl.inline]
+### 9.2.7 The inline specifier [dcl.inline]
 
 #### 6
 inline変数・関数がある翻訳単位でodr-usedされているとき、その翻訳単位の末尾からその定義が到達可能でなければならず、全ての（odr-usedされている）翻訳単位で同様かつ、全く同じ定義を持っていなければならない。（inline変数の使用、inline関数の呼び出しはその定義が（翻訳単位内で）現れる前に行われる可能性がある）
@@ -730,15 +752,14 @@ inline変数・関数がある翻訳単位でodr-usedされているとき、そ
 エクスポートされたinline関数・変数は、（存在している場合は）プライベートモジュールフラグメントの外側で、そのエクスポートされた宣言を含む翻訳単位で定義される。  
 [Note: エクスポートされたinline関数の本体から参照できるエンティティのリンケージに制限はない（リンケージ無しでもok）。constexpr関数は暗黙inline]
 
-### 9.1.7.4 The auto speciﬁer [dcl.spec.auto]
-（9.1.7.5 Placeholder type specifiers 
-[dcl.spec.auto]に変更されてる）
+### 9.2.8.5 Placeholder type specifiers [dcl.spec.auto]
 
 #### 10
 プレースホルダ型（`auto, decltype(auto)`とそれのコンセプト付き）を戻り値型に使用する宣言を持つエクスポートされた関数は、そのエクスポートされた宣言を含む翻訳単位内で、かつ（存在している場合は）プライベートモジュールフラグメントの外側で定義されなければならない。  
 [Note: 推論される戻り値型のリンケージに制限はない]
 
-### 9.2.3.6 Default arguments[dcl.fct.default]
+### 9.3.3.6 Default arguments [dcl.fct.default]
+
 テンプレートでない関数は、同じスコープの後の宣言でデフォルト引数を追加できる。  
 異なるスコープの宣言には完全に異なるデフォルト引数の集合がある。つまり、より内側のスコープの宣言はそれより外側のスコープの宣言からデフォルト引数を取得しない、その逆も同様。
 
@@ -753,7 +774,7 @@ inline変数・関数がある翻訳単位でodr-usedされているとき、そ
 
 `friend`宣言でデフォルト引数式が指定されている場合、その宣言は定義であり、かつその翻訳単位における唯一の関数・関数テンプレートの宣言でなければならない。
 
-### 9.7 Namespaces [basic.namespace]
+### 9.8 Namespaces [basic.namespace]
 
 #### 1
 名前空間は名前付き（無くても良い）の宣言領域である。  
@@ -767,11 +788,11 @@ inline変数・関数がある翻訳単位でodr-usedされているとき、そ
 ### 10.1 Module units and purviews [module.unit]
 
 - module-declaration:
-  - `export` (opt) `module` module-name module-partition (opt) attribute-speciﬁer-seq (opt);
+  - `export`(opt) `module` module-name module-partition(opt) attribute-speciﬁer-seq(opt);
 - module-name:
-  - module-name-qualifier (opt) identifier
+  - module-name-qualifier(opt) identifier
 - module-partition:
-  - : module-name-qualifier (opt) identifier
+  - : module-name-qualifier(opt) identifier
 - module-name-qualifier:
   - identifier `.`
   - module-name-qualifier identifier `.`
@@ -782,7 +803,7 @@ __名前付きモジュール__（*named module*）とは同じ __モジュー�
 `module`と`import`の識別子は、モジュール名もしくは __モジュールパーティション__（module-partition）の識別子として表れることはない。
 
 `std`（+0個以上の数字列）から始まるモジュール名、及び予約語を含むモジュール名は全てC++標準によって予約されているため、モジュール名として使用してはならない。ただし、この診断は不要。  
-そのように予約されたモジュール名のうち、その名前が予約語であるものはC++実装のため、それ以外のものは将来のC++標準のため、それぞれ予約されている。
+そのように予約されたモジュール名のうち、その名前が予約語であるものはC++実装（処理系）のため、それ以外のものは将来のC++標準のため、それぞれ予約されている。
 
 （オプショナルである）attribute-speciﬁerseqはモジュール宣言に作用する（attribute-speciﬁerseqは0個以上の属性指定のこと）。
 
