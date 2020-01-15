@@ -17,6 +17,24 @@ Wroding Changeの項では変更点のみを翻訳するのではなく関連す
 - [P1766R1 : Mitigating minor modules maladies](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1766r1.html)
 - [P1703R1 : Recognizing Header Unit Imports Requires Full Preprocessing](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1703r1.html)
 - [P1502R1 : Standard library header units for C++20](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1502r1.html)
+- [GB022 04.01Allow "import" for accessing standard library names](https://github.com/cplusplus/nbballot/issues/22)
+    - [[intro.compliance] The standard library also offers header units. - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/3356)
+- [FR039 06.05.2.4 Non-exported functions should not be visible via ADL after importing](https://github.com/cplusplus/nbballot/issues/38)
+    - [[basic.lookup.argdep] Inline the definition of 'interface'. - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/3390)
+- [GB 078 10.01 Harmonize "digits" referring to reserved namespace/module names](https://github.com/cplusplus/nbballot/issues/77)
+    - [[namespace.future,diff.cpp14.library] Properly refer to grammar 'digit'](https://github.com/cplusplus/draft/pull/3345)
+- [P1971R0 : Core Language Changes for NB Comments at the November, 2019 (Belfast) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1971r0.html)
+    - [GB079 10.01 Add example for private-module-fragment](https://github.com/cplusplus/nbballot/issues/78)
+    - [US087 10.03 p9 Header unit imports cannot be cyclic, either](https://github.com/cplusplus/nbballot/issues/86)
+    - [US132 15.03 Macros from the command-line not exported by header units](https://github.com/cplusplus/nbballot/issues/131)
+    - [US367 6-15 Instead of header inclusion, also permit header unit import](https://github.com/cplusplus/nbballot/issues/363)
+      - `new`とか`<=>`とか対応するヘッダのインクルードが必要なものについて、`import`を明示的に許可する。以下では省略
+- [P1979R0 : Resolution to US086](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1979r0.html)
+    - [US086 10.03 Treatment of non-exported imports](https://github.com/cplusplus/nbballot/issues/85)
+- [US088 10.04 [module.global] Harmonize labels referring to the global module fragment](https://github.com/cplusplus/nbballot/issues/87)
+    - [[module.global,cpp.glob.frag] Rename labels to ...global.frag.](https://github.com/cplusplus/draft/pull/3351)
+- [GB089 10.06 [module.reach] Mark translation unit boundaries in example](https://github.com/cplusplus/nbballot/issues/88)
+  - [[module.reach] Clearly separate translation units in example.](https://github.com/cplusplus/draft/pull/3331)
 
 ## 以下本文
 
@@ -422,6 +440,12 @@ Atom提案では`export`と`module`は文脈依存キーワードとされてい
 
 ## Wording Change
 
+### 4.1 Implementation compliance [intro.compliance]
+
+#### 5
+
+標準ライブラリで定義される名前は名前空間スコープを持つ。C++翻訳単位は、適切な標準ライブラリのヘッダファイルの`#include`か、適切な標準ライブラリのヘッダーユニットの`import`によって、これらの名前へのアクセスを取得する。
+
 ### 5.4 Preprocessing tokens [lex.pptoken]
 - preprocessing-token:
 	- header-name
@@ -545,13 +569,16 @@ D d2;                           // X(int, int, int) called by D();
 ### 6.4 Name lookup [basic.lookup]
 （ある名前の）名前探索、関数オーバーロード解決、アクセスチェック、が成功した後で初めて、その名前の宣言及び到達可能な再宣言によって導入された意味論的特性（semantic properties）が式の処理（評価）に使用される。
 
-### 6.4.2 Argument-dependent name lookup [basic.lookup.argdep] 
+### 6.4.2 Argument-dependent name lookup [basic.lookup.argdep]
+
+#### 4
+
 関連名前空間`N`を探索するとき、次の点を除いて`N`が修飾子として使用されるときに実行される探索と同じことが行われる。
 
 - N内のusingディレクティブはすべて無視される
 - 関数と関数テンプレート（オーバーロードされているかもしれない）、以外の名前はすべて無視される
 - 関連エンティティの集合の中で 到達可能な定義を持つ クラス内で宣言されたフレンド関数（テンプレート）は、たとえそれらが通常の名前探索で可視でなかったとしてもそれぞれの名前空間内で可視である
-- 名前付きモジュール`M`のインターフェース内名前空間`N`の内側にある宣言`D`は、`D`を囲む最も内側の非inline名前空間内に、`M`に属する関連エンティティがある場合にすべて可視となる
+- 名前付きモジュール`M`本文の、名前空間`N`の内側にあるエクスポートされた宣言`D`は、`D`を囲む最も内側の非inline名前空間内に、`M`に属する関連エンティティがある場合にすべて可視となる
 - 探索が依存名に対するものである場合、`N`内の宣言`D`がインスタンス化コンテキスト内の任意の点における修飾名探索で可視であるとき、次の場合を除いて`N`内の宣言`D`はすべて可視である。
   - 宣言`D`は別の翻訳単位でグローバルモジュールに属して宣言されており、かつ
     - 破棄されている、もしくは
@@ -583,16 +610,16 @@ D d2;                           // X(int, int, int) called by D();
   - declaration 
 
 #### 2
-プライベートモジュールフラグメント（private-module-fragment）はプライマリモジュールインターフェース単位にだけ表れる。 
-private-module-fragmentを持つモジュール単位は、そのモジュールで唯一のモジュール単位となる。その診断は不要。
+~~プライベートモジュールフラグメント（private-module-fragment）はプライマリモジュールインターフェース単位にだけ表れる。 
+private-module-fragmentを持つモジュール単位は、そのモジュールで唯一のモジュール単位となる。その診断は不要。~~
 
-#### 3  
+#### 2
 `module`, `export module`~~, `import`, `export import`~~、のどれかで始まり、直後に`::`が続かないトークン列がtop-level-declarationのdeclarationとして扱われる事は無い。
 
 （上記top-level-declarationの形式中の2番目のdecralationとして扱われない = モジュール宣言として扱われるということ。  
 例えば、`module::C f(){}`、~~`export import::T g(int);`~~ のような形の宣言は既に存在している可能性があるので、それを考慮しての文面だと思われる。`export`は予約語なのでこの心配はない）
 
-#### 4  
+#### 3  
 ある名前が、別のスコープの宣言によって導入された名前と同じ、オブジェクト、参照、関数、型、テンプレート、名前空間、値、を指し示す場合、その名前は __リンケージ__ （*linkage*）を持つ。
 
 名前が外部リンケージを持つ場合、 その名前が指し示すエンティティは次の名前から参照することができる（参照されうる、逆もしかり）。
@@ -608,7 +635,7 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 
 名前がリンケージを持たない場合、 その名前が指し示すエンティティは他のスコープの名前から参照することができない。
 
-#### 5  
+#### 4
 名前空間スコープをもつ名前のうち、非テンプレートの`volatile`ではない`const`変数は、次のいずれでもない場合に内部リンケージを持つ。
 - 明示的に`extern`と宣言されている
 - `inline`変数
@@ -617,7 +644,7 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 
 [Note: const修飾された型のインスタンス化された変数テンプレートは、`extern`と宣言されていなくても、外部リンケージまたはモジュールリンケージを持つ]
 
-#### 6
+#### 5
 無名名前空間、または無名名前空間で直接または間接的に宣言された名前空間は内部リンケージを持つ。  
 そうでない名前空間は外部リンケージを持つ。  
 上記の内部リンケージを持たない名前空間を持ち、次のいずれかのものの名前
@@ -634,11 +661,11 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 - そうでなく、名前の宣言はモジュールに属しており、エクスポートされてない場合、その名前はモジュールリンケージを持つ。
 - それ以外の場合、その名前は外部リンケージを持つ。
 
-#### 8
+#### 7
 ブロックスコープで宣言された関数名と、extern付きの変数名はリンケージを持つ。  
 そのような宣言が名前付きのモジュールに属している場合、プログラムはill-formed。
 
-#### 11
+#### 10
 2つの名前が同じであり異なるスコープで宣言されているとき、次の全てを満たす場合に同じ変数・関数型、テンプレート、名前空間、を表す。
 - 2つの名前が外部リンケージかモジュールリンケージを持っており、同じモジュールに属した宣言によって宣言されている、もしくは、2つの名前が内部リンケージを持ち同じ翻訳単位で宣言されている
 - 2つの名前は同じ名前空間、もしくは継承されていないクラスのメンバーを参照する
@@ -649,7 +676,7 @@ private-module-fragmentを持つモジュール単位は、そのモジュール
 
 外部リンケージを持つ同じ名前の複数の宣言が、異なるモジュールに属していること以外は同じエンティティを宣言している場合、プログラムはill-formdであり、診断は不要。
 
-#### 12
+#### 11
 宣言が、別のモジュールに属した到達可能な宣言を再宣言する場合、プログラムはill-formd
 
 この規則によって、エンティティのすべての宣言は同じモジュールに所属していなければならない、という帰結が得られる。
@@ -1081,7 +1108,7 @@ export namespace N {
     3. ヘッダユニットのすべての宣言は暗黙にエクスポートされるが、内部リンケージを持つ名前の宣言は許可される。  
     ただし、そのような宣言がヘッダーユニットの外側、もしくはインスタンス化地点がヘッダーユニットの外側にあるようなテンプレートのインスタンス化、によってodr-usedされるエンティティを宣言する場合、プログラムはill-formed.
 4. インポート宣言がある翻訳単位`T`をインポートするとき、`T`でエクスポートされたインポート宣言（再エクスポート：`export import T2;`）によってインポートされているすべての翻訳単位もインポートされる。それらの翻訳単位は`T`によってエクスポートされている。  
-5. モジュール単位内のモジュールインポート宣言が、同じモジュール内の別のモジュール単位をインポートすると、そのモジュール単位内でインポート宣言によってインポートされたすべての翻訳単位をインポートする。  
+5. モジュール`M`のあるモジュール単位内のモジュールインポート宣言が、`M`の別のモジュール単位`U`をインポートすると、`U`の本文で再エクスポートされないインポート宣言によってインポートされたすべての翻訳単位をインポートする。  
 （4,5の規則は１つのインポート宣言がさらに多くの翻訳単位のインポートをまねく可能性がある）
 6. モジュール実装単位はエクスポートできない。  
 ```cpp
@@ -1099,10 +1126,11 @@ import M;               // error: Mをそれ自身のモジュール単位でイ
 ```
 
 #### 9
-次のいずれかの場合に、ある翻訳単位はあるモジュール単位`U`に __インターフェース依存関係__（*interface dependency*）を持つ。  
+次のいずれかの場合に、ある翻訳単位はある翻訳単位`U`に __インターフェース依存関係__（*interface dependency*）を持つ。  
 ただし、翻訳単位は自分自身に対してインターフェース依存関係を持たない。
   1. `U`を（暗黙的に）インポートするモジュール宣言、又はモジュールインポート宣言が含まれている場合
-  2. `U`にインターフェース依存関係を持つモジュール単位にインターフェース依存関係を持つ場合
+  2. `U`にインターフェース依存関係を持つ翻訳単位にインターフェース依存関係を持つ場合
+
 ```cpp
 //Interface unit of M1:
 export module M1;
@@ -1117,7 +1145,7 @@ export module M3;
 import M1;              // error: 循環的なインターフェース依存関係 M3→M1→M2→M3
 ```
 
-### 10.4 Global module fragment [module.global]
+### 10.4 Global module fragment [module.global.frag]
 - global-module-fragment:
 	- `module;` top-level-declaration-seq(opt)
 
@@ -1229,7 +1257,56 @@ int b = use_g<int>();           // error: 呼び出し可能なg()はみつか�
 int c = use_h<int>();           // OK、use_h<int>()はモジュールMのインターフェース単位内でインスタンス化済
 ```
 
-### 10.5 Instantiation context [module.context]
+### 10.5 Private module fragment [module.private.frag]
+
+- private-module-fragment:
+  - `module : private;` top-level-declaration-seq (opt)
+  
+#### 1
+
+プライベートモジュールフラグメント（private-module-fragment）はプライマリモジュールインターフェース単位にだけ表れる。 
+private-module-fragmentを持つモジュール単位は、そのモジュールで唯一のモジュール単位となる。その診断は不要。
+
+#### 2
+[Note: プライベートモジュールフラグメントは、他の翻訳単位に影響を及ぼす可能性のある部分のモジュールインターフェース単位を終了する。プライベートモジュールフラグメントを使用すると、モジュールの全ての中身を`import`した翻訳単位から到達可能にすることなく（モジュールの必要な一部分だけを到達可能としながら）単一の翻訳単位としてモジュールを構成できる。
+
+プライベートモジュールフラグメントの存在は次のものに影響を及ぼす
+
+- エクスポートされた`inline`関数の定義が必要とされるポイント
+- エクスポートされたプレイスホルダー戻り値型（後置されない`auto, decltype(auto)`）を持つ関数の定義が必要とされるポイント
+- 以前にプライベートモジュールフラグメントでインスタンス化されたテンプレートのインスタンス化コンテキスト
+- プライベートモジュールフラグメント内部の宣言の到達可能性
+
+]
+
+#### 3
+
+プライベートモジュールフラグメントのサンプルコード
+
+```cpp
+export module A;
+export inline void fn_e();      // error: エクスポートされたinline関数fn_e()は、プライベートモジュールフラグメントの開始前に定義されていない
+inline void fn_m();             // OK, module-linkage inline function
+static void fn_s();
+export struct X;
+export void g(X *x) {
+  fn_s();                       // OK, 同じ翻訳単位のstatic関数の呼び出し
+  fn_m();                       // OK, モジュールリンケージを持つinline関数の呼び出し
+}
+export X *factory();            // OK
+
+module :private;
+struct X {};                    // このモジュールAをインポートした側からは、このXの定義に到達可能ではない
+X *factory() {
+  return new X ();
+}
+void fn_e() {}
+void fn_m() {}
+void fn_s() {}
+```
+
+
+### 10.6 Instantiation context [module.context]
 #### 1
 __インスタンス化コンテキスト__（*instantiation context*）とは、ADLによってどの名前が可視となるか、および特定の宣言又はテンプレートのインスタンス化のコンテキストでどの宣言が到達可能となるか、を決定するプログラム内のある __地点__（*point*）の集合のこと（一箇所ではないことがある）。
 
@@ -1376,13 +1453,13 @@ void g() { f(); }               // error: クラスBの定義は到達可能で�
 エンティティは名前探索で可視でなくても、到達可能な宣言を持つことができる。
 
 ```cpp
-//モジュールA
+//Translation unit #1:モジュールA
 export module A;
 
 struct X {};
 export using Y = X;
 
-//モジュールB
+//Translation unit #2:モジュールB
 module B;
 import A;
 
@@ -1667,6 +1744,14 @@ __プリプロセッシングディレクティブ__（*preprocessing directive*
 	- `export`(opt) `import` pp-tokens new-line
   - （以下略）
 
+#### 3
+
+プログラム内各翻訳単位をプリプロセスするときに検出される各`#define`ディレクティブは、個別のマクロ定義（*macro definition*）である。
+
+[Note: 事前定義されるマクロ名は`#define`ディレクティブで導入されない。追加で任意のマクロを事前定義する方法（コマンドライン引数など）を提供する処理系は、それらを`#define`で導入されたものとして扱わない事が推奨される。（すなわち、ヘッダーユニットからのマクロのエクスポートにおいて、それらの事前定義マクロはエクスポートされない。もしくはしない事が推奨される）]
+
+（以下略）
+
 #### 4
 プリプロセッシングディレクティブ内（ディレクティブ導入トークンの直後から終端改行文字の直前までの間）のプリプロセッシングトークン間に現れる空白文字は、半角スペースと水平タブのみである。
 
@@ -1781,7 +1866,7 @@ int a = Y;      // OK, アクティブなマクロ定義#2と#4、#4はYの有�
 int c = Z;      // error: クティブなマクロ定義#3と#5、#5はZの有効な再定義ではない
 ```
 
-### 15.4 Global module fragment [cpp.glob.frag]
+### 15.4 Global module fragment [cpp.global.frag]
 - pp-global-module-fragment:
 	- `module ;` pp-balanced-token-seq `module`
 - pp-balanced-token-seq:
@@ -1819,7 +1904,21 @@ C++標準ライブラリのエンティティはヘッダで定義されてお�
 #### 3
 翻訳単位は、宣言又は定義の外側にのみヘッダを含め（モジュール単位の場合はグローバルモジュールフラグメント内にのみヘッダを含め）、それらのヘッダ内エンティティのその翻訳単位での最初の参照の前に、ヘッダをインクルードするか、対応するヘッダーユニットをインポートする。その診断は不要である。
 
+### 16.5.4.2.3 Namespaces for future standardization  [namespace.future]
+
+名前空間名が`std`とそれに続く1つ以上の数字で構成される最上位の名前空間は、将来の標準化のために予約されている。
+
+[Example: 最上位の名前空間`std2`はこの国際標準の将来の改訂版で使用されるために予約されている。]
+
 ## Annex C (informative) Compatibility [diff]
+
+### C.4.7 [library]: library introduction [diff.cpp14.library]
+
+#### 2
+Affected subclause: [namespace.future]  
+Change: 新たな予約済み名前空間  
+Rationale: これを用いなければ既存のプログラムと互換性がない可能性のある標準ライブラリの将来のリビジョンのために名前空間を予約する  
+Effect on original feature: グローバルな名前空間`std`とそれに続く1つ以上の数字列は、将来の標準化のために予約される。これに該当するような最上位の名前空間（例えば、`std2`）を使用するC++14で有効なコードは、この国際規格（C++20）では無効になる場合がある。
 
 ### C.5.1 [lex]: lexical conventions [diff.cpp17.lex]
 
