@@ -2,6 +2,8 @@
 
 C++のテンプレートの用語は日本語に優しくなく、似た言葉がこんがらがってよく分からなくなります。分からないのでメモしておきます。
 
+[:contents]
+
 ### 特殊化（*specialization*）
 
 単に特殊化と言ったら、あるテンプレートに対してそのテンプレート引数を全て埋めた状態のものをさします。つまり、テンプレートを使った時、その使っている（もはやテンプレートではない）テンプレートのことをテンプレートの特殊化と呼びます。
@@ -193,3 +195,5 @@ extern template void f(bool);
 - [テンプレートの部分特殊化 - cppreference](https://ja.cppreference.com/w/cpp/language/partial_specialization)
 - [13.9 Template instantiation and specialization[temp.spec]](http://eel.is/c++draft/temp.spec#temp.explicit-7.sentence-1)
 - [`extern template` - cpprefjp](https://cpprefjp.github.io/lang/cpp11/extern_template.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200124_template_term.md)
