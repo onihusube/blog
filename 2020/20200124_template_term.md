@@ -15,17 +15,17 @@ struct S {
 };
 
 template<typename T>
-void f(T t) {
+T f(T t) {
   return t;
 }
 
 // クラステンプレートSの特殊化
 S<int> s{};     // S<int>
-S s = {1.0};    // S<double>
+S s1 = {1.0};   // S<double>
 
 // 関数テンプレートfの特殊化
 f(10);          // f<int>
-f<float>(1.0);  // f<double>
+f<float>(1.0);  // f<float>
 ```
 
 #### 明示的特殊化（*explicit specialization*）
@@ -42,19 +42,19 @@ struct S {
 
 template<typename T>
 void f(T t) {
-  std::cout << t << std::endl
+  std::cout << t << std::endl;
 }
 
 // S<int>は常にこちらが使用される
 template<>
 struct S<int> {
-  t t = 10;
+  int t = 10;
 };
 
 // f<int>は常にこちらが使用される
 template<>
 void f(int t) {
-  std::cout << (2 * t) << std::endl
+  std::cout << (2 * t) << std::endl;
 }
 ```
 
@@ -113,12 +113,12 @@ struct S {
 
 template<typename T>
 void f(T t) {
-  std::cout << t << std::endl
+  std::cout << t << std::endl;
 }
 
 
 S<int> s{};     // S<int>がインスタンス化される
-S s = {1.0};    // S<double>がインスタンス化される
+S s1 = {1.0};   // S<double>がインスタンス化される
 
 f(10);          // f<int>がインスタンス化される
 f<float>(1.0);  // f<float>がインスタンス化される
@@ -145,7 +145,7 @@ struct S {
 
 template<typename T>
 void f(T t) {
-  std::cout << t << std::endl
+  std::cout << t << std::endl;
 }
 
 // S<int>の明示的インスタンス化
@@ -183,7 +183,7 @@ template struct S<int>;
 template void f(int);
 
 // 明示的インスタンス化の宣言
-extern template S<bool>;
+extern template struct S<bool>;
 extern template void f(bool);
 ```
 
