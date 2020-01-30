@@ -196,4 +196,10 @@ extern template void f(bool);
 - [13.9 Template instantiation and specialization[temp.spec]](http://eel.is/c++draft/temp.spec#temp.explicit-7.sentence-1)
 - [`extern template` - cpprefjp](https://cpprefjp.github.io/lang/cpp11/extern_template.html)
 
+### 謝辞
+
+この記事の7割は以下の方々によるご指摘によって成り立っています。
+
+- [kariya-mitsuruさん](https://github.com/onihusube/blog/pull/2)
+
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200124_template_term.md)
