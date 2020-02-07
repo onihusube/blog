@@ -35,6 +35,8 @@ Wroding Changeの項では変更点のみを翻訳するのではなく関連す
     - [[module.global,cpp.glob.frag] Rename labels to ...global.frag.](https://github.com/cplusplus/draft/pull/3351)
 - [GB089 10.06 [module.reach] Mark translation unit boundaries in example](https://github.com/cplusplus/nbballot/issues/88)
   - [[module.reach] Clearly separate translation units in example.](https://github.com/cplusplus/draft/pull/3331)
+- [P1874R1 Dynamic Initialization Order of Non-Local Variables in Modules](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1874r1.html)
+    - [US082 10.03 [module.import] Define order of initialization for globals in modules P1874](https://github.com/cplusplus/nbballot/issues/81)
 
 ## 以下本文
 
@@ -711,7 +713,7 @@ int k();            // error: #4と同じエンティティの再宣言、同じ
 そのようなエンティティはモジュールに ***属している（attached）*** と言われる
 
 
-### 6.8.3.1 main function [basic.start.main]
+### 6.9.3.1 main function [basic.start.main]
 
 #### 1
 プログラムはグローバルモジュールに属している`main`という名前のグローバル関数を含む。
@@ -721,6 +723,47 @@ int k();            // error: #4と同じエンティティの再宣言、同じ
 - グローバルスコープで`main`という名前の変数を宣言している
 - 名前付きのモジュールに属しているグローバルスコープで`main`という名前の関数を宣言している
 - Cリンケージを使用して`main`という名前の関数を宣言している
+
+### 6.9.3.3 Dynamic initialization of non-local variables [basic.start.dynamic]
+
+#### 1
+
+静的記憶域期間を持つ非ローカル変数の動的初期化順序が順序付けされるかは、その変数に応じて次のように規定される。
+
+- （暗黙・明示的に）インスタンス化されたテンプレートの特殊化
+    - 順序付けされない（*unordered*）
+- （暗黙・明示的に）インスタンス化されたテンプレートの特殊化、ではない`inline`変数
+    - 半順序が規定される（*partially-ordered*）
+- その他の場合（上記2つのいずれでもないその他全ての変数）
+    - 順序が規定される（*ordered*）
+
+[Note: 明示的に特殊化された、非`inline`静的データメンバまたは変数テンプレートの特殊化の初期化は、順序が規定される、]
+
+#### 2
+
+次のどちらかの場合、宣言`D`は宣言`E`の前に、 __出現順通りに順序付け（*appearance-ordered*）__ される
+
+- `D`は`E`と同じ翻訳単位に現れる
+- `E`を含む翻訳単位は`D`を含む翻訳単位にインターフェース依存関係を持つ
+
+いずれの場合も`D`は`E`より前に現れる。
+
+#### 3
+
+静的記憶域期間を持つ非ローカル変数`V, W`の動的初期化は、次の順序で行われる
+
+1. `V`と`W`の初期化は順序が規定されており、`V`の定義は`W`の定義の前に __出現順通りに順序付け__ されているか、
+2. `V`の初期化は半順序が規定されていて（すなわち、非テンプレートの`inline`変数）かつ、`W`の初期化は何らかの順序が規定されており、`W`の全ての定義`E`に対して __出現順通りに順序付け__ される`V`の定義`D`が存在する場合、次のどちらか
+      1. プログラムがメインスレッド以外のスレッドを開始しないか、`V`と`W`の初期化は順序付けられており同じ翻訳単位で定義されている場合
+         - `V`の初期化は`W`の初期化の前に順序付けられる（*sequenced before*）
+      2. それ以外の場合
+         - `V`の初期化は`W`の初期化の前に強く発生する（*strongly happens before*）
+3. そうではなく、`V`か`W`（どちらか）の初期化前にプログラムがメインスレッド以外のスレッドを開始する場合
+      - `V`と`W`の初期化がどのスレッドで発生するかは未規定、かつ
+      - `V`と`W`の初期化が同じスレッドで発生した場合の初期化順序も未規定
+4. それ以外の場合、`V`と`W`の初期化順序は不定
+
+[Note: この定義によって、順序付けられた変数シーケンスを別のシーケンスの初期化と同時に（並行して）行うことができる]
 
 ### 9.2.3 The typedef specifier[dcl.typedef]
 
