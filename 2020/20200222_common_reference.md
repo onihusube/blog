@@ -28,9 +28,11 @@ Rangeライブラリのようなシーケンスを抽象化して扱うライブ
 
 見て分かるように、これらの型はもはや`const value_type&`という型で受けることはできず、`value_type t = *it`のような操作もできません。2つの型の間の関連性は失われてしまっています。
 
-しかし、この場合でもこの2つの型の間には関連性があるはずです（そう思えます）し、そうあってほしい。仮にそうだとして、ジェネリックな操作においてはそのような関連性についてどのような事を安全に仮定する事ができるのか・・・？
+しかし、この場合でもこの2つの型の間に何の関連も無いという事はなく、なにかしら関連性があるように思えます。しかし、どのような関連性を仮定し利用できるのでしょうか・・・？
 
 ### `std::common_reference`
+
+
 
 
 
@@ -39,4 +41,5 @@ Rangeライブラリのようなシーケンスを抽象化して扱うライブ
 ### 参考文献
 
 - [What is the purpose of C++20 std::common_reference? - stackoverflow](https://stackoverflow.com/questions/59011331/what-is-the-purpose-of-c20-stdcommon-reference)
+- [P0022R1 Proxy Iterators for the Ranges Extensions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/p0022r1.html)
 - [std::common_reference - cpprefjp](https://cpprefjp.github.io/reference/type_traits/common_reference.html)
