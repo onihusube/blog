@@ -96,3 +96,5 @@ void algo(Iterator it, Iterator::value_type val) {
 - [P1727R0 Issues with current flat_map proposal](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1727r0.pdf)
 - [Trip Report: ISO C++ Meeting Cologne (2019) by Matthias Gehre](https://www.silexica.com/news/iso_cpp_meeting_2019/)
     - `std::flat_map`と`zip_view`についての議論に触れられていたが、リンク切れしている・・・
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200224_common_reference.md)
