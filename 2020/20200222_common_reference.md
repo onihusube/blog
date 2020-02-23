@@ -32,7 +32,7 @@ rangeライブラリのようなシーケンスを抽象化して扱うライブ
 
 ### `std::common_reference`
 
-`common_reference`はそれに対する1つの解（あるいは要求）です。つまり、イテレータ種別に関わらずその`reference`と`value_type`の間には共通の参照型（従来のイテレータにおける`const value_type&`）に相当するものがあるはずであり、あるものとして、ジェネリックな操作において（すなわち任意のイテレータについて）その仮定を安全なものであると定めます。
+`std::common_reference`はそれに対する1つの解（あるいは要求）です。つまり、イテレータ種別に関わらずその`reference`と`value_type`の間には共通の参照型（従来のイテレータにおける`const value_type&`）に相当するものがあるはずであり、あるものとして、ジェネリックな操作において（すなわち任意のイテレータについて）その仮定を安全なものであると定めます。
 
 そして、そのような共通の参照型に相当するものを統一的に求め、表現するために用意されたのが`std::common_reference`メタ関数です。
 
@@ -55,26 +55,28 @@ void algo(Iterator it, Iterator::value_type val) {
 
 #### `std::common_reference_with`コンセプト
 
-ある型のペアが`common_reference`を有しているかを`std::common_reference::type`が有効かを調べて判定するなどということは前時代的です。C++20にはコンセプトがあり、それで判定すればいいはず。
+ある型のペアが`common_reference`を有しているかを`std::common_reference<T, U>::type`が有効かを調べて判定するなどということは前時代的です。C++20にはコンセプトがあり、それで判定すればいいはず。
 
 ということで？C++20ではそのような用途のために`std::common_reference_with`コンセプトが`<concepts>`に用意されています。これは、`std::common_reference_with<T, U>`のように2つの型の間に`common_reference`があることを表明（要求）するそのままのものです。
 
 #### C++20に`zip_view`が無いのは・・・
 
-`common_reference`の動機付けでもあった`zip_iterator`を返す`zip_view`のようなrange操作はC++20には導入されていません（同じ事情を持つものには`std::vector<bool>`が既にあります）。なぜかといえば、`zip_iterator`についての`common_reference`を単純には求められなかったためです。`zip_iterator`の`reference`と`value_type`は一般的には次のようになります。
+`std::common_reference`の動機付けでもあった`zip_iterator`を返す`zip_view`のようなrange操作はC++20には導入されていません（同じ事情を持つものには`std::vector<bool>`が既にあります）。なぜかといえば、`zip_iterator`についての`common_reference`を単純には求められなかったためです。再掲になりますが、`zip_iterator`の`reference`と`value_type`は一般的には次のようになります。
 
 - `reference`  : `std::pair<T&, U&>`
 - `value_type` : `std::pair<T, U>`
 
-この`common_reference`は単純には`std::pair<T&, U&>`になるでしょうが、現在の`std::pair`は`std::pair<T, U> -> std::pair<T&, U&>`のような変換はできません。C++20でもそれは可能になってはいません。かといって、`zip_view`のためだけにpair-likeな型を用意するのも当然好まれません。
+この場合の`common_reference`は単純には`std::pair<T&, U&>`になるでしょうが、現在の`std::pair`は`std::pair<T, U> -> std::pair<T&, U&>`のような変換はできません。C++20でもそれは可能になってはいません。かといって、`zip_view`のためだけにpair-likeな型を用意するのも当然好まれません。
 
 この問題をどうするのかの議論はされていますが、結論がC++20には間に合わなかったためC++20には`zip_view`はありません。
 
-そして、この影響をもろに受けてしまったのが`std::flat_map`です。C++20入りを目指していましたが、パフォーマンスのためにそのKeyのシーケンスとvalueのシーケンスをそれぞれ別で持つという設計を選択していたため、その要素のイテレートのために`zip_view`が必要となりました。しかし、`zip_view`は延期されたため`std::flat_map`も延期され、それに引きずられて`std::flat_set`もC++20には入りませんでした。
+そして、この影響を受けてしまったのが`std::flat_map`です。C++20入りを目指していましたが、パフォーマンスのためにそのKeyのシーケンスとvalueのシーケンスをそれぞれ別で持つという設計を選択していたため、要素のイテレートのために`zip_view`が必要となりました。しかし、`zip_view`は延期されたのとその設計からくる問題があったのとで`std::flat_map`も延期され、それに引きずられて`std::flat_set`もC++20には入りませんでした。
 
 どれも将来的には入るとは思いますが、C++20で使いたかった・・・
 
-### ～_withなコンセプト定義に現れる`common_reference_with`
+### コンセプト定義に現れる`common_reference_with`
+
+
 
 ### 参考文献
 
