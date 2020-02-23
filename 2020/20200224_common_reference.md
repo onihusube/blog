@@ -1,4 +1,4 @@
-# ［C++］std::common_reference
+# ［C++］std::common_referenceの意義
 
 C++20より追加された`std::common_reference<T, U>`は型`T, U`両方から変換可能な共通の参照型を求めるメタ関数です。ただしその結果型は必ずしも参照型ではなかったりします。`std::common_type`との差など、存在理由がよく分からない物でもあります・・・
 
@@ -76,7 +76,17 @@ void algo(Iterator it, Iterator::value_type val) {
 
 ### コンセプト定義に現れる`common_reference_with`
 
+`std::common_reference`はイテレータ型を受け取るのではなく2つの型を受け取ってその間の`common_reference`を求めます。`common_reference`の動機付けはイテレータ型からのものでしたが、そこから脱却すれば、`common_reference`はより一般化した2つの型の間の関連性ととらえることができます。
 
+そのような`common_reference`とは、2つの型に共通している部分を表す型だと見ることができます。`std::common_type`は集合論的な意味での共通部分に相当していますが、`std::common_reference`はそのような共通部分を参照、あるいは束縛できる型を表します。つまり、`std::common_reference`は`std::common_type`を包含しています。  
+このことは逆に言えば、`common_reference`を持つ2つの型は何かしら共通した部分を持つ、という事です。それはおそらく基底クラスもしくは同じ型のメンバであるでしょう。
+
+そして、この性質は標準ライブラリにおけるコンセプト定義において利用されます。例えば、`std::totally_ordered_with<T, U>`や`std::swappable_with<T, U>`のように2つの型の間で可能な性質を表明するコンセプトの定義においてほぼ必ず`std::common_reference_with<T, U>`が現れています（そのようなコンセプトは多くが`~_with`という命名になっています）。  
+これらのようなコンセプトが表明する関係は明らかに2つの型の間に共通した部分があることを前提にしています。`std::common_reference_with`を定義中に使用しているのは、そのような関連性があることを表明し、要請するためです。
+
+例えば、`std::totally_ordered_with, std::equality_comparable_with, std::three_way_comparable_with`など比較に関するコンセプトなら、比較可能であるという事は2つの型の間に比較可能な部分がある筈ですし、`std::swappable_with`ならば2つの型の間に交換可能な共通の部分がある筈です。
+
+`std::common_reference`と`std::common_reference_with`は一見すると意味不明で何に使うのか良く分かりませんが、ここまでくるとようやく意味合いが見えてくるでしょうか。特に、コンセプト定義における`std::common_reference_with`は[意味のあるコンセプト](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#t20-avoid-concepts-without-meaningful-semantics)を定義するのに役立つかもしれません。
 
 ### 参考文献
 
