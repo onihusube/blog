@@ -1,4 +1,4 @@
-# ［C++］std::common_referenceの意義
+# ［C++］std::common_referenceの概念
 
 C++20より追加された`std::common_reference<T, U>`は型`T, U`両方から変換可能な共通の参照型を求めるメタ関数です。ただしその結果型は必ずしも参照型ではなかったりします。`std::common_type`との差など、存在理由がよく分からない物でもあります・・・
 
