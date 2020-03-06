@@ -205,6 +205,10 @@ int main() {
 |`volatile`|`volatile T&`|`volatile T&`|`volatile T&&`|
 |`const volatile`|`const volatile T&`|`const volatile T&`|`const volatile T&&`|
 
+メンバ関数の第一引数にはその修飾によって上記のいずれかと同じシグネチャで隠れた引数があり、メンバ関数呼び出しの際にはその`T`のオブジェクトがそのままそこに渡されます。
+
+その際の`T`のオブジェクトのCV修飾と値カテゴリによって、上記のいずれかから最もマッチする関数が選択され、呼び出されることになります。
+
 CV修飾に関してはほぼ想定通りになると思われますが、参照修飾をするときは少し気にする必要があるかもしれません。
 
 ### 参考文献
@@ -219,4 +223,4 @@ CV修飾に関してはほぼ想定通りになると思われますが、参照
 
 - [@tetzromさん](https://twitter.com/tetzrom/status/1235160659899207681)
 
-[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200306_constref_memfun.md)
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200307_constref_memfun.md)
