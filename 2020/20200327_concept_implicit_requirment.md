@@ -1,7 +1,6 @@
 # ［C++］コンセプトの無言のお願い事
 
-[http://eel.is/c++draft/concepts.equality]
-主にここに書いてあることを訳しただけの記事です。
+[:contents]
 
 ### 等しさの保持（*equality preservation*）
 
@@ -44,7 +43,7 @@ equality_comparable_with](https://cpprefjp.github.io/reference/concepts/equality
 
 ### 制約式の引数に対しての制約
 
-標準ライブラリのコンセプト定義においては、ある`requires`式内の各制約式が引数に対して副作用を及ぼすか否か（引数を変更するかどうか）をその`requires`式の引数（ローカルパラメータ）の`const`修飾によって表現しています。ローカルパラメータが`const`修飾されている場合はそのパラメータを引数に取る制約式は対応する引数を変更してはなりません。逆に、`const`修飾されていなければ変更しても構いません。
+標準ライブラリのコンセプト定義においては、ある`requires`式内の各制約式が引数に対して副作用を及ぼしても良いかどうか（引数を変更することが許されるか）をその`requires`式の引数（ローカルパラメータ）の`const`修飾によって表現しています。ローカルパラメータが`const`修飾されている場合はそのパラメータを引数に取る制約式は対応する引数を変更してはなりません。逆に、`const`修飾されていなければ変更しても構いません。
 
 このことも、コンセプトを満たそうとすれば自然にユーザーコードに対して要求されることになります。とはいえ、`const`修飾されたローカルパラメータが渡ってくるところでその引数を変更しようとするのは、`const_cast`とか`mutable`とかなんかおかしなことをしない限りそれを破ることは無いでしょう・・・？
 
@@ -170,6 +169,11 @@ f(int&& n, int m); // 非const右辺値だけしか受けられない
 
 あるコンセプト`C`について、型`T`が`C`の要求する構文的な制約（制約式）を全て満たしていて、上記3つの暗黙的な制約も全て満たしており、かつ`C`に追加で指定される意味論的な制約を全て満たしている時、型`T`はコンセプト`C`の **モデル（*model*）** であると言います。
 
+型がコンセプトのモデルであることは、標準ライブラリのテンプレート（クラス・関数）の事前条件（*Post Condition*）において要求されます。このとき、そこに指定されているコンセプトのモデルとならない型の入力は診断不用（チェックも警告もされない）の未定義動作になります。  
+少なくとも標準ライブラリのものを利用するときは、コンセプトのモデルについて意識を向ける必要があるでしょう。
+
+C++20で導入された`<span>, <ranges>, <format>`や`<algorithm>, <iterator>`の一部等は既にコンセプトを使用するように定義されているため、その事前条件においてはコンセプトのモデルであることを要求するようになっています。
+
 ### 参考文献
 
 - [18.2 Equality preservation [concepts.equality]](http://eel.is/c++draft/concepts.equality)
@@ -177,3 +181,5 @@ f(int&& n, int m); // 非const右辺値だけしか受けられない
 - [`<concepts>` - cpprefjp](https://cpprefjp.github.io/reference/concepts.html)
 - [P2102R0 Make “implicit expression variations” more explicit (Wording for US185)](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2102r0.html)
 - [P2101R0 “Models” subsumes “satisfies” (Wording for US298 and US300)](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2101r0.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200327_concept_implicit_requirment.md)
