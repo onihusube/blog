@@ -41,23 +41,23 @@ int main() {
   auto u8str = u8R"(日本語出力テスト　🤔 😢 🙇‍♂️ 🎉 😰 😊 😭 😥 終端)"sv;
 
   //UTF-8 -> UTF-16
-  auto requiredSize = ::MultiByteToWideChar(CP_UTF8, 0, 
+  auto length = ::MultiByteToWideChar(CP_UTF8, 0, 
     reinterpret_cast<const char*>(u8str.data()), static_cast<int>(u8str.length()),
     nullptr, 0);
 
-	std::wstring temp(requiredSize, '\0');
+	std::wstring temp(length, '\0');
 
 	auto res = ::MultiByteToWideChar(CP_UTF8, 0,
     reinterpret_cast<const char*>(u8str.data()), static_cast<int>(u8str.length()),
     temp.data(), temp.length());
 
   //UTF-16 -> Shift-JIS
-	requiredSize = ::WideCharToMultiByte(CP_ACP, 0,
+	length = ::WideCharToMultiByte(CP_ACP, 0,
     temp.data(), static_cast<int>(temp.length()),
     nullptr, 0,
     nullptr, nullptr);
 
-	std::string result(requiredSize, '\0');
+	std::string result(length, '\0');
 
 	res = ::WideCharToMultiByte(CP_ACP, 0,
     temp.data(), static_cast<int>(temp.length()),
@@ -97,16 +97,20 @@ int main() {
   auto u8str = u8R"(日本語出力テスト　🤔 😢 🙇‍♂️ 🎉 😰 😊 😭 😥 終端)"sv;
 
   //UTF-8 -> UTF-16
-  auto requiredSize = ::MultiByteToWideChar(CP_UTF8, 0, 
+  auto length = ::MultiByteToWideChar(CP_UTF8, 0, 
     reinterpret_cast<const char*>(u8str.data()), static_cast<int>(u8str.length()),
     nullptr, 0);
 
-	std::wstring result(requiredSize, '\0');
+	std::wstring result(length, '\0');
 
 	auto res = ::MultiByteToWideChar(CP_UTF8, 0,
     reinterpret_cast<const char*>(u8str.data()), static_cast<int>(u8str.length()),
     result.data(), static_cast<int>(result.length()));
 
+  // wcoutにシステムデフォルトのロケールを設定
+	std::wcout.imbue(std::locale(""));
+
+  // 出力
   std::wcout << result;
 }
 ```
@@ -116,7 +120,24 @@ int main() {
 日本語出力テスト　
 ```
 
-絵文字以降の部分が全く出力されていませんがとりあえず日本語出力は出来ました。
+絵文字は消えましたが日本語出力は出来ているように見えます。しかし、これ以降同じプログラム内で`std::wcout`に何か出力しようとしても何も出てきません。
+
+絵文字が消えているまさにそれが問題で、Shift-JISは絵文字を表現できないので絵文字の変換でエラーとなってしまい、それ以降fail状態となり何も出てこなくなるのです。これは[`fail()`](https://cpprefjp.github.io/reference/ios/basic_ios/fail.html)によって検出でき、[`clear()`](https://cpprefjp.github.io/reference/ios/basic_ios/clear.html)によって回復できます。
+
+```cpp
+  // wcoutにシステムデフォルトのロケールを設定
+	std::wcout.imbue(std::locale(""));
+
+  // 出力
+  std::wcout << result;
+
+  // fail状態なら状態を復帰する
+  if (std::wcout.fail()) {
+		std::wcout.clear();
+	}
+```
+
+`std::wcout`で出力したとしてもその内部で結局Shift-JISへの変換が走っているうえに、変換エラーによって出力できなくなるというのはこれはこれでイケてないですね・・・
 
 ### 2. 標準出力をユニコードモードにする
 
