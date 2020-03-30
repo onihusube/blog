@@ -44,27 +44,27 @@ int main() {
   auto length = ::MultiByteToWideChar(CP_UTF8, 0, 
     reinterpret_cast<const char*>(u8str.data()), static_cast<int>(u8str.length()),
     nullptr, 0);
+  
+  std::wstring temp(length, '\0');
 
-	std::wstring temp(length, '\0');
-
-	auto res = ::MultiByteToWideChar(CP_UTF8, 0,
+  auto res = ::MultiByteToWideChar(CP_UTF8, 0,
     reinterpret_cast<const char*>(u8str.data()), static_cast<int>(u8str.length()),
     temp.data(), temp.length());
 
   //UTF-16 -> Shift-JIS
-	length = ::WideCharToMultiByte(CP_ACP, 0,
+  length = ::WideCharToMultiByte(CP_ACP, 0,
     temp.data(), static_cast<int>(temp.length()),
     nullptr, 0,
     nullptr, nullptr);
 
-	std::string result(length, '\0');
+  std::string result(length, '\0');
 
-	res = ::WideCharToMultiByte(CP_ACP, 0,
+  res = ::WideCharToMultiByte(CP_ACP, 0,
     temp.data(), static_cast<int>(temp.length()),
     result.data(), static_cast<int>(result.length()),
     nullptr, nullptr);
 
-	std::cout << result;
+  std::cout << result;
 }
 ```
 
