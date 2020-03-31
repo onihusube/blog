@@ -68,10 +68,6 @@ int main() {
 }
 ```
 
-出力例
-```
-日本語出力テスト　?? ?? ???♂? ?? ?? ?? ?? ?? 終端
-```
 
 変換の実装を信用すれば、UTF-8 -> UTF-16の変換で文字が落ちることはありませんが、UTF-16 -> Shift-JISの変換では当然Shift-JISでは受けきれないものが出てきます（絵文字とか）。それは`WideCharToMultiByte`がシステムデフォルト値（どうやら`??`）で埋めてくれます。
 
@@ -141,6 +137,8 @@ int main() {
 
 ### 2. UTF-16に変換して`WriteConsoleW()`する
 
+Windowsにおいて、あるコンソールに直接出力するためのAPIが`WriteConsoleW()`関数です。この関数はUTF-16文字列を受け取り、コンソールに直接出力します。
+
 ```cpp
 #include <iostream>
 #include <string_view>
@@ -167,6 +165,11 @@ int main() {
   ::WriteConsoleW(::GetStdHandle(STD_OUTPUT_HANDLE), result.data(), result.length(), nullptr, nullptr);
 }
 ```
+
+![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/writeconsole.png)
+
+出力結果をコピペしてみると分かるのですが、絵文字列は表示出来ていないだけでコピペ先が表示できるもの（VSCodeとか）ならばちゃんと表示されます。どうやら、この関数はUTF-16文字列をそのままコンソール出力しているようです。絵文字が出ないのはおそらくコマンドプロンプト（あるいはconhost.exe）がサロゲートペアを扱えないのに起因していると思われます。
+
 
 ### 3. 標準出力をユニコードモードにする
 
@@ -239,15 +242,7 @@ int main() {
 }
 ```
 
-出力例（Windows）
-```
-日本語出力テスト　?? ?? ???♂? ?? ?? ?? ?? ?? 終端
-```
-
-出力例（非Windows）
-```
-日本語出力テスト　🤔 😢 🙇‍♂️ 🎉 😰 😊 😭 😥 終端
-```
+試していないので出力がどうなるのかは分かりませんが、おそらく`WriteConsoleW()`を使用したときと同様になるかと思われます。
 
 ### 絵文字の表示 in Windows
 
@@ -267,6 +262,7 @@ int main() {
 - [[めも]コンソールに日本語を出力したい場合(wcoutで日本語出力する場合など) - Qita](https://qiita.com/toris-birds/items/5443777ad0bb0ae05d3b)
 - [Visual C++における文字コード変換 - C++と色々](https://nekko1119.hatenablog.com/entry/2017/01/02/054629)
 - [Windows のコンソール端末と Unicode の相性 - NUMBER-SHOT.NET](https://number-shot.net/blog/windows-console-terminal-with-unicode/)
+- [Windows 10までほとんど手が入れられてこなかったWindowsのコンソール機能 - ASCII.jp](https://ascii.jp/elem/000/001/718/1718052/)
 - [Boost.Nowide - github](https://github.com/boostorg/nowide)
 
 ### 謝辞
