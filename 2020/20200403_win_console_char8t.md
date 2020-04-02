@@ -25,7 +25,7 @@ int main() {
 
 一番簡便かつ確実な方法は、UTF-8文字列をANSI(Shift-JIS)文字列へ変換して`std::cout`へ出力することです。
 
-`std::codecvt`はC++17で非推奨化してしまったので変換にはWinAPIを利用することにしますが、`UTF-8 -> Shift-JIS`の変換を実はそのままできません。`MultiByteToWideChar : char* -> wchar_t*`、`WideCharToMultiByte : wchar_t* -> char*`なので、どうしても型を合わせられないのです・・・
+`std::codecvt`はC++17で非推奨化してしまったので変換にはWinAPIを利用することにしますが、`UTF-8 -> Shift-JIS`の変換を実はそのままできません。`MultiByteToWideChar`は`char* -> wchar_t*`へ、`WideCharToMultiByte`は`wchar_t* -> char*`へ変換するので、どうしても型を合わせられないのです・・・
 
 なのでこれらを連続適用して、`UTF-8 -> UTF-16 -> Shift-JIS`という2段階変換することになります。
 
@@ -168,7 +168,7 @@ int main() {
 
 ![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/writeconsole.png)
 
-出力結果をコピペしてみると分かるのですが、絵文字列は表示出来ていないだけでコピペ先が表示できるもの（VSCodeとか）ならばちゃんと表示されます。どうやら、この関数はUTF-16文字列をそのままコンソール出力しているようです。絵文字が出ないのはおそらくコマンドプロンプト（あるいはconhost.exe）がサロゲートペアを扱えないのに起因していると思われます。
+出力結果をコピペしてみると分かるのですが、絵文字列は表示出来ていないだけでコピペ先が表示できるもの（VSCodeとか）ならばちゃんと表示されます。すなわち、文字コードとしては出力までUTF-16で行われています。どうやら、この関数はUTF-16文字列をそのままコンソール出力しているようです。絵文字が出ないのはおそらくコンソールの表示部分がサロゲートペアを扱えないのに起因していると思われます。
 
 
 ### 3. 標準出力をユニコードモードにする
@@ -196,13 +196,17 @@ int main() {
     result.data(), static_cast<int>(result.length()));
 
   // 標準出力をユニコードモードにする
-  _setmode(_fileno(stdout), _O_U16TEXT);
+  ::_setmode(_fileno(stdout), _O_U16TEXT);
   // 出力
   std::wcout << result;
 }
 ```
 
-### 4. コンソールのコードページを変更してバイナリ列を直接流し込む
+この方法、実はユニコードモードといいつつユニコード直接出力出来ているわけではありません（コピペしてみると分かります）。おそらく内部でUTF-16 -> Shift-JIS変換が行われています。変換に失敗した文字列はスペースが当てられているのでしょうか。
+
+なお、この方法だと`std::cout`が使用できなくなります。出力するとエラー吐いて止まります・・・。他人の書いたライブラリを使っているときなどはログ出力に`std::cout`が使用されている可能性があるので注意が必要です。
+
+### 4. コンソールのコードページを変更してUTF-8バイト列を直接流し込む
 
 ```cpp
 #include <iostream>
@@ -218,15 +222,19 @@ int main() {
   // 出力先コンソールのコードページをUTF-8にする
   ::SetConsoleOutputCP(65001u);
   // 標準出力をバイナリモードにする
-  _setmode(_fileno(stdout), _O_BINARY);
+  ::_setmode(_fileno(stdout), _O_BINARY);
   // バイナリ列として直接出力
   std::cout.write(reinterpret_cast<const char*>(u8str.data()), u8str.length());
 }
 ```
 
-### 5. boost.nowideを使用する
+この方法でも、VSCodeなどにコピペしてみれば絵文字が正しく表示されるので、UTF-8を直接出力することに成功しているようです。Ascii範囲内の文字ならば`std::cout`は依然として使用可能ですが、`std::wcout`は文字化けします。
 
-boost1.73から追加されたboost.nowideは`<iostream>`や`<fstream>`のUTF-8対応をポータブルにするライブラリです。非Windows環境に対しては`char`のエンコードがUTF-8だと仮定しそのまま、Windows環境ではUTF-8 -> UTF-16変換して`WriteConsoleW()`などWindowsのユニコード対応APIで出力します。
+このモードでは標準出力は入ってきたバイト列をそのままコンソール出力します。コードページを変更してあるので、コンソールは入ってきたバイト列をUTF-8文字列として表示します。UTF-8はAscii文字と下位互換性があるので`std::cout`はAscii範囲内に限って使用可能となり、`std::wcout`は通常`wchar_t`（UTF-16）を受け付けるのでそのままだと文字化けするわけです。
+
+### 5. Boost.Nowideを使用する
+
+boost1.73から追加された[Boost.Nowide](https://github.com/boostorg/nowide)は`<iostream>`や`<fstream>`のUTF-8対応をポータブルにするライブラリです。非Windows環境に対しては`char`のエンコードがUTF-8だと仮定しそのまま、Windows環境ではUTF-8 -> UTF-16変換して`WriteConsoleW()`などWindowsのユニコード対応APIで出力します。
 
 残念ながら`char8_t`対応はされていない（おそらく厳しい）のですが、これを利用すれば一番最初に紹介した方法がポータブルになります。
 
@@ -242,7 +250,7 @@ int main() {
 }
 ```
 
-試していないので出力がどうなるのかは分かりませんが、おそらく`WriteConsoleW()`を使用したときと同様になるかと思われます。
+試していないので出力がどうなるのかは分かりませんが、実装を見るにおそらく`WriteConsoleW()`を使用したときと同様になるかと思われます。
 
 ### 絵文字の表示 in Windows
 
