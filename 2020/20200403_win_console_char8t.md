@@ -1,5 +1,7 @@
 # ［C++］コンソール出力にchar8_t文字列を出力したい・・・
 
+[:contents]
+
 ### 非Windows
 
 おそらくほとんどの場合、非Windows環境では`char`のエンコードがUTF-8なのでそのまま出力できるはずです。しかし、C++20では標準出力ストリームに対する`char8_t char16_t char32_t`の`operator<<`が`delete`されているため、そのままではコンパイルエラーになります。でもまあ`char`がUTF-8なのですから、こう、ちょっとひねってやれば、無事出力できます・・・
@@ -83,8 +85,6 @@ Windowsのコンソールにおいてそれを指定しているのがコード�
 
 ### 1. 素直に変換して`std::cout`する
 
-ここからは全てWindowsでの話になります。
-
 一番簡便かつ確実な方法は、UTF-8文字列をANSI(Shift-JIS)文字列へ変換して`std::cout`へ出力することです。
 
 `std::codecvt`はC++17で非推奨化してしまったので変換にはWinAPIを利用することにしますが、`UTF-8 -> Shift-JIS`の変換を実はそのままできません。`MultiByteToWideChar`は`char* -> wchar_t*`へ、`WideCharToMultiByte`は`wchar_t* -> char*`へ変換するので、どうしても型を合わせられないのです・・・
@@ -130,6 +130,7 @@ int main() {
 }
 ```
 
+![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/cout.png)
 
 変換の実装を信用すれば、UTF-8 -> UTF-16の変換で文字が落ちることはありませんが、UTF-16 -> Shift-JISの変換では当然Shift-JISでは受けきれないものが出てきます（絵文字とか）。それは`WideCharToMultiByte`がシステムデフォルト値（どうやら`??`）で埋めてくれます。
 
@@ -173,10 +174,7 @@ int main() {
 }
 ```
 
-出力例
-```
-日本語出力テスト　
-```
+![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/wcout.png)
 
 絵文字は消えましたが日本語出力は出来ているように見えます。しかし、これ以降同じプログラム内で`std::wcout`に何か出力しようとしても何も出てきません。
 
@@ -195,11 +193,11 @@ int main() {
   }
 ```
 
-`std::wcout`で出力したとしてもその内部で結局Shift-JISへの変換が走っているうえに、変換エラーによって出力できなくなるというのはこれはこれでイケてないですね・・・
+`std::wcout`で出力したとしてもその内部でコードページに従った変換（結局Shift-JISへの変換）が走っているうえに、変換エラーによって出力できなくなるというのはこれはこれでイケてないですね・・・
 
 ### 2. UTF-16に変換して`WriteConsoleW()`する
 
-Windowsにおいて、あるコンソールに直接出力するためのAPIが`WriteConsoleW()`関数です。この関数はUTF-16文字列を受け取り、コンソールに直接出力します。
+Windowsにおいて、スクリーンバッファに直接出力するためのAPIが`WriteConsoleW()`関数です。この関数はUTF-16文字列を受け取り、指定されたコンソールのスクリーンバッファに直接出力します。
 
 ```cpp
 #include <iostream>
@@ -239,6 +237,8 @@ int main() {
 
 ### 3. 標準出力をユニコードモードにする
 
+冒頭で説明したように、ユニコード出力だけを使うのであれば標準ストリームをユニコードモードにしてしまえばいいでしょう。Windowsでは`_setmode()`関数によってストリームのモードを後から変更できます。
+
 ```cpp
 #include <iostream>
 #include <string_view>
@@ -268,11 +268,15 @@ int main() {
 }
 ```
 
-この方法、実はユニコードモードといいつつユニコード直接出力出来ているわけではありません（コピペしてみると分かります）。おそらく内部でUTF-16 -> Shift-JIS変換が行われています。変換に失敗した文字列はスペースが当てられているのでしょうか。
+![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/unicodemode.png)
+
+この方法実は、ユニコードモードといいつつユニコード直接出力出来ているわけではありませんので、コピペしてみると表示できないものは表示できない事が分かるでしょう。内部でUTF-16 -> Shift-JIS -> UTF-16変換が行われています。変換に失敗した文字列はスペースが当てられているのでしょうか。試してませんが、UTF-16コードページに変更すればあるいは・・・
 
 なお、この方法だと`std::cout`が使用できなくなります。出力するとエラー吐いて止まります・・・。他人の書いたライブラリを使っているときなどはログ出力に`std::cout`が使用されている可能性があるので注意が必要です。
 
 ### 4. コンソールのコードページを変更してUTF-8バイト列を直接流し込む
+
+C/C++I/O関数の範囲内においてはバイナリモードで出力しコンソールのコードページをUTF-8に変更してしまえば、スクリーンバッファへの出力時のUTF-16変換一回で済みそうです。これならばUTF-8文字列をなるべく変換させず、文字が落ちることもほぼないはず・・・
 
 ```cpp
 #include <iostream>
@@ -294,12 +298,15 @@ int main() {
 }
 ```
 
-この方法でも、VSCodeなどにコピペしてみれば絵文字が正しく表示されるので、UTF-8を直接出力することに成功しているようです。Ascii範囲内の文字ならば`std::cout`は依然として使用可能ですが、`std::wcout`は文字化けします。
+![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/u8binary.PNG)
 
-コードページを変更してあるので、コンソールは入ってきたバイト列をUTF-8文字列として表示します。UTF-8はAscii文字と下位互換性があるので`std::cout`はAscii範囲内に限って使用可能となり、`std::wcout`は通常`wchar_t`（UTF-16）を受け付けるのでそのままだと文字化けするわけです。
+最後の方がダブってるのはなんでしょうか、3バイト以上の文字が悪さをしているのでしょうか・・・
 
-ただし、コンソールのスクリーンバッファへの出力は通常UTF-16なので、UTF-8がそのまま出力されているわけではなく、スクリーンバッファへの出力にあたってはUTF-8 -> UTF-16の変換が行われているようです。  
-なお、VSのプロジェクトの設定をマルチバイト文字セットに変えるとおそらくコンソールスクリーンバッファの文字コードはANSI(Shift-JIS)になるはずです。
+この方法でも、VSCodeなどにコピペしてみれば絵文字が正しく表示されるので意図通りになっているようです。また、Ascii範囲内の文字ならば`std::cout`は依然として使用可能ですが、`std::wcout`は文字化けします。
+
+コードページを変更してあるので、コンソールはまず入ってきたバイト列をUTF-8文字列として解釈します。UTF-8はAscii文字と下位互換性があるので`std::cout`はAscii範囲内に限って使用可能となります。しかし、`std::wcout`は通常`wchar_t`（UTF-16）を受け付けますが、バイナリモードでは無変換でコンソール入力へ到達し、そこでのコードページに従った解釈の際、UTF-16文字列をUTF-8文字列だと思って処理してしまうため、文字化けします・・・
+
+ただし、コンソールのスクリーンバッファへの出力は通常UTF-16なので、UTF-8がそのまま出力されているわけではなく、スクリーンバッファへの出力にあたってはUTF-8 -> UTF-16の変換が行われます。
 
 ### 5. Boost.Nowideを使用する
 
@@ -327,11 +334,15 @@ int main() {
 
 ### 絵文字の表示 in Windows
 
-通常のコンソールでは、無理です。
+通常のコンソールでは無理ですが、[Windows Terminal](https://github.com/microsoft/terminal)を使えば表示できます。
 
-あるいは、Windows Terminalを使えば表示できます。
+上記2の（`WriteConsoleW()`による）方法での出力 in Windows Terminal
 
+![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/wt_writeconsole.png)
 
+上記4の（コードページ変更とバイナリモードによる）方法での出力 in Windows Terminal
+
+![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/wt_u8binary.png)
 
 まだ合字が表示できないみたいですが、今後に期待ですね。
 
@@ -366,4 +377,6 @@ int main() {
 この記事の6割は以下の方々によるご指摘によって成り立っています。
 
 - [@Reputelessさん](https://twitter.com/Reputeless/status/1243960591745605633)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200403_win_console_char8t.md)
 
