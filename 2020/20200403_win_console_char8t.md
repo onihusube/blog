@@ -19,6 +19,29 @@ int main() {
 
 問題なのはWindowsさんです・・・
 
+### Windowsのコンソール出力と標準出力
+
+C言語ではI/Oをファイルとそれに対するデータのストリームとして抽象化しています。ファイルの読み書きによって動作環境との通信（すなわちI/O）を制御し、規定しています。標準出力（`stdout`）や標準入力は（`stdin`）は標準によって予め開くファイルが規定されているストリームで、これらにおいてのファイルとはコンソール（端末）です。
+
+C++もCからこれらのことを継承し、多くのI/O関数はCのものを参照しているため、この辺りの標準I/Oストリームに関することは共通しています。
+
+従って、C/C++の範囲から見た標準出力とはとりあえずは何かのファイルに対する出力として考えることができます。特に、標準出力が受け取った文字列をどう表示するかというところはファイル出力の先の話であり、C/C++が感知するところではありません。
+
+#### 標準IOストリームのモード
+
+C言語においてのファイルストリームには3つのモードがあり、ファイルオープンに使う関数種別`fopen/wfopen`およびその引数で決定されます。
+
+- Text
+
+
+#### コンソールのコードページ
+
+ここからはWindowsの事情を鑑みなければなりません。
+
+#### スクリーンバッファ
+
+コンソール出力の到達点
+
 ### 1. 素直に変換して`std::cout`する
 
 ここからは全てWindowsでの話になります。
@@ -85,7 +108,7 @@ int main() {
 #include <iostream>
 #include <string_view>
 
-#define WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEANv
 #include <Windows.h>
 
 int main() {
@@ -168,7 +191,11 @@ int main() {
 
 ![出力結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200403_win_console_char8t/writeconsole.png)
 
-出力結果をコピペしてみると分かるのですが、絵文字列は表示出来ていないだけでコピペ先が表示できるもの（VSCodeとか）ならばちゃんと表示されます。すなわち、文字コードとしては出力までUTF-16で行われています。どうやら、この関数はUTF-16文字列をそのままコンソール出力しているようです。絵文字が出ないのはおそらくコンソールの表示部分がサロゲートペアを扱えないのに起因していると思われます。
+`WriteConsoleW()`関数は指定されたコンソールのスクリーンバッファに対して指定されたUTF-16文字列を直接書き込む関数です。スクリーンバッファはコンソールの出力そのもので、ここに書き込まれているデータがフォントレンダラによって表示されます。
+
+出力結果をコピペしてみると分かるのですが、絵文字列は表示出来ていないだけでコピペ先が表示できるもの（VSCodeとか）ならばちゃんと表示されます。すなわち、文字コードとしては出力までUTF-16で行われています。絵文字が出ないのはおそらくコンソールの表示部分がサロゲートペアを扱えないのに起因していると思われます。
+
+`WriteConsoleW()`関数は名前の通りコンソール出力専用の関数なので、起動したプログラムにコンソールが割り当てられていない場合に失敗します。すなわち、この関数による出力ではリダイレクトができません。
 
 
 ### 3. 標準出力をユニコードモードにする
@@ -230,7 +257,10 @@ int main() {
 
 この方法でも、VSCodeなどにコピペしてみれば絵文字が正しく表示されるので、UTF-8を直接出力することに成功しているようです。Ascii範囲内の文字ならば`std::cout`は依然として使用可能ですが、`std::wcout`は文字化けします。
 
-このモードでは標準出力は入ってきたバイト列をそのままコンソール出力します。コードページを変更してあるので、コンソールは入ってきたバイト列をUTF-8文字列として表示します。UTF-8はAscii文字と下位互換性があるので`std::cout`はAscii範囲内に限って使用可能となり、`std::wcout`は通常`wchar_t`（UTF-16）を受け付けるのでそのままだと文字化けするわけです。
+コードページを変更してあるので、コンソールは入ってきたバイト列をUTF-8文字列として表示します。UTF-8はAscii文字と下位互換性があるので`std::cout`はAscii範囲内に限って使用可能となり、`std::wcout`は通常`wchar_t`（UTF-16）を受け付けるのでそのままだと文字化けするわけです。
+
+ただし、コンソールのスクリーンバッファへの出力は通常UTF-16なので、UTF-8がそのまま出力されているわけではなく、スクリーンバッファへの出力にあたってはUTF-8 -> UTF-16の変換が行われているようです。  
+なお、VSのプロジェクトの設定をマルチバイト文字セットに変えるとおそらくコンソールスクリーンバッファの文字コードはANSI(Shift-JIS)になるはずです。
 
 ### 5. Boost.Nowideを使用する
 
@@ -252,26 +282,41 @@ int main() {
 
 試していないので出力がどうなるのかは分かりませんが、実装を見るにおそらく`WriteConsoleW()`を使用したときと同様になるかと思われます。
 
+### UTF-8の直接出力 in Windows
+
+無理です。
+
 ### 絵文字の表示 in Windows
 
-無理です諦めてください。
+通常のコンソールでは、無理です。
 
-あるいは、Windows Terminalを使えば表示できる様子です。なんかまだ非Ascii圏対応は怪しそうですが、今後に期待です・・・
+Windows Terminalを使えば表示できる様子です。なんかまだ非Ascii圏対応は怪しそうですが、今後に期待です・・・
 
 ### 参考文献
 
-- [P1423R3 `char8_t` backward compatibility remediation](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1423r3.html)
-- [コードページ - Microsoft Docs](https://docs.microsoft.com/ja-jp/cpp/c-runtime-library/code-pages?view=vs-2019)
-- [WriteConsole function - Microsoft Docs](https://docs.microsoft.com/en-us/windows/console/writeconsole?redirectedfrom=MSDN)
-- [SetConsoleOutputCP function - Microsoft Docs](https://docs.microsoft.com/en-us/windows/console/setconsoleoutputcp)
-- [C言語のワイド文字入出力 — MSVCRTの場合 - 雑記帳](https://blog.miz-ar.info/2017/01/wide-stdio-msvcrt/)
-- [C言語のワイド文字入出力 — Windows Console 編 - 雑記帳](https://blog.miz-ar.info/2017/01/wide-stdio-on-windows-console/)
-- [WindowsコマンドプロンプトにUnicode表示 - エンジニア徒然草](http://mitaka1954.cocolog-nifty.com/blog/2013/01/windowsunicode-.html)
-- [[めも]コンソールに日本語を出力したい場合(wcoutで日本語出力する場合など) - Qita](https://qiita.com/toris-birds/items/5443777ad0bb0ae05d3b)
-- [Visual C++における文字コード変換 - C++と色々](https://nekko1119.hatenablog.com/entry/2017/01/02/054629)
-- [Windows のコンソール端末と Unicode の相性 - NUMBER-SHOT.NET](https://number-shot.net/blog/windows-console-terminal-with-unicode/)
-- [Windows 10までほとんど手が入れられてこなかったWindowsのコンソール機能 - ASCII.jp](https://ascii.jp/elem/000/001/718/1718052/)
-- [Boost.Nowide - github](https://github.com/boostorg/nowide)
+- コンソール出力関連
+    - [標準ストリーム - Wikipedia](https://ja.wikipedia.org/wiki/標準ストリーム)
+    - [ファイルとストリーム - Microsoft Docs](https://docs.microsoft.com/ja-jp/cpp/c-runtime-library/files-and-streams?view=vs-2019)
+    - [C言語のワイド文字入出力 - 雑記帳](https://blog.miz-ar.info/2017/01/wide-stdio/)
+    - [C言語のワイド文字入出力 — MSVCRTの場合 - 雑記帳](https://blog.miz-ar.info/2017/01/wide-stdio-msvcrt/)
+    - [C言語のワイド文字入出力 — Windows Console 編 - 雑記帳](https://blog.miz-ar.info/2017/01/wide-stdio-on-windows-console/)
+    - [WindowsコマンドプロンプトにUnicode表示 - エンジニア徒然草](http://mitaka1954.cocolog-nifty.com/blog/2013/01/windowsunicode-.html)
+    - [標準入出力とリダイレクト - EternalWindows](http://eternalwindows.jp/windevelop/console/console02.html)
+    - [コンソールへの入出力 - EternalWindows](http://eternalwindows.jp/windevelop/console/console02.html)
+    - [Unicode Stream I/O in Text and Binary Modes - EternalWindows](https://docs.microsoft.com/en-us/cpp/c-runtime-library/unicode-stream-i-o-in-text-and-binary-modes?view=vs-2019)
+    - [CHAR_INFO structure - Microsoft Docs](https://docs.microsoft.com/en-us/windows/console/char-info-str)
+    - [コードページ - Microsoft Docs](https://docs.microsoft.com/ja-jp/cpp/c-runtime-library/code-pages?view=vs-2019)
+    - [Windows 10までほとんど手が入れられてこなかったWindowsのコンソール機能 - ASCII.jp](https://ascii.jp/elem/000/001/718/1718052/)
+- 各方法関連
+    - [Visual C++における文字コード変換 - C++と色々](https://nekko1119.hatenablog.com/entry/2017/01/02/054629)
+    - [[めも]コンソールに日本語を出力したい場合(wcoutで日本語出力する場合など) - Qita](https://qiita.com/toris-birds/items/5443777ad0bb0ae05d3b)
+    - [WriteConsole function - Microsoft Docs](https://docs.microsoft.com/en-us/windows/console/writeconsole?redirectedfrom=MSDN)
+    - [SetConsoleOutputCP function - Microsoft Docs](https://docs.microsoft.com/en-us/windows/console/setconsoleoutputcp)
+    - [Boost.Nowide - github](https://github.com/boostorg/nowide)
+- その他
+    - [P1423R3 `char8_t` backward compatibility remediation](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1423r3.html)
+    - [Windows のコンソール端末と Unicode の相性 - NUMBER-SHOT.NET](https://number-shot.net/blog/windows-console-terminal-with-unicode/)
+
 
 ### 謝辞
 
