@@ -1,6 +1,8 @@
 # ［C++］to_chars()とfrom_chars()ってはやいの？？
 
-`<charconv>`ヘッダはC++17から導入されたヘッダで、ロケール非依存、動的確保なし、例外なげない、などを謳うといういいことづくめで高速な文字列⇄数値変換を謳う関数が提供されています。現在フルで実装しているのはMSVCだけですが、実際速いってどのくらいなの？既存の手段と比べてどうなの？？という辺りが気になったので調べてみた次第です。
+`<charconv>`ヘッダはC++17から導入されたヘッダで、ロケール非依存、動的確保なし、例外なげない、などを謳ういいことづくめで高速な文字列⇄数値変換を謳う関数が提供されています。現在フルで実装しているのはMSVCだけですが、実際速いってどのくらいなの？既存の手段と比べてどうなの？？という辺りが気になったので調べてみた次第です。
+
+[:contents]
 
 ### 計測環境
 
@@ -8,7 +10,7 @@
 - Windows 10 1909 18363.778
 - VisualStudio 2019 update 6 preview 3
 
-一応電源プランを高パフォーマンスにして、VS以外を終了させた状態で計測。
+一応電源プランを高パフォーマンスにして、VS以外を終了させた状態で計測。ビルドは`/std:c++latest `を追加したリリースモードで行っています。
 
 ### `std::to_chars()`
 
@@ -343,6 +345,9 @@ template<std::size_t N>
 void output(const char* filename, std::vector<std::chrono::milliseconds>(&array)[N]) {
 
   std::ofstream ofs{ filename , std::ios::out | std::ios::trunc};
+  //BOM付加
+  unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+  ofs.write(reinterpret_cast<char*>(bom), sizeof(bom));
 
   auto datanum = array[0].size();
 
