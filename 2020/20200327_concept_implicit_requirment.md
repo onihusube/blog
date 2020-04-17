@@ -138,10 +138,12 @@ concept C = requires(const T a, T b) {
 // 明示的に書けば以下の様になる
 template<typename T>
 concept C = 
-  requires(const T   a, T b) { f(a, b); } &&
-  requires(      T   a, T b) { f(a, b); } &&
-  requires(      T&& a, T b) { f(std::move(a), b); } &&
-  requires(const T&& a, T b) { f(std::move(a), b); };
+  requires(const T a, T b) { 
+    f(a, b);
+    f(std::move(a), b);
+  } &&
+  requires(T   a, T b) { f(a, b); } &&
+  requires(T&& a, T b) { f(std::move(a), b); };
 ```
 
 この様な`f()`は例えば次の様になります。
@@ -181,5 +183,11 @@ C++20で導入された`<span>, <ranges>, <format>`や`<algorithm>, <iterator>`�
 - [`<concepts>` - cpprefjp](https://cpprefjp.github.io/reference/concepts.html)
 - [P2102R0 Make “implicit expression variations” more explicit (Wording for US185)](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2102r0.html)
 - [P2101R0 “Models” subsumes “satisfies” (Wording for US298 and US300)](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2101r0.html)
+
+### 謝辞
+
+この記事の6割は以下の方々によるご指摘によって成り立っています。
+
+- [@yohhoyさん](https://twitter.com/yohhoy/status/1251165903460249602)
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200327_concept_implicit_requirment.md)

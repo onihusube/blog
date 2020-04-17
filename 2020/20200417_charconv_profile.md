@@ -133,7 +133,7 @@ int main()
 
   profiling<std::int64_t>("to_chars() int64", [first, last](auto v) {
     auto [ptr, ec] = std::to_chars(first, last, v);
-    if (ec != std::errc{}) assert(false);
+    if (ec != std::errc{}) throw new std::exception{};
   });
 }
 ```
@@ -217,7 +217,10 @@ auto make_data(unsigned int N) -> std::pair<std::vector<char>, std::vector<std::
   for (auto i = 0u; i < N; ++i) {
     const auto num = rng(urbg);
     const auto [end, ec] = std::to_chars(pos, pos + 21, num);
-    if (ec != std::errc{}) assert(false);
+    if (ec != std::errc{}) {
+      --i;
+      continue;
+    }
     
     const std::size_t len = end - pos;
     vec.emplace_back(pos, len);
@@ -266,10 +269,10 @@ void profiling(const char* target, F&& func) {
 int main()
 {
   std::int64_t v;
-  
+
   profiling<std::int64_t>("to_chars() int64", [&v](auto sv) {
-    auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), v);
-    if (ec != std::errc{}) assert(false);
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.length(), v);
+    if (ec != std::errc{}) throw new std::exception{};
   });
 }
 ```
@@ -373,7 +376,12 @@ int main() {
 }
 ```
 
-グラフは箱ひげ図で見てみます。
+グラフは箱ひげ図で見てみます。  
+各箱は100万件の整数/浮動小数点数値に対する文字列⇄数値変換にかかった処理時間とばらつきを表しており、各箱に含まれるデータ数は10です。
+
+箱の上辺は第三四分位点、下辺は第一四分位点、中央の線が中央値、×点が平均値を表しています。ひげの上辺は最大値、下辺は最小値を表し、それらから外れた孤立点は外れ値を表しています。
+
+これによって、各処理方法毎のおおよその処理時間とそのばらつきを視覚的に確認・比較できます。
 
 #### `std::to_chars()`
 
@@ -383,6 +391,8 @@ int main() {
 
 ![std::from_chars()の計測結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200417_charconv_profile/from_chrs.png)
 
+
+`to_chars()/from_chars()`が他よりも明らかに速い事が改めて確認できます。また、全体の傾向として整数変換よりも浮動小数点数変換の方が重いことも分かります。
 
 ### 結論
 
