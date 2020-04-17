@@ -368,12 +368,20 @@ int main() {
 }
 ```
 
+グラフは箱ひげ図で見てみます。
+
 #### `std::to_chars()`
+
+![std::to_chars()の計測結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200417_charconv_profile/to_chars.png)
+
 #### `std::from_chars()`
+
+![std::from_chars()の計測結果](https://raw.githubusercontent.com/onihusube/blog/master/2020/20200417_charconv_profile/from_chrs.png)
+
 
 ### 結論
 
-使えるなら`to_chars()/from_chars()`使いましょう！
+使えるなら`to_chars()/from_chars()`使いましょう！ちょっぱやです！！
 
 ### 注意点
 
