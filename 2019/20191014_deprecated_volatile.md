@@ -246,8 +246,7 @@ static_assert(std::is_volatile_v<decltype(c)>); //ok
 
 ### C++20より非推奨となる標準ライブラリ内の`volatile`
 
-当初の提案は標準ライブラリ内にある`volatile`に関する所も非推奨とする提案を含んでいましたが、のちにそれは別の提案（[P1831R0 Deprecating volatile: library](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1831r0.html)）として分離されました。  
-まだ採択されていませんが、合意は取れているようなのでC++20に入ることは確実でしょう。その場合、DR（Defect Report : 欠陥報告）としてC++20に追加される可能性があります。
+当初の提案は標準ライブラリ内にある`volatile`に関する所も非推奨とする提案を含んでいましたが、のちにそれは別の提案（[P1831R1 Deprecating volatile: library](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1831r1.html)）として分離され、その後同様にC++20に採択されました。
 
 #### 標準ライブラリ内テンプレートの`volatile`なオーバーロード
 
@@ -437,6 +436,7 @@ volatile device dev; //初期化（コンストラクタ内）、破棄（デス
 - [P1152R2 : Deprecating volatile](https://wg21.link/p1152r2)
 - [P1152R4 : Deprecating volatile](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1152r4.html)
 - [P1831R0 : Deprecating volatile: library](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1831r0.html)
+- [P1831R1 : Deprecating volatile: library](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1831r1.html)
 - [P1382R0 : volatile_load<T> and volatile_store<T>](https://wg21.link/p1382r0)
 - [Time of check to time of use - Wikipedia](https://ja.wikipedia.org/wiki/Time_of_check_to_time_of_use)
 - [setjmp - cppreference.com](https://ja.cppreference.com/w/cpp/utility/program/setjmp)
