@@ -97,4 +97,11 @@ void algo(Iterator it, Iterator::value_type val) {
 - [Trip Report: ISO C++ Meeting Cologne (2019) by Matthias Gehre](https://www.silexica.com/news/iso_cpp_meeting_2019/)
     - `std::flat_map`と`zip_view`についての議論に触れられていたが、リンク切れしている・・・
 
+### 謝辞
+
+この記事の6割は以下の方々によるご指摘によって成り立っています。
+
+- [@yohhoyさん](https://twitter.com/yohhoy/status/1237378765207916544)
+- [@cpp_akiraさん](https://twitter.com/cpp_akira/status/1237382086954123265)
+
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200224_common_reference.md)
