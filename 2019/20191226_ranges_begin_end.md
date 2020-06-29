@@ -82,11 +82,11 @@ void my_swap(T&& t, U&& u) {
 
 ### `std::ranges::size`
 
-これも先ほどまでと似たようなものです。標準ライブラリにあるコンテナはほとんど現在抱えている要素数を`size()`メンバ関数で取得できます。しかし、生配列は当然そうではなく、`std::forward_list`はそのフットプリントを最小化するために現在の容量についての情報を持たないため、`size()`を利用できません。また、`begin()/end()`の時と同じくメンバ関数ではなくフリー関数で定義している場合もあるかもしれません。
+これも先ほどまでと似たようなものです。標準ライブラリにあるコンテナはほとんど現在抱えている要素数を`size()`メンバ関数で取得できます。しかし、生配列は当然そうではなく`begin()/end()`の時と同じくメンバ関数ではなくフリー関数で定義している場合もあるかもしれません。
 
-C++17までは、フリー関数の`std::size()`を使えば`std::forward_list`以外の標準のコンテナからは要素数を取得できましたが、追加で`std::forward_list`から取得するにはイテレータを取り出して`std::distance()`する特殊処理を自分で書く必要がありました。
+C++17までは、フリー関数の`std::size()`を使えば`std::forward_list`以外の標準のコンテナからは要素数を取得できました。また、非メンバで定義されていた場合のケアもしてくれていました。
 
-そこでRangeライブラリの登場です。[`std::ranges::size`](http://eel.is/c++draft/range.prim.size)関数（オブジェクト）は以下のような効果を持ちます。
+[`std::ranges::size`](http://eel.is/c++draft/range.prim.size)関数（オブジェクト）はもう少し頑張って、以下のような効果を持ちます。
 
 - 配列型ならその要素数を返す
 - そうではなく、メンバ関数の`E.size()`があればその結果を返す
@@ -94,7 +94,7 @@ C++17までは、フリー関数の`std::size()`を使えば`std::forward_list`�
 - そうでもなく、`std::ranges::end(E) - std::ranges::begin(E)`が有効ならばその結果を返す
 - そうでもなければ*ill-formed*
 
-`std::forward_list`だけではなく、フリー関数として定義されている場合のフォローもしてくれています。
+フリー関数として定義されている場合のフォローと、定義が無くてもイテレータを使ってサイズを求めてくれています。残念ながら、`std::forward_list`はサイズを定数時間（`O(1)`）で求められないので、この関数ではサイズを得られません。
 
 ### `std::ranges::empty`
 
@@ -107,7 +107,7 @@ C++17までは、フリー関数の`std::size()`を使えば`std::forward_list`�
 - そうでもなく、`bool(std::ranges::begin(E) == std::ranges::end(E))`が有効ならその結果を返す
 - そうでもなければ*ill-formed*
 
-すごく頑張ってくれているのが伝わります。正直、2番目に引っかからずに3番目が有効というケースが分かりません・・・
+すごく頑張ってくれているのが伝わります。2番目に引っかからずに3番目に引っかかるのは`empty()`を持たない`std::forward_list`みたいな型の場合のようです。
 
 ### `std::ranges::data`
 
@@ -140,5 +140,12 @@ C++20からは従来の関数のことは忘れて`std::ranges`名前空間の�
 - [Customization Point Object - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20190403/p1)
 - [C++標準化委員会の文書集、2015-04 pre-Lenexa mailingsのレビュー: N4381-N4389 - 本の虫](https://cpplover.blogspot.com/2015/05/c2015-04-pre-lenexa-mailings-n4381-n4389.html)
 - [［C++］expression-equivalentのお気持ち - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2019/09/12/002550)
+
+### 謝辞
+
+この記事の6割は以下の方々によるご指摘によって成り立っています。
+
+- [@kariya_mitsuruさん](https://twitter.com/kariya_mitsuru/status/1277378882853670912)
+
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2019/20191226_ranges_begin_end.md)
