@@ -6,6 +6,8 @@ Github Actionsで用意されている[ubuntu 20.04環境に用意されてい�
 
 つまり、この2つを組み合わせれば最新のGCCを使いながらGithub Actionsできるはず！
 
+※以下ではGithub ActionsとかDocker関係の用語が必ずしも正しく使われていない可能性があります、ご了承ください。
+
 ### Dcokerコンテナを起動しその上でビルドとテストを走らせるActionを作成する
 
 - [Docker コンテナのアクションを作成する - GitHub Docs](https://docs.github.com/ja/actions/creating-actions/creating-a-docker-container-action)
@@ -39,7 +41,7 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 - [Docker コンテナのアクションを作成する - GitHub Docs](https://docs.github.com/ja/actions/creating-actions/creating-a-docker-container-action#writing-the-action-code)
 
-このページにあるものを参考にして書きます。ただこのページだけ見ても、テストしたいリポジトリのクローンをどうするのかが分かりません。試してみると別にクローンされてはいないので自分でクローンしてくる必要があります。なので、それを引数として受け取るようにします。
+このページにあるものを参考にして書きます。ただこのページだけ見ても、テストしたいリポジトリのクローンをどうするのかが分かりません。試してみると別にクローンされてはいないので自分でクローンしてくる必要があります。なので、そのために必要な情報を引数として受け取るようにします。
 
 公式のActionにはcheckoutというのがありますが、今回はDocker上で実行するため利用できなさそうです。
 
@@ -54,7 +56,7 @@ meson test -C build -v
 
 第一引数にリポジトリ名（=ディレクトリ名）、第二引数にリポジトリのURLを受けるようにしています。5-6行目はmeson特有のものなので、お使いのビルドシステムのビルドコマンドと成果物の実行コマンドに置き換えてください。
 
-ファイル名は先程Dockerfileに書いた`entrypoint.sh`と合わせます。`chmod +x entrypoint.sh`で実行可能にすることを忘れないようにしてください。  
+ファイル名は先程Dockerfileに書いた`entrypoint.sh`と合わせます。`chmod +x entrypoint.sh`で実行可能にすることを忘れすに、
 Windowsの場合は次のページが参考になります。
 
 - [Gitでファイルの実行権限を変更する - Qita](https://qiita.com/satotka/items/29f1483f8921d2ecfeab)
@@ -93,7 +95,7 @@ runs:
 #### Actionリポジトリの作成
 
 ここまで用意したDockerfile、やることを記述したシェルスクリプト`entrypoint.sh`、Actionを記述した`action.yml`の3つをGithub上の公開リポジトリに保存しておき、リリースタグを打っておくことで、他のリポジトリからActionとして参照できるようになります。  
-リポジトリのトップに全てをぶちまけるのが正しそうです。
+ここまではリポジトリのトップに全てをぶちまける事を前提に書いてありますので、今回はそうします。
 
 私の場合は次のようになりました。
 
@@ -136,3 +138,11 @@ jobs:
 - [Docker コンテナのアクションを作成する - GitHub Docs](https://docs.github.com/ja/actions/creating-actions/creating-a-docker-container-action)
 - [GitHub Actionsのメタデータ構文 - GitHub Docs](https://docs.github.com/ja/actions/creating-actions/metadata-syntax-for-github-actions)
 - [Gitでファイルの実行権限を変更する - Qita](https://qiita.com/satotka/items/29f1483f8921d2ecfeab)
+
+### 謝辞
+
+この記事の8割は以下の方によるご指摘によって成り立っています。
+
+- [@Reputelessさん](https://twitter.com/Reputeless/status/1284405268235706370)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200724_githubactions_docker.md)
