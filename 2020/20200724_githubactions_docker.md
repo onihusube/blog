@@ -90,7 +90,8 @@ runs:
 
 - [GitHub Actionsのメタデータ構文 - GitHub Docs](https://docs.github.com/ja/actions/creating-actions/metadata-syntax-for-github-actions)
 
-`runs`にActionとして呼ばれたときにやることを書いておきます。`using`は何のアプリケーションを使用するのかを指示するもので、ここではDockerを指定します。`image`には使いたいDockerイメージ名を指定します。Docker Hubにあるイメージ名を指定しても良いようですが、今回は先ほど用意したDockerfile（のファイル名）を指定します。
+`runs`にActionとして呼ばれたときにやることを書いておきます。`using`は何のアプリケーションを使用するのかを指示するもので、ここではDockerを指定します。`image`には使いたいDockerイメージ名を指定します。Docker Hubにあるイメージ名を指定しても良いようですが、今回は先ほど用意したDockerfile（のファイル名）を指定します。  
+そして、`args`で引数をどの順で受け取るかを指定しています。先程`inputs`で定義した引数名を`inputs.name`の様に参照しています。シェルスクリプトにはここで書いた順番に引数が渡されることになります。
 
 #### Actionリポジトリの作成
 
