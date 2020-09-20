@@ -23,7 +23,7 @@ export int munge(int a, int b) {
 ```cpp
 /// libA.h
 
-int libm_munge(int a, int b);
+int libA_munge(int a, int b);
 ```
 
 ```cpp
@@ -32,7 +32,7 @@ int libm_munge(int a, int b);
 #include "libA.h"
 import moduleA;
 
-int libm_munge(int a, int b) {
+int libA_munge(int a, int b) {
     return munge(a, b);
 }
 ```
@@ -48,9 +48,11 @@ import moduleB;
 int main() {
   // それぞれ、どちらが呼ばれる？
   int a = munge(1, 2);      // moduleBのものが呼ばれる？
-  int b = libm_munge(1, 2); // moduleAのものが呼ばれる？
+  int b = libA_munge(1, 2); // moduleAのものが呼ばれる？
 }
 ```
+
+（[こちら](https://devblogs.microsoft.com/cppblog/standard-c20-modules-support-with-msvc-in-visual-studio-2019-version-16-8/)のサンプルコードを改変しています）
 
 C++の意味論としてはこれは当然明白なことで、コメントにある通りに呼ばれるはずです。しかし、このプログラムはコンパイルされリンクされた結果として一つの実行ファイルになります。C++20の名前付きモジュールはそれそのものが1つの翻訳単位をなすので、そこには2つのモジュール（`moduleA`と`moduleB`）をコンパイルした2つのオブジェクトファイルが含まれます。  
 その時、翻訳単位`main.cpp`と`libA.cpp`はそれぞれのコードの意味論から期待されるモジュールからの関数を呼び出すでしょうか？
@@ -85,7 +87,7 @@ import moduleB;
 int main() {
   // 弱い所有権モデルの下では未定義動作！！
   int a = munge(1, 2);
-  int b = libm_munge(1, 2);
+  int b = libA_munge(1, 2);
 }
 ```
 
@@ -104,7 +106,7 @@ import moduleB;
 int main() {
   // 強い所有権モデルの下では期待通りに呼ばれる
   int a = munge(1, 2);      // -1（moduleBのものが呼ばれる）
-  int b = libm_munge(1, 2); // 3（moduleAのものが呼ばれる）
+  int b = libA_munge(1, 2); // 3（moduleAのものが呼ばれる）
 }
 ```
 
