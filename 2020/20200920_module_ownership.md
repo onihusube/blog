@@ -131,11 +131,11 @@ static int func3(int a, int b) {
 }
 ```
 
-リンケージの観点からは、2つの所有権モデルの差異は外部リンケージを持つ名前をモジュールが所有するかどうか？という問題とみることができます。
+リンケージの観点からは、2つの所有権モデルの差異は外部リンケージを持つ（エクスポートされている）名前をモジュールが所有するかどうか？という問題とみることができます。
 
 弱い所有権モデルでは、内部リンケージとモジュールリンケージを持つ名前だけをモジュールが所有し、エクスポートされている名前をモジュールは所有しません。
 
-強い所有権モデルでは、外部リンケージを持つ名前を含めたモジュールに属するすべての名前がモジュールによって所有されます。
+強い所有権モデルでは、エクスポートされている名前を含めたモジュールに属するすべての名前がモジュールによって所有されます。
 
 ### 所有権と名前マングリング
 
@@ -203,3 +203,5 @@ static int func3(int a, int b) {
 - [Standard C++20 Modules support with MSVC in Visual Studio 2019 version 16.8 - C++ Team Blog](https://devblogs.microsoft.com/cppblog/standard-c20-modules-support-with-msvc-in-visual-studio-2019-version-16-8/)
 - [C++ Modules - GCC Wiki](https://gcc.gnu.org/wiki/cxx-modules)
 - [What are the problems with modules in C++20? - reddit](https://www.reddit.com/r/cpp/comments/iukqju/what_are_the_problems_with_modules_in_c20/)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20200920_module_ownership.md)
