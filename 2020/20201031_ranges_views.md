@@ -69,38 +69,41 @@ concept viewable_­range =
 
 ### `subrange`
 
-## *range factories*
+## 初めに
 
-### *View* 🤔
+### 初めに : *View*について
 
-*range*ライブラリにおける*View*とは、他の所（言語、ライブラリ、概念・・・）での任意のシーケンスにおける*View*と呼ばれるものと同じ意味です。元のシーケンスに対して何か操作を適用した結果得られ、元のシーケンスをコピーせず参照し、かつ遅延評価によってシーケンスに操作を適用するものです。  
-さらに、*View*自身もシーケンスなので、*View*に対してさらに他の処理を適用していくことができるようになっています。
+*range*ライブラリにおける*View*とは、他の所（言語、ライブラリ、概念・・・）での任意のシーケンスに対する*View*と呼ばれるものと同じ意味です。元のシーケンスに対して何か操作を適用した結果得られ、元のシーケンスをコピーせず参照し、かつ遅延評価によってシーケンスに操作を適用するものです。  
+さらに、*View*自身もシーケンスなので*View*に対してさらに他の処理を適用していくことができるようになっています。
 
-*range*ライブラリにおける*View*はコンセプトによって次のように定義されます。
+*range*ライブラリにおける*View*はコンセプトによって構文・意味論の両方向から次のように定義されます。
 
 ```cpp
 template<class T>
 concept view =
-  range<T> &&                 // begin()/end()が共に呼び出し可能でイテレータを返す
+  range<T> &&                 // begin()/end()によってイテレータペアを取得可能
   movable<T> &&               // ムーブ可能
   default_­initializable<T> && // デフォルト構築可能
-  enable_view<T>;
+  enable_view<T>;             // viewコンセプトを有効化する変数テンプレート
 ```
 
 - ムーブ構築/代入は定数時間
 - デストラクトは定数時間
 - コピー不可もしくは、コピー構築/代入は定数時間
 
-これら全ての要件を満たしたものが*range*ライブラリにおける*View*として扱われます。
+この定義に沿う型が*range*ライブラリにおける*View*として扱われます。
 
-随分分かりづらいかもしれませんが意味するところはすなわち、任意の範囲（*range* : イテレータペア）を所有せず参照し、*View*自身の構築・コピー・ムーブ・破棄は参照する範囲とは無関係であるということです。  
-これは同時に、一般的な意味の*View*であるための最低限の要求です。
+分かりづらいかもしれませんが意味するところはすなわち、任意のシーケンスを所有せずに参照し、*View*自身の構築・コピー・ムーブ・破棄は参照する範囲とは無関係であるということです。
+
+実際の実装はほぼ間違いなくイテレータペア（*range*）を保持するクラス型となり、*View*にまつわる操作は`begin()`の呼び出し時、あるいはそのイテレータに対する`++, *`等の操作のタイミングで実行されることによって遅延評価されることになるでしょう。
+
+標準ライブラリにある*View*であるクラス型にはたとえば`std::string_view`があります。`std::string_view`は自身も*range*であり、ムーブやデフォルト構築が可能で、単に文字列の先頭ポインタと長さを保持するものなので、構文的にも意味論的にもこの定義に沿っています。  
+ただし、`std::ranges::enable_view<std::string_view>`（上記コンセプト定義の一番最後の条件）が`false`となるので`std::string_view`は`view`コンセプトを満たしません。`enable_view`は`view`コンセプトを有効化するための最後の一押しです。
 
 #### `view_interface`
 
-`<ranges>`にある*View*となるクラスは共通部分の実装を簡略化するために`view_interface`というクラスを継承しています。`view_interface`はCRTPによって派生クラス型を受け取り、派生している*View*に対してコンテナインターフェースを備えるためのものです。
-
-これによって、*View*の保持する*range*の種類（すなわち、イテレータカテゴリ）によって`empty()/data()/size()/front()/back()/[]`と言った要素を参照する操作が利用可能となります。
+`<ranges>`にある*View*となるクラスは共通部分の実装を簡略化するために`view_interface`というクラスを継承しています。`view_interface`はCRTPによって派生クラス型を受け取り、派生している*View*に対してコンテナインターフェースを備えるためのものです。  
+これによって、`empty()/data()/size()/front()/back()/operator[]`と言った要素を参照する操作が利用可能となります（ただし、*View*の参照する*range*の種類（すなわち、イテレータカテゴリ）によります）。
 
 ```cpp
 template<class D>
@@ -110,14 +113,78 @@ class view_interface : public view_base {
 };
 ```
 
-`view_base`というのは単なるタグ型で、*View*となるクラスを識別するためのものです。
+`view_base`というのは単なるタグ型で、*View*となるクラスを識別するためのものです。*View*の型`D`に求めらているのはクラス型でありCV修飾されていない事だけです。自分で*View*を定義する時もこれを利用すると良いでしょう。ちなみに、これを継承しておくと`std::ranges::enable_view<T>`が自動的に`true`となるようになっています。
 
-#### 名前空間
+#### *View*の命名規則と操作
 
+`<ranges>`にある*View*は`操作名_view`という名前でクラスとして`std::ranges`名前空間に定義されており、*range*オブジェクトを渡して構築することでその操作を行う*View*オブジェクトを得ることができます。そして、その操作に対応する`view`を作成するための関数オブジェクトが`std::ranges::views`名前空間に`操作名_view`に対して`操作名`で定義されています。こちらを用いると*View*を得る操作を簡潔に書くことができます。
 
+名前空間名は真面目に書くと長いですが`std::views`という名前空間エイリアスが用意されており、そちらを用いると少し短く書けます。
+
+この様な関数オブジェクトには、*range factories*と*range adaptor objects*の2種類があります。
 
 ### `empty_view`
 
+`empty_view<T>`は型`T`の空のシーケンスを表す*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::ranges::empty_view<int> ev{};
+
+  for (int n : ev) {
+    assert(false);  // 呼ばれない
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/eJq2oHSPjhPhaDZS)
+
+これは次のように定義されます。
+
+```cpp
+namespace std::ranges {
+  template<class T>
+    requires is_object_v<T>
+  class empty_view : public view_interface<empty_view<T>> {
+  public:
+    static constexpr T* begin() noexcept { return nullptr; }
+    static constexpr T* end() noexcept { return nullptr; }
+    static constexpr T* data() noexcept { return nullptr; }
+    static constexpr size_t size() noexcept { return 0; }
+    static constexpr bool empty() noexcept { return true; }
+  };
+
+  namespace views {
+    // 変数テンプレート
+    template<class T>
+    inline constexpr empty_view<T> empty{};
+  }
+}
+```
+
+使いどころはすぐには思いつきませんが、*range*を取るアルゴリズムに対してあえて空の*range*を渡したい場合に利用することができるでしょうか。そのような場合、型`T`を与えるだけで空の*range*を得ることができるのでお手軽です。
+
+この定義からわかるように、`empty_view`の*range*は*contiguous range*（イテレータが*contiguous iterator*の範囲）です。
+
+
+### range factories
+
+`std::views`（`std::ranges::views`）名前空間にある関数オブジェクトを用いると空の*View*を取得するという操作を若干簡潔に書くことができます。
+
+```cpp
+#include <ranges>
+
+int main() {
+  for (int n : std::views::empty<int>) {
+    assert(false);  // 呼ばれない
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/RgtkTNZWIszHh5NW)
+
+
+`std::views`名前空間にあるこの様な*View*クラスに対応する操作を表す関数オブジェクトの事を、*range factory*と呼びます。
 
 ### `single_view`
 ### `iota_view`
