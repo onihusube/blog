@@ -275,7 +275,7 @@ int main() {
   std::ranges::iota_view iv{1, 10};
 
   for (int n : iv) {
-    std::cout << n;
+    std::cout << n; // 123456789
   }
 }
 ```
@@ -290,22 +290,99 @@ int main() {
   std::ranges::iota_view iv{1};
 
   for (int n : iv) {
-    std::cout << n;
+    std::cout << n;     // 1234567891011121314151617181920
     if (n == 20) break; // 何かしら終わらせる条件がないと無限ループ
   }
 }
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/niHMzCrLfiHNcA76)
 
-このような無限列は、*range adaptor*と呼ばれる*View*と組み合わせる事で有効活用することができます。
+このような無限列は、*range adaptor*と呼ばれる*View*と組み合わせる事で有効活用することができます（後の方で紹介予定）。
 
-基本的には数列を生成するために使用すれば良いのですが、この実体はインクリメント可能でありかつ終端を判定できさえすればどんな型の単調増加シーケンスでも作成可能です。  
-浮動小数点数型にとどまらず、ポインタ型やイテレータ型のシーケンスも作成可能です。
+基本的には整数列を生成するために使用すれば良いのですが、この実体はインクリメント可能であり距離を定義できさえすればどんな型の単調増加シーケンスでも作成可能です。これは[`std::weakly_incrementable`](https://cpprefjp.github.io/reference/iterator/weakly_incrementable.html)コンセプトによって制約されます。  
+例えば、ポインタ型やイテレータ型のシーケンスを作成可能です。
 
+
+```cpp
+int main() {
+  
+  int array[] = {2, 4, 6, 8, 10};
+  
+  // ポインタのインクリメントシーケンス
+  std::ranges::iota_view iva{std::ranges::begin(array), std::ranges::end(array)};
+
+  for (int* p : iva) {
+    std::cout << *p;  // 246810
+  }
+  
+  std::cout << '\n';
+  
+  std::list list = {1, 3, 5, 7, 9}; 
+  
+  // listイテレータのインクリメントシーケンス
+  std::ranges::iota_view ivl{std::ranges::begin(list), std::ranges::end(list)};
+
+  for (auto it : ivl) {
+    std::cout << *it; // 13579
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/3jbhn5RgULKqGeiy)
+
+正直このジェネリックな振る舞いは使いどころがあるのか分かりません。頭の片隅に置いておくと役立つこともあるでしょうか・・・？  
+なお、`<ranges>`の*View*はおおよそ全てがこの様になるべく~~無駄に~~ジェネリックに動作可能なように設計されています。
+
+なお、浮動小数点数型は`std::weakly_incrementable`を満たさないので`iota_view`では使用できません。距離を整数値で定義できないのが原因のようです。
+
+### 遅延評価
+
+`iota_view`によって生成されるシーケンスは`iota_view`オブジェクトを構築した時点では生成されておらず、その生成は遅延評価されます。
+
+具体的には、`iota_view`オブジェクトから得られるイテレータのインクリメント（`++i/i++`）のタイミングで1つづつシーケンスの要素が計算されます。
+
+```cpp
+int main() {
+  std::ranges::iota_view iv{1, 10}; // この段階ではまだ何もしてない
+
+  auto it = std::ranges::begin(iv); // この段階ではまだ何もしてない
+
+  int n1 = *it; // 初項（1）が得られる
+  ++it;         // ここで次の項（2）が計算される
+  it++;         // ここで次の項（3）が計算される
+  int n2 = *it; // 3番目の項（3）が得られる  
+}
+```
+
+### *range*カテゴリ
+
+`iota_view`の表す*range*はその要素型によって*range*カテゴリが変化します。整数型で使用する分には常に*random access range*ですが、そのほかの型の場合は可能な操作によって弱くなる可能性があります。例えば、`std::list`のイテレータによる`iota_view`オブジェクトは*bidirectional range*になります。
+
+*random access range*となる`iota_view`のシーケンスは、そのイテレータに対して`--, +=, -=`等でシーケンス上をほぼ自由に移動でき、*bidirectional range*となる場合は`++, --`によって前後方向への移動が可能になります。
 
 ### range factories
 
-`single_view`にも*range factory*となる関数オブジェクトが用意されています。これを用いると幾分か記述を省略できます。
+`iota_view`にも*range factory*となる関数オブジェクトが用意されています。
+
+
+```cpp
+#include <ranges>
+
+int main() {
+  for (int n : std::views::iota(1, 10)) {
+    std::cout << n;   // 123456789
+  }
+  
+  std::cout << '\n';
+
+  for (int n : std::views::iota(1)) {
+    std::cout << n;   // 1234567891011121314151617181920
+    if (n == 20) break;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/niHMzCrLfiHNcA76)
+
+この`std::views::iota`はカスタマイゼーションポイントオブジェクトで、1つか2つの引数を受け取りその引数をそのまま転送して`iota_view`オブジェクトを生成し返します。
 
 ## `basic_istream_view`
 
