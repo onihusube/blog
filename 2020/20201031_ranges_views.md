@@ -230,6 +230,8 @@ namespace std::ranges {
 }
 ```
 
+`single_view`もまた、*contiguous range*（イテレータが*contiguous iterator*の範囲）です。
+
 4つ目のコンストラクタは`T`のオブジェクトを内部で*in place*構築するためのものです。`args...`にコンストラクタ引数を渡す事で、直接コンストラクタを呼んで構築することができます。
 
 ```cpp
@@ -262,5 +264,48 @@ int main() {
 ただし、このCPOは1引数しか受け付けないため、*in place*コンストラクタを呼び出すことはできません。
 
 ## `iota_view`
+
+`iota_view`は渡された2つの値をそれぞれ始点と終点として、単調増加するシーケンスを作成する*View*です。  
+整数型に限定するならば、`init, bound`の2つの値を渡すと[init, bound)の範囲で1づつ増加していく数列を生成します。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::ranges::iota_view iv{1, 10};
+
+  for (int n : iv) {
+    std::cout << n;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/1ITXZXmU2yOpSJYE)
+
+また、引数1つだけで構築した場合は終端のない無限列を生成します。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::ranges::iota_view iv{1};
+
+  for (int n : iv) {
+    std::cout << n;
+    if (n == 20) break; // 何かしら終わらせる条件がないと無限ループ
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/niHMzCrLfiHNcA76)
+
+このような無限列は、*range adaptor*と呼ばれる*View*と組み合わせる事で有効活用することができます。
+
+基本的には数列を生成するために使用すれば良いのですが、この実体はインクリメント可能でありかつ終端を判定できさえすればどんな型の単調増加シーケンスでも作成可能です。  
+浮動小数点数型にとどまらず、ポインタ型やイテレータ型のシーケンスも作成可能です。
+
+
+### range factories
+
+`single_view`にも*range factory*となる関数オブジェクトが用意されています。これを用いると幾分か記述を省略できます。
+
 ## `basic_istream_view`
 
