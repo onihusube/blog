@@ -402,11 +402,11 @@ int main() {
 
 要は[`std::istream_iterator`](https://cpprefjp.github.io/reference/iterator/istream_iterator.html)を`<range>`における*View*として再設計したものです。
 
-その特性上、`istream_view`は常に*input_range*となり、一方向性でマルチパス保証がありません。そのため、`istream_view`のイテレータはムーブオンリーです。
+その特性上`istream_view`は常に*input range*となり、一方向性でマルチパス保証がありません。そのため`istream_view`のイテレータはムーブオンリーです。
 
 ### `basic_istream_view`
 
-`istream_view<T>`というのは実は*View*クラスではなくて*range factory*となる関数？です。`istream_view`の実体は`basic_istream_view`というクラスで、`istream_view`は任意の`istream`を引数に受け取り、それを用いて`basic_istream_view`オブジェクトを構築して返します。
+`istream_view<T>`というのは実は*View*クラスではなくて*range factory*に対応する関数です。`istream_view`の実体は`basic_istream_view`というクラスで、`istream_view`は任意の`istream`を引数に受け取り、それを用いて`basic_istream_view`オブジェクトを構築して返します。
 
 この`basic_istream_view`が*View*クラスであり次のように定義されています。
 
@@ -441,14 +441,12 @@ namespace std::ranges {
 
 `basic_istream_view`は3つのテンプレートパラメータ（シーケンスの要素型、ストリームの文字型、文字型の`traits`）を受け取るのですが、最初の要素型`Val`を必ず指定しなければいけないためにテンプレート引数推論を行えず、これを直接使おうとすると3つのテンプレートパラメータ全てを指定しなければなりません。
 
-これが地味に面倒なので、利用するときは`istream_view`関数？を用いるといいでしょう。これは、要素型だけを指定して入力ストリームを渡せば、残り2つのテンプレートパラメータは引数の`istream`の型から取得して補ってくれます。  
+これは地味に面倒なので利用するときは`std::ranges::istream_view<T>()`を用いるといいでしょう（なお、`std::views::istream_view`はありません）。これは、要素型だけを指定して入力ストリームを渡せば、残り2つのテンプレートパラメータは引数の`istream`の型から取得して補ってくれます。  
 なお、この記事では`basic_istream_view`による*View*を指して`istream_view`と呼びます。
-
-（`std::ranges::istream_view`は規格書に一瞬しか出てこないけど確かに利用できる謎の存在です。GCCでは関数として実装されていますが、詳細がどこにも書かれていない気がしてます・・・）
 
 ### 遅延評価
 
-上記定義を見るとピンとくるかもしれませんが、`istream_view`は遅延評価されます。`istream_view`によって生成されるシーケンスは`istream_view`オブジェクトを構築した時点では生成されてはいません。
+上記定義を見るとピンとくるかもしれませんが`istream_view`は遅延評価されます。`istream_view`によって生成されるシーケンスは`istream_view`オブジェクトを構築した時点では生成されていません。
 
 まず、`istream_view`オブジェクトから`begin()`によってイテレータを取得した時点で最初の要素が計算（読み取り）されます。そして、インクリメント（`++i/i++`）のタイミングで1つづつ後続の要素が計算されます。
 
@@ -488,10 +486,8 @@ int main() {
 }
 ```
 
-（範囲終端到達後のイテレータのインクリメントはもしかしたら未定義動作に当たるかもしれません）
+### *range factories -> range adaptors*
 
-### range factories -> range adaptors
-
-ここまでで4つの*View*クラス（`empty_view`, `single_view`, `iota_view`, `istream_view`）を見てきました。これらの*View*はどれもシーケンスを生成するもので、他のシーケンスに対して操作を適用したりするものではありません。その振る舞いから、これらの*View*は*range factories*とカテゴライズされます。
+ここまでで4つの*View*クラス（`empty_view`, `single_view`, `iota_view`, `istream_view`）を見てきました。これらの*View*はどれもシーケンスを生成するもので、他のシーケンスに対して操作を適用したりするものではありません。その振る舞いから、これらの*View*は*range factories*とカテゴライズされます（`std::views`にある関数オブジェクトの事も同時に指しているようなので、すこしややこしいですが・・・）。
 
 おそらく*range*ライブラリの本命たる、他のシーケンスに対して作用するタイプの*View*は*range adaptors*にカテゴライズされ、次回はついにそこに足を踏み入れていきます。
