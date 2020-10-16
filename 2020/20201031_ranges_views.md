@@ -384,5 +384,114 @@ int main() {
 
 この`std::views::iota`はカスタマイゼーションポイントオブジェクトで、1つか2つの引数を受け取りその引数をそのまま転送して`iota_view`オブジェクトを生成し返します。
 
-## `basic_istream_view`
+## `istream_view`
 
+`istream_view<T>`は任意の`istream`が示す入力ストリーム上にある`T`の値のシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // 標準入力に"1 2 3 4 5 6"のように入力したとする
+  for (int n : std::ranges::istream_view<int>(std::cin)) {
+    std::cout << n; // 123456
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/2hOyESIGsmHxFtoC)
+
+要は[`std::istream_iterator`](https://cpprefjp.github.io/reference/iterator/istream_iterator.html)を`<range>`における*View*として再設計したものです。
+
+その特性上、`istream_view`は常に*input_range*となり、一方向性でマルチパス保証がありません。そのため、`istream_view`のイテレータはムーブオンリーです。
+
+### `basic_istream_view`
+
+`istream_view<T>`というのは実は*View*クラスではなくて*range factory*となる関数？です。`istream_view`の実体は`basic_istream_view`というクラスで、`istream_view`は任意の`istream`を引数に受け取り、それを用いて`basic_istream_view`オブジェクトを構築して返します。
+
+この`basic_istream_view`が*View*クラスであり次のように定義されています。
+
+```cpp
+namespace std::ranges {
+
+  template<movable Val, class CharT, class Traits>
+    requires default_initializable<Val> &&
+             stream-extractable<Val, CharT, Traits>
+  class basic_istream_view : public view_interface<basic_istream_view<Val, CharT, Traits>> {
+  public:
+    basic_istream_view() = default;
+    constexpr explicit basic_istream_view(basic_istream<CharT, Traits>& stream);
+
+    constexpr auto begin()
+    {
+      if (stream_) {
+        *stream_ >> object_;
+      }
+      return iterator{*this};
+    }
+
+    constexpr default_sentinel_t end() const noexcept;
+
+  private:
+    struct iterator;                                    // 説明専用メンバ変数
+    basic_istream<CharT, Traits>* stream_ = nullptr;    // 説明専用メンバ変数
+    Val object_ = Val();                                // 説明専用メンバ変数
+  };
+}
+```
+
+`basic_istream_view`は3つのテンプレートパラメータ（シーケンスの要素型、ストリームの文字型、文字型の`traits`）を受け取るのですが、最初の要素型`Val`を必ず指定しなければいけないためにテンプレート引数推論を行えず、これを直接使おうとすると3つのテンプレートパラメータ全てを指定しなければなりません。
+
+これが地味に面倒なので、利用するときは`istream_view`関数？を用いるといいでしょう。これは、要素型だけを指定して入力ストリームを渡せば、残り2つのテンプレートパラメータは引数の`istream`の型から取得して補ってくれます。  
+なお、この記事では`basic_istream_view`による*View*を指して`istream_view`と呼びます。
+
+（`std::ranges::istream_view`は規格書に一瞬しか出てこないけど確かに利用できる謎の存在です。GCCでは関数として実装されていますが、詳細がどこにも書かれていない気がしてます・・・）
+
+### 遅延評価
+
+上記定義を見るとピンとくるかもしれませんが、`istream_view`は遅延評価されます。`istream_view`によって生成されるシーケンスは`istream_view`オブジェクトを構築した時点では生成されてはいません。
+
+まず、`istream_view`オブジェクトから`begin()`によってイテレータを取得した時点で最初の要素が計算（読み取り）されます。そして、インクリメント（`++i/i++`）のタイミングで1つづつ後続の要素が計算されます。
+
+```cpp
+int main() {
+  // 標準入力に"1 2 3 4 5 6"のように入力したとする
+
+  auto iv = std::ranges::istream_view<int>(std::cin); // この段階ではまだ何もしてない
+
+  auto it = std::ranges::begin(iv); // この段階で最初の要素（1）が読み取られる
+
+  int n1 = *it; // 最初の要素（1）が得られる
+  ++it;         // ここで次の要素（2）が読み取られる
+  it++;         // ここで次の要素（3）が読み取られる
+  int n2 = *it; // 3番目の要素（3）が得られる  
+}
+```
+
+この事によって、`istream_view`によるシーケンスは通常のシーケンスとは異なりメモリ上に空間的に存在するのではなく、ストリーム上に時間的に存在しています。すなわち、`istream_view`を構築したタイミングで入力データが全て到着している必要はなく、任意のタイミングで到着しても構いません。  
+この事は、C#におけるLINQに対するRxの対応と同じです。
+
+シーケンス終端の判定は、ストリーム上にデータが残っているかによって行われます（`std::basic_ios`の[`operator bool`](https://cpprefjp.github.io/reference/ios/basic_ios/op_bool.html)が用いられます）。入力が無い状態でイテレータをインクリメントするとおそらくブロックすることになります。
+
+```cpp
+int main() {
+  // 標準入力に"1 2"のように入力したとする
+
+  auto iv = std::ranges::istream_view<int>(std::cin);
+  auto it = std::ranges::begin(iv); // この段階で最初の要素（1）が読み取られる
+  auto fin = std::ranges::end(iv);
+
+  it == fin;  // false
+  ++it;       // ここで次の要素（2）が読み取られる、ストリーム上のデータはなくなる
+
+  it == fin;  // true
+  ++it;       // 次のデータの到着まで待機する（ストリーム実装によるかもしれない？
+}
+```
+
+（範囲終端到達後のイテレータのインクリメントはもしかしたら未定義動作に当たるかもしれません）
+
+### range factories -> range adaptors
+
+ここまでで4つの*View*クラス（`empty_view`, `single_view`, `iota_view`, `istream_view`）を見てきました。これらの*View*はどれもシーケンスを生成するもので、他のシーケンスに対して操作を適用したりするものではありません。その振る舞いから、これらの*View*は*range factories*とカテゴライズされます。
+
+おそらく*range*ライブラリの本命たる、他のシーケンスに対して作用するタイプの*View*は*range adaptors*にカテゴライズされ、次回はついにそこに足を踏み入れていきます。
