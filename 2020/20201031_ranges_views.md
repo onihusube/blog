@@ -494,15 +494,15 @@ int main() {
 
 ## *range adaptors*
 
-*range adaptors*は他の*View*を含む任意の*range*に対して作用して、特定の操作を適用した*View*に変換するものです。*range adaptor*は*range*から*range*へ操作を適用しつつ変換するものなので、*range adaptor*の結果にさらに*range adaptor*を適用する形で、操作をチェーンさせることができます。そして、その最終的な結果もまた*range*として得られます。
+*range adaptors*は他の*View*を含む任意の*range*に対して作用して、特定の操作を適用した*View*に変換するものです。*range adaptor*は*range*から*range*へ操作を適用しつつ変換するものなので、*range adaptor*の結果にさらに*range adaptor*を適用する形で操作をチェーンさせることができます。そして、その最終的な結果もまた*range*として得られます。
 
-*range factories*はシーケンスを生成するタイプの*View*なので*range adaptors*のように他の*range*に作用することはできませんが、それらと比較してみると、*range factories*は*range adaptors*によるチェーンの起点となる*View*であることが分かるでしょう。
+*range factories*はシーケンスを生成するタイプの*View*なので*range adaptors*のように他の*range*に作用することはできませんが、*range adaptors*と比較してみると*range factories*は*range adaptors*によるチェーンの起点となる*View*であることが分かるでしょう。
 
 ### *range adaptor objects*
 
 *range factories*の*View*型には`std::views`名前空間にその構築を簡略化するための関数オブジェクトなどが用意されていました。これと同様に、*range adaptors*にもその構築を簡略化し明瞭にするための関数オブジェクトが用意されます。これらのものは*range adaptor objects*と呼ばれます。
 
-*range adaptor objects*は第一引数に*range*を取り戻り値として対応する*View*を返すカスタマイゼーションポイントオブジェクトとして定義されています。
+*range adaptor objects*は第一引数に*range*を取り、戻り値として対応する*View*を返すカスタマイゼーションポイントオブジェクトとして定義されています。
 
 ### パイプライン演算子（`|`）と関数呼び出し
 
@@ -575,11 +575,11 @@ int main()
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/rdrLoR3LjOGs7mu2)
 
-また、C++20Rangeライブラリの元となったRange-V3ライブラリでは`zip_view`を構成するためにも利用されているようです。  
-例えば、*View*を作ろうとするとデフォルト構築とムーブ構築/代入が少なくとも求められますが、*range*への参照を持つと代入演算子やデフォルトコンストラクタが定義ができなくなり、ポインタを利用する場合は`nullptr`とならないことを保証せねばなりません。`view`コンセプトによる*View*の定義を思い出すと、すべての*View*はデフォルト構築可能でムーブ構築/代入が可能であり、`ref_view`もまたそれに従います。  
+また、C++20のRangeライブラリの元となったRange-V3ライブラリでは`zip_view`を構成するためにも利用されているようです。  
+例えば、*View*を作ろうとするとデフォルト構築とムーブ構築/代入が少なくとも求められますが、*range*への参照を持つと代入演算子やデフォルトコンストラクタが定義ができなくなり、ポインタを利用する場合は`nullptr`を気にしなければなりません。`view`コンセプトによる*View*の定義を思い出すと、すべての*View*はデフォルト構築可能でムーブ構築/代入が可能であり、`ref_view`もまたそれに従います。  
 このように自分で*View*を作成する時など、他の*range*をクラスメンバに持って参照したいときに直接その*range*の参照を持つ代わりに利用することもできます。
 
-比較的短いので定義も載せておきます。
+比較的短いので定義も見てみましょう。
 
 ```cpp
 namespace std::ranges {
@@ -629,16 +629,22 @@ int main() {
   std::vector vec = {1, 3, 5, 7, 9, 11};
 
   for (int n : std::views::all(vec)) {
-    std::cout << n; // 1357911
+    std::cout << n;
+  }
+
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (int n : vec | std::views::all) {
+    std::cout << n;
   }
 }
 ```
-- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/1bIU93sBu6RippU9)
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/jX7bqXs8NDkzKgMm)
 
+`views::all`はカスタマイゼーションポイントオブジェクトであり、1つの引数（`r`）を受け取りそれに応じて次の3つのいずれかの結果を返します。
 
-`ref_view`はカスタマイゼーションポイントオブジェクトであり、1つの引数（`r`）を受け取りそれに応じて次の3つのいずれかの結果を返します。
-
-1. `std::decay_t<decltype(r)>`が*View*である（`std::ranges::view`コンセプトを満たす）ならば、`r`を*decay copy*して返す
+1. `r`が*View*である（ `std::decay_t<decltype(r)>`が`std::ranges::view`コンセプトを満たす）ならば、`r`を*decay copy*して返す
 2. `ref_view{r}`が構築可能ならば、`ref_view{r}`
 3. それ以外の場合、`std::ranges::subrange{r}`
 
