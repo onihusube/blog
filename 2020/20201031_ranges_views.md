@@ -491,3 +491,159 @@ int main() {
 ここまでで4つの*View*クラス（`empty_view`, `single_view`, `iota_view`, `istream_view`）を見てきました。これらの*View*はどれもシーケンスを生成するもので、他のシーケンスに対して操作を適用したりするものではありません。その振る舞いから、これらの*View*は*range factories*とカテゴライズされます（`std::views`にある関数オブジェクトの事も同時に指しているようなので、すこしややこしいですが・・・）。
 
 おそらく*range*ライブラリの本命たる、他のシーケンスに対して作用するタイプの*View*は*range adaptors*にカテゴライズされ、次回はついにそこに足を踏み入れていきます。
+
+## *range adaptors*
+
+*range adaptors*は他の*View*を含む任意の*range*に対して作用して、特定の操作を適用した*View*に変換するものです。*range adaptor*は*range*から*range*へ操作を適用しつつ変換するものなので、*range adaptor*の結果にさらに*range adaptor*を適用する形で、操作をチェーンさせることができます。そして、その最終的な結果もまた*range*として得られます。
+
+*range factories*はシーケンスを生成するタイプの*View*なので*range adaptors*のように他の*range*に作用することはできませんが、それらと比較してみると、*range factories*は*range adaptors*によるチェーンの起点となる*View*であることが分かるでしょう。
+
+### *range adaptor objects*
+
+*range factories*の*View*型には`std::views`名前空間にその構築を簡略化するための関数オブジェクトなどが用意されていました。これと同様に、*range adaptors*にもその構築を簡略化し明瞭にするための関数オブジェクトが用意されます。これらのものは*range adaptor objects*と呼ばれます。
+
+*range adaptor objects*は第一引数に*range*を取り戻り値として対応する*View*を返すカスタマイゼーションポイントオブジェクトとして定義されています。
+
+### パイプライン演算子（`|`）と関数呼び出し
+
+*range adaptor*は関数呼び出しによって使用するほかに、パイプライン演算子（`|`）によっても使用することができます。パイプライン演算子によるスタイルはネストした関数呼び出しをその適用順に分解した形で書くことができ、コードの可読性の向上が期待できます。
+
+同じ*range adaptor*については、パイプラインスタイルと関数呼び出しスタイルはどちらを用いても同じ*View*が得られることが保証されています。
+
+```cpp
+// R, R1, R2を任意のrange adaptorとする
+
+// この2つの呼び出しは同じViewを返す
+R(std::views::iota(1));
+std::views::iota(1) | R ;
+
+// この3つの呼び出しも同じViewを返す、さらにrange adaptorが増えても同様
+R2(R1(std::views::iota(1)));
+std::views::iota(1) | R1 | R2;
+std::views::iota(1) | (R1 | R2);
+
+// range adopterが追加の引数を取るときでも、次の3つは同じViewを生成する
+R(std::views::iota(1), args...);
+R(std::views::iota(1))(args...);
+std::views::iota(1) | R(args...)
+```
+
+なお、このパイプライン演算子は新しい演算子ではなくて既存のビット論理和演算子をオーバーロードしたものです。
+
+
+## `ref_view`
+
+`ref_view`は他の*range*を参照するだけの*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::vector vec = {1, 3, 5, 7, 9, 11};
+
+  for (int n : std::ranges::ref_view(vec)) {
+    std::cout << n; // 1357911
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/kw9ARGn9rnF6txaB)
+
+右辺値でさえなければ任意の*range*を受けることができて、その*range*を単に参照するだけの*View*となります。`ref_view`の*range*のカテゴリは参照している*range*のものを受け継ぎます。
+
+ぱっと見ると何に使うのか不明ですが、これは`std::vector`などのコピーが気軽にできない*range*の取り回しを改善するために利用できます。そのような*range*の軽量な参照ラッパとなることで、コピーされるかを気にしなくてよくなるなど可搬性が向上します。役割としては、通常のオブジェクトの参照に対する`std::reference_wrapper`に対応しています。  
+例えば、`std::async`の追加の引数として渡すときなどのように*decay copy*されてしまう所に渡す場合に活用できるでしょう。
+
+```cpp
+struct check {
+  check() = default;
+  check(const check&) {
+    std::cout << "コピーされたよ！" << std::endl;
+  }
+};
+
+int main()
+{
+  std::vector<check> vec{};
+  vec.emplace_back();
+  
+  [[maybe_unused]]
+  auto f1 = std::async(std::launch::async, [](auto&&) {}, vec); // vectorがコピーされる
+  
+  [[maybe_unused]]
+  auto f2 = std::async(std::launch::async, [](auto&&) {}, std::ranges::ref_view{vec});  // ref_viewがコピーされる
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/rdrLoR3LjOGs7mu2)
+
+また、C++20Rangeライブラリの元となったRange-V3ライブラリでは`zip_view`を構成するためにも利用されているようです。  
+例えば、*View*を作ろうとするとデフォルト構築とムーブ構築/代入が少なくとも求められますが、*range*への参照を持つと代入演算子やデフォルトコンストラクタが定義ができなくなり、ポインタを利用する場合は`nullptr`とならないことを保証せねばなりません。`view`コンセプトによる*View*の定義を思い出すと、すべての*View*はデフォルト構築可能でムーブ構築/代入が可能であり、`ref_view`もまたそれに従います。  
+このように自分で*View*を作成する時など、他の*range*をクラスメンバに持って参照したいときに直接その*range*の参照を持つ代わりに利用することもできます。
+
+比較的短いので定義も載せておきます。
+
+```cpp
+namespace std::ranges {
+  template<range R>
+    requires is_object_v<R>
+  class ref_view : public view_interface<ref_view<R>> {
+  private:
+    R* r_ = nullptr;  // 説明専用メンバ変数
+  public:
+    constexpr ref_view() noexcept = default;
+
+    template<not-same-as<ref_view> T>
+      requires /*see below*/
+    constexpr ref_view(T&& t);
+
+    constexpr R& base() const { return *r_; }
+
+    constexpr iterator_t<R> begin() const { return ranges::begin(*r_); }
+    constexpr sentinel_t<R> end() const { return ranges::end(*r_); }
+
+    constexpr bool empty() const
+      requires requires { ranges::empty(*r_); }
+    { return ranges::empty(*r_); }
+
+    constexpr auto size() const requires sized_­range<R>
+    { return ranges::size(*r_); }
+
+    constexpr auto data() const requires contiguous_­range<R>
+    { return ranges::data(*r_); }
+  };
+
+  template<class R>
+    ref_view(R&) -> ref_view<R>;
+}
+```
+
+このように、`ref_view`自体は対象の*range*へのポインタを保持し、参照する*range*のイテレータをそのまま利用します。
+
+### `views::all`
+
+`ref_view`に対応する*range adaptor object*が`std::views::all`です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::vector vec = {1, 3, 5, 7, 9, 11};
+
+  for (int n : std::views::all(vec)) {
+    std::cout << n; // 1357911
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/1bIU93sBu6RippU9)
+
+
+`ref_view`はカスタマイゼーションポイントオブジェクトであり、1つの引数（`r`）を受け取りそれに応じて次の3つのいずれかの結果を返します。
+
+1. `std::decay_t<decltype(r)>`が*View*である（`std::ranges::view`コンセプトを満たす）ならば、`r`を*decay copy*して返す
+2. `ref_view{r}`が構築可能ならば、`ref_view{r}`
+3. それ以外の場合、`std::ranges::subrange{r}`
+
+厳密には`ref_view`だけを生成するわけではないのですが、結果の型を区別しなければ実質的に`ref_view`相当の*View*を得ることができます。
+
+### 参考文献
+
+- [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
