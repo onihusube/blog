@@ -719,6 +719,78 @@ int main() {
 
 `views::filter`もカスタマイゼーションポインオブジェクトであり、*range*と述語オブジェクトを受け取りそれをそのまま転送して`filter_view`を構築して返します。関数呼び出しによって使う場合あまり恩恵はありませんが、パイプラインスタイルで使用するといい感じに書くことができます。
 
+## `transform_view`
+
+`transform_view`は元となるシーケンスの要素それぞれに対して与えられた変換を適用したシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // 各要素を2倍する
+  std::ranges::transform_view tv{std::views::iota(1, 5), [](int n) { return n * 2; }};
+  
+  for (int n : tv) {
+    std::cout << n; // 2468
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/BBS3Ium3NFWLWvQR)
+
+型`T`のシーケンスと`T -> U`へ変換する関数を受けて、`U`のシーケンスを返すものです。この例では結果も`int`ですが、型を変換することも当然できます。
+
+`transform_view`の*range*カテゴリは、元となっている*range*のカテゴリをそのまま継承します。ただし、*contiguous range*にはなりません。
+
+`transform_view`は`filter_view`と共に*range*アルゴリズムの基礎となる*View*であり、多くの所で活用できるでしょう。
+
+### 遅延評価
+
+`transform_view`もまた、遅延評価によってシーケンスを生成します。イテレータの`*`による参照のタイミングで要素の読み出しと変換の適用が行われます。
+
+```cpp
+// transform_view構築時にはまだ計算されない
+std::ranges::transform_view tv{std::views::iota(1, 5), [](int n) { return n * 2; }};
+
+// イテレータ取得時にも計算されない
+auto it = std::ranges::begin(tv);
+
+// インクリメント時にも計算されない
+++it;
+
+// 間接参照時に要素が読みだされ、変換が適用される
+int n1 = *it; // n1 == 2
+int n2 = *it; // n2 == 2、再計算している
+
+++it;
+
+int n3 = *it; // n3 == 4
+```
+
+少し注意点なのですが、この性質上`*`による間接参照のタイミングで毎回変換が行われます。一度計算した値をキャッシュしたりはしません。なので、変換関数としてあまり重い処理を渡すことは避けた方が良いでしょう。
+
+### `views::transform`
+
+`transform_view`に対応する*range adaptor object*が`std::views::transform`です。
+
+```cpp
+#include <ranges>
+int main() {
+  for (int n : std::views::transform(std::views::iota(1, 5), [](int n) { return n * 2; })) {
+    std::cout << n;
+  }
+
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (int n : std::views::iota(1, 5) | std::views::transform([](int n) { return n * 2; })) {
+    std::cout << n;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/BBS3Ium3NFWLWvQR)
+
+`views::transform`もカスタマイゼーションポインオブジェクトであり、操作を適用する*range*と変換関数を受け取りそれをそのまま転送して`transform_view`を構築して返します。
+
 ### 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
