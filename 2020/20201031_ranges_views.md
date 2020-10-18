@@ -650,6 +650,75 @@ int main() {
 
 厳密には`ref_view`だけを生成するわけではないのですが、結果の型を区別しなければ実質的に`ref_view`相当の*View*を得ることができます。
 
+## `filter_view`
+
+`filter_view`は受け取った述語に従って元となる*range*の要素を選別したシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // 奇数をフィルターする（偶数のみ取り出す）
+  std::ranges::filter_view fv{std::views::iota(1, 10), [](int n) { return n % 2 == 0; }};
+  
+  for (int n : fv) {
+    std::cout << n; // 2468
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/Cj8dbTWeONREFjri)
+
+名前の通りに、元となるシーケンスの要素をフィルターしたシーケンスを得るものです。
+
+`filter_view`の*range*カテゴリは、元となっている*range*のカテゴリによって*bidirectional range*から*input range*まで変化します。ただ、一番強くても*bidirectional range*になります。
+
+入力となるシーケンスもフィルタ条件も任意であり結果もまたシーケンスとなるので、`filter_view`は色々なところで活躍できそうです。
+
+### 遅延評価
+
+*range adopter*全てがそうなのですが、`filter_view`によるシーケンス生成は遅延評価されます。構築時に最初の要素が計算され、残りの要素はイテレータのインクリメントのタイミングで計算されます。
+
+```cpp
+// 構築時に条件を満たす最初の要素が探索され、`filter_view`の1番目の要素が計算される
+std::ranges::filter_view fv{std::views::iota(1, 10), [](int n) { return n % 2 == 0; }};
+
+auto it = std::ranges::begin(fv);
+
+// 次に条件を満たす要素が探索され、`filter_view`の2番目の要素が計算される
+++it;
+
+int n = *it; // 2番目の要素（4）が得られる
+```
+
+この例では`iota_view`もまた遅延評価されているので、一連のシーケンス全体が遅延評価によって生成されています。
+
+この様に、`filter_view`に限らず*range adaptor*による処理チェーンは多くの場合可能な限り遅延評価されます。
+
+### `views::filter`
+
+`filter_view`に対応する*range adaptor object*が`std::views::filter`です。
+
+
+```cpp
+#include <ranges>
+
+int main() {
+  for (int n : std::views::filter(std::views::iota(1, 10), [](int n) { return n % 2 == 0; })) {
+    std::cout << n;
+  }
+
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (int n : std::views::iota(1, 10) | std::views::filter([](int n) { return n % 2 == 0; })) {
+    std::cout << n;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/gzj8H7ZSPsiuqcYO)
+
+`views::filter`もカスタマイゼーションポインオブジェクトであり、*range*と述語オブジェクトを受け取りそれをそのまま転送して`filter_view`を構築して返します。関数呼び出しによって使う場合あまり恩恵はありませんが、パイプラインスタイルで使用するといい感じに書くことができます。
+
 ### 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
