@@ -791,6 +791,147 @@ int main() {
 
 `views::transform`もカスタマイゼーションポインオブジェクトであり、操作を適用する*range*と変換関数を受け取りそれをそのまま転送して`transform_view`を構築して返します。
 
+## `take_view`
+
+`take_view`は元となるシーケンスの先頭から指定された数だけ要素を取り出したシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // 先頭から5つの要素だけを取り出す
+  std::ranges::take_view tv{std::views::iota(1), 5};
+  
+  for (int n : tv) {
+    std::cout << n; // 12345
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/BBS3Ium3NFWLWvQR)
+
+`iota_view`の生成する無限列のように無限に続くシーケンスから決められた数だけを取り出したり、*range*アルゴリズムにおいて他の操作を適用したシーケンスから（先頭に集められた）最終的な結果を取り出す時などに活用できるでしょう。
+
+### オーバーランの防止
+
+意地悪な人はきっと、`take_view`に元となるシーケンスの長さよりも長い数を指定したらどうなるん？と思うことでしょう。残念ながら？これは対策されています。
+
+`take_view`のイテレータは元となるシーケンス（`r`とします）の種別によって3つのパターンに分岐します。
+
+1. `r`が`sized_range`であるならば、次のいずれか
+   1. `random_access_range`なら、`r`の先頭イテレータをそのまま利用
+   2. それ以外の場合、`std::counted_iterator`に`r`の先頭イテレータと与えられた長さと`r`の長さの短い方を渡して構築
+2. それ以外の場合、`std::counted_iterator`に`r`の先頭イテレータと与えられた長さを渡して構築
+
+`sized_range`というのはコンセプトで、距離を定義可能な*range*を表します。 
+`std::counted_iterator`はC++20から追加された*iteretor adaptor*で、与えられたイテレータをラップして指定された長さだけイテレート可能なものに変換します。
+
+これによって、距離が事前に求まる場合はその距離を超えてイテレートされることはありません。そして、`sized_range`ではない*range*に対しても`take_view`の提供する*sentinel*によって確実にオーバーランしないようにチェックされています。
+
+```cpp
+#include <ranges>
+
+int main() {
+  using namespace std::string_view_literals;
+  
+  // 元の文字列の長さを超えた長さを指定する（上記1.1のケース）
+  std::ranges::take_view tv1{"str"sv, 10};
+  
+  int count = 0;
+  
+  // 安全、3回しかループしない
+  for ([[maybe_unused]] char c : tv1) {
+    ++count;
+  }
+  
+  std::cout << "loop : " << count << '\n';  // loop : 3
+  
+  std::list li = {1, 2, 3, 4, 5};
+  
+  // 元のリストの長さを超えた長さを指定する（上記1.2のケース）
+  std::ranges::take_view tv2{li, 10};
+  count = 0;
+
+  // 安全、5回しかループしない
+  for ([[maybe_unused]] int n : tv2) {
+    ++count;
+  }
+  
+  std::cout << "loop : " << count << '\n';  // loop : 5
+
+  std::forward_list fl = {1, 2, 3, 4, 5};
+  
+  // 元のリストの長さを超えた長さを指定する（上記2のケース）
+  std::ranges::take_view tv3{fl, 10};
+  count = 0;
+
+  // 安全、5回しかループしない
+  for ([[maybe_unused]] int n : tv3) {
+    ++count;
+  }
+  
+  std::cout << "loop : " << count << '\n';  // loop : 5
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/xAgRnDzn2Eg1WZ7c)
+
+`std::counted_iterator`は与えられたイテレータの特性を完全に継承するので、`take_view`の*range category*もまた与えられた*range*と同じになります。
+
+なお、`take_view`に負の値を渡すこともできますが、*random access range*の場合以外は未定義動作になります。何かに使えそうな気がしないでもないですが、基本的には避けた方が良いでしょう。
+
+### 遅延評価
+
+`take_view`もまた、遅延評価によってシーケンスを生成します。ただ、`take_view`は元となる*range*の極薄いラッパーなので、ほとんどの操作はベースにあるイテレータの操作をそのまま呼び出すだけで、特別な事は行ないません。
+
+`take_view`が行なっている事はほぼその長さの管理だけです。それは主に`==`による終端チェック時に行われます。また、`std::counted_iterator`が使用される場合はそのためにインクリメントのタイミングで残りの距離の計算（単純なカウンタのデクリメントによる）が行われます。
+
+```cpp
+// transform_view構築時には何もしない
+std::ranges::take_view tv{std::views::iota(1), 5};
+
+// イテレータ取得時には元のシーケンスによって最適なイテレータを返す
+auto it = std::ranges::begin(tv);
+
+// インクリメントはベースのイテレータをインクリメントする
+// counted_iteratorが使用される場合、ここで残りの距離が計算される
+++it;
+
+// 間接参照時はベースのイテレータを間接参照するだけ
+int n1 = *it; // n1 == 2
+
+// 番兵取得時には元のシーケンスによって最適な番兵を返す
+auto fin = std::ranges::end(tv);
+
+// 終端チェック時に与えられた長さと元のシーケンスの長さ、現在の位置に基づいてチェックが行われる
+it == fin;
+```
+
+### `views::take`
+
+`take_view`に対応する*range adaptor object*が`std::views::take`です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  
+  for (int n : std::views::take(std::views::iota(1), 5)) {
+    std::cout << n;
+  }
+  
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (int n : std::views::iota(1) | std::views::take(5)) {
+    std::cout << n;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/BBS3Ium3NFWLWvQR)
+
+`views::take`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらに応じた*View*を返します。その条件は複雑なので割愛しますが、例えば`random_access_range`かつ`sized_range`である標準ライブラリのもの（`std::span, std::string_view`など）に対しては、与えられた長さと元の長さのより短い方の長さにカットして構築し直したその型のオブジェクトを返します。
+
+厳密には`take_view`だけを返すわけではありませんが、結果の型を区別しなければ実質的に`take_view`と同等の*View*が得られます。
+
 ### 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
