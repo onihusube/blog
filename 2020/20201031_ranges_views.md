@@ -807,7 +807,7 @@ int main() {
   }
 }
 ```
-- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/BBS3Ium3NFWLWvQR)
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/EYSHSFamhQcywChy)
 
 `iota_view`の生成する無限列のように無限に続くシーケンスから決められた数だけを取り出したり、*range*アルゴリズムにおいて他の操作を適用したシーケンスから（先頭に集められた）最終的な結果を取り出す時などに活用できるでしょう。
 
@@ -818,7 +818,7 @@ int main() {
 `take_view`のイテレータは元となるシーケンス（`r`とします）の種別によって3つのパターンに分岐します。
 
 1. `r`が`sized_range`であるならば、次のいずれか
-   1. `random_access_range`なら、`r`の先頭イテレータをそのまま利用
+   1.  `r`が`random_access_range`なら、`r`の先頭イテレータをそのまま利用
    2. それ以外の場合、`std::counted_iterator`に`r`の先頭イテレータと与えられた長さと`r`の長さの短い方を渡して構築
 2. それ以外の場合、`std::counted_iterator`に`r`の先頭イテレータと与えられた長さを渡して構築
 
@@ -885,7 +885,7 @@ int main() {
 `take_view`が行なっている事はほぼその長さの管理だけです。それは主に`==`による終端チェック時に行われます。また、`std::counted_iterator`が使用される場合はそのためにインクリメントのタイミングで残りの距離の計算（単純なカウンタのデクリメントによる）が行われます。
 
 ```cpp
-// transform_view構築時には何もしない
+// take_vieww構築時には何もしない
 std::ranges::take_view tv{std::views::iota(1), 5};
 
 // イテレータ取得時には元のシーケンスによって最適なイテレータを返す
@@ -928,9 +928,83 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/BBS3Ium3NFWLWvQR)
 
-`views::take`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらに応じた*View*を返します。その条件は複雑なので割愛しますが、例えば`random_access_range`かつ`sized_range`である標準ライブラリのもの（`std::span, std::string_view`など）に対しては、与えられた長さと元の長さのより短い方の長さにカットして構築し直したその型のオブジェクトを返します。
+`views::take`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらに応じた*View*を返します。その条件は複雑なので割愛しますが、例えば`random_access_range`かつ`sized_range`である標準ライブラリのもの（`std::span, std::string_view`など）に対しては、与えられた長さと元の長さのより短い方の長さによって構築し直したその型のオブジェクトを返します。
 
 厳密には`take_view`だけを返すわけではありませんが、結果の型を区別しなければ実質的に`take_view`と同等の*View*が得られます。
+
+## `take_while_view`
+
+`take_while_view`は元となるシーケンスから指定された条件を満たす連続要素によるシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // 先頭から7未満の要素だけを取り出す
+  std::ranges::take_while_view tv{std::views::iota(1), [](int n) { return n < 7; }};
+  
+  for (int n : tv) {
+    std::cout << n; // 123456
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/A4CXrQoZgcHF2GKy)
+
+元となるシーケンスの先頭から条件を満たさない最初の要素の一つ前までのシーケンスを生成します。
+
+`take_while_view`は元となる*range*の性質をそのまま受け継ぎ（というかイテレータをそのまま利用し）、元となる*range*と同じカテゴリになります。
+
+### 遅延評価
+
+`take_while_view`もまた、遅延評価によってシーケンスを生成します。ただ、`take_while_view`は元となる*range*の極々薄いラッパーなので、ほとんどの操作はベースにあるイテレータの操作をそのまま呼び出すだけで、特別な事は行ないません。
+
+`take_while_view`が行なっている事は終端の管理だけで、`==`による終端チェックのタイミングで現在の要素が条件を満たすか否かをチェックします。また、同時に現在の位置が元のシーケンスの終端に到達しているかもチェックすることでオーバーランを防止します。
+
+```cpp
+// take_while_view構築時には何もしない
+std::ranges::take_while_view tv{std::views::iota(1), [](int n) { return n < 7; }};
+
+// イテレータ取得時には元のイテレータをそのまま返す
+auto it = std::ranges::begin(tv);
+
+// インクリメントは元のイテレータのインクリメント
+++it;
+
+// 間接参照も元のイテレータの間接参照
+int n1 = *it; // n1 == 2
+
+// 受け取った述語オブジェクトを私て番兵を構築する
+auto fin = std::ranges::end(tv);
+
+// 終端チェック時に現在のイテレータの指す要素が与えられた条件を満たしているかをチェック
+// 同時に元のシーケンスの終端に到達しているかもチェックする
+it == fin;
+```
+
+この特性上、`==`による終端チェック時には毎回要素の参照と条件のチェックが行われます。条件判定にはあまり重い処理を渡さないように気を付けましょう。
+
+### `views::take_while`
+
+`take_while_view`に対応する*range adaptor object*が`std::views::take_while`です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  for (int n : std::views::take_while(std::views::iota(1), [](int n) { return n < 7; })) {
+    std::cout << n; // 123456
+  }
+  
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (int n : std::views::iota(1) | std::views::take_while([](int n) { return n < 7; })) {
+    std::cout << n; // 123456
+  }
+}
+```
+
+`views::take_while`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらを転送して`take_while_view`を構築して返します。
 
 ### 参考文献
 
