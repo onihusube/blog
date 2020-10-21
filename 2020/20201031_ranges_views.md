@@ -1006,6 +1006,52 @@ int main() {
 
 `views::take_while`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらを転送して`take_while_view`を構築して返します。
 
+## `drop_view`
+
+`drop_view`は元となるシーケンスの先頭から指定された数の要素を取り除いた残りのシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // 先頭から5つの要素を取り除く
+  std::ranges::drop_view dv{std::views::iota(1, 10), 5};
+  
+  for (int n : dv) {
+    std::cout << n; // 6789
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/bi9QtwtHlVbO0SZ4)
+
+ちょうど`take_view`と逆の働きをするもので、ループ的に考えるなら先頭から指定個数の要素をスキップしたところから開始するシーケンスを生成します。
+
+### `views::drop`
+
+`drop_view`に対応する*range adaptor object*が`std::views::drop`です。
+  
+```cpp
+#include <ranges>
+
+int main() {
+  for (int n : std::views::drop(std::views::iota(1, 10), 5)) {
+    std::cout << n;
+  }
+  
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (int n : std::views::iota(1, 10) | std::views::drop(5)) {
+    std::cout << n;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/mOGi253qHEodidd2)
+
+`views::drop`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらに応じた*View*を返します。その条件は複雑なので割愛しますが、例えば`random_access_range`かつ`sized_range`である標準ライブラリのもの（`std::span, std::string_view`など）に対しては、与えられた長さと元の長さのより短い方の位置から開始するように構築し直したその型のオブジェクトを返します。
+
+厳密には`drop_view`だけを返すわけではありませんが、結果の型を区別しなければ実質的に`drop_view`と同等の*View*が得られます。
+
 ### 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
