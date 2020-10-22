@@ -1076,6 +1076,74 @@ int main() {
 
 厳密には`drop_view`だけを返すわけではありませんが、結果の型を区別しなければ実質的に`drop_view`と同等の*View*が得られます。
 
-### 参考文献
+## `drop_while_view`
+
+`drop_while_view`は元となるシーケンスの先頭から条件を満たす連続した要素を取り除いたシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+iint main() {
+  // 先頭のホワイトスペースを取り除く
+  std::ranges::drop_while_view dv{"     drop while view", [](char c) { return c == ' '; }};
+  
+  for (char c : dv) {
+    std::cout << c;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/G48GYzqNV8citPDG)
+
+`drop_while_view`はかなり`drop_view`と似た振る舞いをします。
+
+### オーバーラン防止と遅延評価
+
+`drop_while_view`も`drop_view`と同様の方法によって遅延評価とオーバーランの防止を行なっています。
+
+すなわち、`drop_while_view`はそのイテレータの取得時（`begin()`の呼び出し時）に元となるシーケンスの先頭イテレータを条件を満たさない最初の要素まで進めて返します。その際、元のシーケンス上で終端チェックを行いながら進めることでオーバーランしないようになっています。これはC++20から追加された[`std::ranges::find_if_not(base_view, pred)`](https://cpprefjp.github.io/reference/algorithm/find_if_not.html)を使用して行われます。
+
+```cpp
+// drop_view構築時にはまだ何もしない
+std::ranges::drop_while_view dv{"     drop while view", [](char c) { return c == ' '; }};
+
+// イテレータ取得時にスキップ処理が行われる
+// 元のシーケンスの先頭イテレータを条件を満たす間進めるだけ
+// その際終端チェックを同時に行う
+auto it = std::ranges::begin(dv);
+
+// その他の操作は元のシーケンスのイテレータそのまま
+++it;
+*it;
+```
+
+`drop_while_view`は元となるシーケンスのイテレータを完全に流用するので、`drop_while_view`の*range*は元のシーケンスの*range*カテゴリと同じになります。
+
+`drop_while_view`の`begin()`の呼び出しも、元のシーケンスが`forward_range`（以上の強さ）であるときキャッシュされることが規定されています。これによって`drop_while_view`の`begin()`も計算量は償却定数となります。
+
+### `views::drop_while`
+
+`drop_while_view`に対応する*range adaptor object*が`std::views::drop_while`です。
+  
+```cpp
+#include <ranges>
+
+int main() {
+  for (char c : std::views::drop_while("     drop while view", [](char c) { return c == ' '; })) {
+    std::cout << c;
+  }
+  
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (char c : "     drop while view" | std::views::drop_while([](char c) { return c == ' '; })) {
+    std::cout << c;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/bWXWqx5RSlcA9ed0)
+
+`views::drop_while`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらを転送して`drop_while_view`を構築して返します。
+
+## 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
