@@ -1144,6 +1144,84 @@ int main() {
 
 `views::drop_while`はカスタマイゼーションポイントオブジェクトであり、2つの引数を受け取りそれらを転送して`drop_while_view`を構築して返します。
 
+## `join_view`
+
+`join_view`は*View*の*range*となっているシーケンスを平坦化したシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::vector<std::vector<int>> vecvec = { {1, 2, 3}, {}, {}, {4}, {5, 6, 7, 8, 9}, {10, 11}, {} };
+
+  std::ranges::join_view jv{vecvec};
+  
+  for (int n : jv) {
+    std::cout << n; // 1234567891011
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/DmH7x7Ntg6XdCRB6)
+
+すなわち、配列の配列を1つの配列に直列化するような事を行うものです。
+
+`join_view`の*range*は通常、元となるシーケンスの外側と内側の*range*が両方とも`bidirectional_range`以上であれば*bidirectional range*となり、`forward_range`以上であれば*forward range*となります。  
+それ以外の場合、及び外側の*range*のイテレータの`*`が*prvalue*を返すような場合には常に*input range*になります。
+
+### 遅延評価
+
+`join_view`によるシーケンスもまた遅延評価によって生成されます。`join_view`の仕事の殆どは元となるシーケンスの内側の*range*を接続することにあり、イテレータのインクリメントのタイミングでそれを行います。
+
+`join_view`は元となるシーケンスの内側のシーケンスのイテレータを利用する事で1つの内側*range*のイテレートを行います。そのイテレータが終端に達した時（1つの内側*range*の終端に達した時）、外側*range*のイテレータを一つ進めてそこから次の内部*range*のイテレータを取得します。  
+そのままだと内部*range*が空の場合に死ぬので、すぐに内部*range*の終端チェックを行い空でない内部*range*が見つかるまで外側*range*をイテレートします。
+
+```cpp
+std::vector<std::vector<int>> vecvec = { {1, 2, 3}, {}, {}, {4}, {5, 6, 7, 8, 9}, {10, 11}, {} };
+
+// 構築とイテレータ取得時には何もしない
+std::ranges::join_view jv{vecvec};
+auto it = std::ranges::begin(jv);
+
+// インクリメント時に内側イテレータの接続を行う
+// 内側イテレータが終端に到達していれば、外側イテレータを進めてそこから内側イテレータを再取得する
+// 同時に内側イテレータの終端チェックを行い、空の内側*range*をスキップする
+++it;
+
+// デクリメント時はその逆を行う
+--it;
+
+// 間接参照は元のシーケンスのイテレータそのまま
+int n = *it;
+```
+
+1つの内側*range*をイテレートしている間は内側イテレータの終端チェックのみが行われますが、終端に到達した時（2つの内側*range*を接続する時）は少し処理が重くなります。
+
+![`join_view`の様子](./20201031_ranges_views/join_view.png)
+
+### `views::join`
+
+`join_view`に対応する*range adaptor object*が`std::views::join`です。
+
+```cpp
+int main() {
+  std::vector<std::vector<int>> vecvec = { {1, 2, 3}, {}, {}, {4}, {5, 6, 7, 8, 9}, {10, 11}, {} };
+
+  for (int n : std::views::join(vecvec)) {
+    std::cout << n;
+  }
+
+  std::cout << '\n';
+
+  // パイプラインスタイル
+  for (int n : vecvec | std::views::join) {
+    std::cout << n;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/muoBErBueGCZNb2N)
+
+`views::join`はカスタマイゼーションポイントオブジェクトであり、任意の*range*オブジェクト1つを受け取りそれを転送して`join_view`を構築して返します。
+
 ## 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
