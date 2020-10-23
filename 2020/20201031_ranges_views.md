@@ -1263,9 +1263,9 @@ int main() {
   std::ranges::split_view sv{"split_view takes a view and a delimiter, and splits the view into subranges on the delimiter.", ' '};
   
   // split_viewは切り出した文字列のシーケンスとなる
-  for (auto outer_range : sv) {
-    // outer_rangeは分割された文字列1つを表すView
-    for (char c : outer_range) {
+  for (auto inner_range : sv) {
+    // inner_rangeは分割された文字列1つを表すView
+    for (char c : inner_range) {
       std::cout << c;
     }
     std::cout << '\n';
@@ -1276,7 +1276,7 @@ int main() {
 
 基本的には文字列の分割に使用することになるでしょう。
 
-`split_view`は切り出した文字列それぞれを要素とするシーケンス（外側*range*）となります。そのため、その要素を参照すると分割後文字列を表す別のシーケンス（内側*range*）が得られます。そこから、内側*range*の要素を参照することで1文字づつ取り出すことができます。なお、この`outer_range`（外側*range*）は`std::string_view`あるいは類する何かではなく、単なる*forward range*である何かです。
+`split_view`は切り出した文字列それぞれを要素とするシーケンス（外側*range*）となります。そのため、その要素を参照すると分割後文字列を表す別のシーケンス（内側*range*）が得られます。そこから、内側*range*の要素を参照することで1文字づつ取り出すことができます。なお、この`inner_range`（内側*range*）は`std::string_view`あるいは類するものではなく、単に*forward range*である何かです。
 
 `split_view`の結果はとても複雑で一見非自明です。たとえば`"abc,12,cdef,3"`という文字列を`,`で分割するとき、`split_view`の様子は次のようになっています。
 
@@ -1332,8 +1332,8 @@ bool f = inner_it == std::ranges::end(inner_range); // false
 int main() {
   const auto str = std::string_view("split_view takes a view and a delimiter, and splits the view into subranges on the delimiter.");
 
-  for (auto outer_range : std::views::split(str, ' ')) {
-    for (char c : outer_range) {
+  for (auto inner_range : std::views::split(str, ' ')) {
+    for (char c : inner_range) {
       std::cout << c;
     }
     std::cout << '\n';
@@ -1342,8 +1342,8 @@ int main() {
   std::cout << "------------" << '\n';
 
   // パイプラインスタイル
-  for (auto outer_range : str | std::views::split(' ')) {
-    for (char c : outer_range) {
+  for (auto inner_range : str | std::views::split(' ')) {
+    for (char c : inner_range) {
       std::cout << c;
     }
     std::cout << '\n';
@@ -1368,8 +1368,8 @@ int main() {
 
   // カンマとホワイトスペースで区切りたい
   // そのままだとナル文字\0が入るのでうまくいかない
-  for (auto outer_range : str | std::views::split(", ")) {
-    for (char c : outer_range) {
+  for (auto inner_range : str | std::views::split(", ")) {
+    for (char c : inner_range) {
       std::cout << c;
     }
     std::cout << '\n';
@@ -1378,8 +1378,8 @@ int main() {
   std::cout << "------------" << '\n';
 
   // デリミタ文字列を2文字分のシーケンスにする
-  for (auto outer_range : str | std::views::split(std::string_view(", ", 2))) {
-    for (char c : outer_range) {
+  for (auto inner_range : str | std::views::split(std::string_view(", ", 2))) {
+    for (char c : inner_range) {
       std::cout << c;
     }
     std::cout << '\n';
@@ -1398,8 +1398,8 @@ int main() {
   std::vector<int> vec = {1, 2, 4, 4, 1, 1, 1, 10, 23, 67, 9, 1, 1, 1, 1111, 1, 1, 1, 1, 1, 1, 9, 0};
   std::list<int> delimiter = {1, 1, 1};
   
-  for (auto outer_range : vec | std::views::split(delimiter)) {
-    for (int n : outer_range) {
+  for (auto inner_range : vec | std::views::split(delimiter)) {
+    for (int n : inner_range) {
       std::cout << n;
     }
     std::cout << '\n';
@@ -1434,7 +1434,7 @@ int main() {
 }
 ```
 
-`split_view`の内側*range*は単純な*View*であって、`std::string`への暗黙変換を備えていません。そして、内側*range*は`begin()/end()`のイテレータ型が同じ型を示す`common_range`ではありませんので、C++17以前の設計のイテレータ範囲から構築するコンストラクタからは構築できません。かといっても1文字づつ読んで`std::string`に入れる処理を書くのは忍びない・・・
+`split_view`の内側*range*は単純な*View*であって、`std::string`への暗黙変換を備えていません。そして、内側*range*は`begin()/end()`のイテレータ型が同じ型を示す`common_range`ではありませんので、C++17以前の設計のイテレータ範囲から構築するコンストラクタからは構築できません。かといって1文字づつ読んで`std::string`に入れる処理を書くのは忍びない・・・
 
 `<ranges>`にはこのような時のために`common_range`ではない*range*を`common_range`に変換する*View*が用意されています（次次回紹介予定）。それを用いれば次のように書くことができます。
 
@@ -1469,19 +1469,19 @@ int main() {
 
   for (auto split_str : str | std::views::split(' ')
                             | std::views::transform([](auto view) {
-                              auto common = std::views::common(view);
-                              return std::string_view{&*common.begin(), std::size_t(std::distance(common.begin(), common.end()))};
-                            })
+                                auto common = std::views::common(view);
+                                return std::string_view(&*common.begin(), std::ranges::distance(common));
+                              })
   ) {
     std::cout << split_str << '\n';
   }
 }
 ```
-- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/ifUeaoJGpshSlkNA)
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/MQrlgQ1C8t0ISugP)
 
 ただ、ここで`views::transform`の引数に来ている`view`は内部*range*であり、文字列の場合それは`forward_range`です。そのため、その長さを定数時間で求めることができません。`std::string`で動的確保してコピーしてよりかは低コストだとは思いますが・・・
 
-このような絶妙な使いづらさは`split_view`が遅延評価を行うことに加えてとてもとてもジェネリックに設計されていることから来ています。このことは標準化委員会の人たちにも認識されていて、`split_view`の主たる用途は文字列の分割なのだから、汎用性を捨てて破壊的変更をしてでも文字列で扱いやすくしよう！という提案（[P2210R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2210r0.html)）が提出されています（まだ議論中です）。
+これらの絶妙な使いづらさは`split_view`が遅延評価を行うことに加えてとてもとてもジェネリックに設計されていることから来ています。このことは標準化委員会の人たちにも認識されていて、`split_view`の主たる用途は文字列の分割なのだから、汎用性を捨てて破壊的変更をしてでも文字列で扱いやすくしよう！という提案（[P2210R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2210r0.html)）が提出されています（まだ議論中です）。
 
 ## 参考文献
 
