@@ -1168,12 +1168,39 @@ int main() {
 `join_view`の*range*は通常、元となるシーケンスの外側と内側の*range*が両方とも`bidirectional_range`以上であれば*bidirectional range*となり、`forward_range`以上であれば*forward range*となります。  
 それ以外の場合、及び外側の*range*のイテレータの`*`が*prvalue*を返すような場合には常に*input range*になります。
 
+この例では`std::vector`の`std::vector`を利用していますが、別に外側と内側の*range*が同じものである必要はありません。`std::list`の`std::vector`とか、`std::deque`の生配列など、*range*の*range*になっていれば`join_view`は平坦化してくれます。。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::vector<std::list<int>> veclist = { {1, 2, 3}, {}, {}, {4}, {5, 6, 7, 8, 9}, {10, 11}, {} };
+
+  std::ranges::join_view jv1{veclist};
+  
+  for (int n : jv1) {
+    std::cout << n; // 1234567891011
+  }
+  
+  std::cout << '\n';
+  
+  std::deque<int> arrdeq[] = { {1, 2, 3}, {}, {}, {4}, {5, 6, 7, 8, 9}, {10, 11}, {} };
+
+  std::ranges::join_view jv2{arrdeq};
+  
+  for (int n : jv2) {
+    std::cout << n; // 1234567891011
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/svVToBWSPrzPg7DV)
+
 ### 遅延評価
 
 `join_view`によるシーケンスもまた遅延評価によって生成されます。`join_view`の仕事の殆どは元となるシーケンスの内側の*range*を接続することにあり、イテレータのインクリメントのタイミングでそれを行います。
 
-`join_view`は元となるシーケンスの内側のシーケンスのイテレータを利用する事で1つの内側*range*のイテレートを行います。そのイテレータが終端に達した時（1つの内側*range*の終端に達した時）、外側*range*のイテレータを一つ進めてそこから次の内部*range*のイテレータを取得します。  
-そのままだと内部*range*が空の場合に死ぬので、すぐに内部*range*の終端チェックを行い空でない内部*range*が見つかるまで外側*range*をイテレートします。
+`join_view`は元となるシーケンスの内側のシーケンスのイテレータを利用する事で1つの内側*range*のイテレートを行います。そのイテレータが終端に達した時（1つの内側*range*の終端に達した時）、外側*range*のイテレータを一つ進めてそこから次の内側*range*のイテレータを取得します。  
+そのままだと内側*range*が空の場合に死ぬので、すぐに内側*range*の終端チェックを行い空でない内側*range*が見つかるまで外側*range*をイテレートします。
 
 ```cpp
 std::vector<std::vector<int>> vecvec = { {1, 2, 3}, {}, {}, {4}, {5, 6, 7, 8, 9}, {10, 11}, {} };
@@ -1195,6 +1222,8 @@ int n = *it;
 ```
 
 1つの内側*range*をイテレートしている間は内側イテレータの終端チェックのみが行われますが、終端に到達した時（2つの内側*range*を接続する時）は少し処理が重くなります。
+
+次の図は、配列の配列になっているシーケンスと`join_view`の様子をそれっぽく書いたものです。
 
 ![`join_view`の様子](./20201031_ranges_views/join_view.png)
 
@@ -1220,7 +1249,7 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/muoBErBueGCZNb2N)
 
-`views::join`はカスタマイゼーションポイントオブジェクトであり、任意の*range*オブジェクト1つを受け取りそれを転送して`join_view`を構築して返します。
+`views::join`はカスタマイゼーションポイントオブジェクトであり、*range*の*range*となっている*range*オブジェクト1つを受け取りそれを転送して`join_view`を構築して返します。
 
 ## `split_view`
 
