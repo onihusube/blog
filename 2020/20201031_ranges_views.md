@@ -1222,6 +1222,238 @@ int main() {
 
 `views::join`はカスタマイゼーションポイントオブジェクトであり、任意の*range*オブジェクト1つを受け取りそれを転送して`join_view`を構築して返します。
 
+## `split_view`
+
+`split_view`は元のシーケンスから指定されたデリミタを区切りとして切り出した部分シーケンスのシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // ホワイトスペースをデリミタとして文字列を切り出す
+  std::ranges::split_view sv{"split_view takes a view and a delimiter, and splits the view into subranges on the delimiter.", ' '};
+  
+  // split_viewは切り出した文字列のシーケンスとなる
+  for (auto outer_range : sv) {
+    // outer_rangeは分割された文字列1つを表すView
+    for (char c : outer_range) {
+      std::cout << c;
+    }
+    std::cout << '\n';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/YzM0g8aHz94DhuxP)
+
+基本的には文字列の分割に使用することになるでしょう。
+
+`split_view`は切り出した文字列それぞれを要素とするシーケンス（外側*range*）となります。そのため、その要素を参照すると分割後文字列を表す別のシーケンス（内側*range*）が得られます。そこから、内側*range*の要素を参照することで1文字づつ取り出すことができます。なお、この`outer_range`（外側*range*）は`std::string_view`あるいは類する何かではなく、単なる*forward range*である何かです。
+
+`split_view`の結果はとても複雑で一見非自明です。たとえば`"abc,12,cdef,3"`という文字列を`,`で分割するとき、`split_view`の様子は次のようになっています。
+
+![`join_view`の様子](./20201031_ranges_views/split_view.png)
+
+実際の実装は元のシーケンスのイテレータを可能な限り使いまわすのでもう少し複雑になっていますが、概ねこの図のような関係性の*range*が生成されます。
+
+### 遅延評価
+
+`split_view`もまた遅延評価によって分割処理と*View*の生成を行います。
+
+`split_view`の主たる仕事は元のシーケンス上でデリミタと一致する部分を見つけだし、そこを区切りに内側*range*を生成する事にあります。それは外側*range*のイテレータのインクリメントと内側イテレータの終端チェックのタイミングで行われます。
+
+外側*range*のイテレータ（外側イテレータ）は元のシーケンスのイテレータ（元イテレータ）を持っており、インクリメント時にはそのイテレータから出発して最初に出てくるデリミタ部分を探し出し、そのデリミタ部分の終端位置に元イテレータを更新します。インクリメントと共にこれを行う事で、デリミタ探索範囲を限定しています。
+
+内側*range*における終端検出（すなわち文字列分割そのもの）は、内側*range*のイテレータ（内側イテレータ）の終端チェック（`==`）のタイミングで行われます。内側イテレータは自身を生成した外側イテレータとその親の`split_view`を参照して、外側イテレータの保持する元イテレータの終端チェック→デリミタが空かのチェック→自信の現在位置とデリミタの比較、の順で終端チェックを行います。　
+
+```cpp
+// 構築時点では何もしない
+std::ranges::split_view sv{"split_view takes a view and a delimiter, and splits the view into subranges on the delimiter.", ' '};
+
+// 外側イテレータの取得、特に何もしない
+auto outer_it = std::ranges::begin(sv);
+
+// 外側イテレータのインクリメント時、元のシーケンスから次に出現するデリミタを探す
+// 内部rangeは"split_view"->"takes"へ進む
+++outer_it;
+
+// 内側rangeの取得、特に何もしない
+auto inner_range = *outer_it;
+
+// 内側イテレータの取得、特に何もしない
+auto inner_it = std::ranges::begin(inner_range);
+
+// 内側イテレータのインクリメントは、元のシーケンスのイテレータのインクリメントとほぼ等価
+++inner_it;
+
+// 元のシーケンスのイテレータのデリファレンスと等価
+char c = *inner_it; // a
+
+// 内部rangeの終端チェック
+// 元のシーケンスの終端と、デリミタが空かどうか、現在の位置でデリミタが出現しているかどうか、を調べる
+bool f = inner_it == std::ranges::end(inner_range); // false
+```
+
+`split_view`の結果が複雑となる一因は、この遅延評価を行うことによるところがあります。
+
+### `views::split`
+
+`split_view`に対応する*range adaptor object*が`std::views::split`です。
+
+```cpp
+int main() {
+  const auto str = std::string_view("split_view takes a view and a delimiter, and splits the view into subranges on the delimiter.");
+
+  for (auto outer_range : std::views::split(str, ' ')) {
+    for (char c : outer_range) {
+      std::cout << c;
+    }
+    std::cout << '\n';
+  }
+
+  std::cout << "------------" << '\n';
+
+  // パイプラインスタイル
+  for (auto outer_range : str | std::views::split(' ')) {
+    for (char c : outer_range) {
+      std::cout << c;
+    }
+    std::cout << '\n';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/VB4JrSSXUTStbG8e)
+
+`views::split`はカスタマイゼーションポイントオブジェクトであり、分割対象の*range*オブジェクトとデリミタを示す*range*オブジェクトを受け取りそれを転送して`split_view`を構築して返します。
+
+### 任意のシーケンスによる任意のシーケンスの分割
+
+実のところ、`split_view`はとてもジェネリックに定義されているため分割対象は文字列に限らず、デリミタもまた文字だけではなく任意の*range*を使用することができます。
+
+たとえば、文字列を文字列で分割することができます。
+
+```cpp
+#include <ranges>
+
+int main() {
+  const auto str = std::string_view("1, 12434, 5, 0000, 3942");
+
+  // カンマとホワイトスペースで区切りたい
+  // そのままだとナル文字\0が入るのでうまくいかない
+  for (auto outer_range : str | std::views::split(", ")) {
+    for (char c : outer_range) {
+      std::cout << c;
+    }
+    std::cout << '\n';
+  }
+
+  std::cout << "------------" << '\n';
+
+  // デリミタ文字列を2文字分のシーケンスにする
+  for (auto outer_range : str | std::views::split(std::string_view(", ", 2))) {
+    for (char c : outer_range) {
+      std::cout << c;
+    }
+    std::cout << '\n';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/VB4JrSSXUTStbG8e)
+
+デリミタに任意のシーケンスを使用できるので、`std::vector`を`std::list`で分割することもできます。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // 3つ1が並んでいるところで分割する
+  std::vector<int> vec = {1, 2, 4, 4, 1, 1, 1, 10, 23, 67, 9, 1, 1, 1, 1111, 1, 1, 1, 1, 1, 1, 9, 0};
+  std::list<int> delimiter = {1, 1, 1};
+  
+  for (auto outer_range : vec | std::views::split(delimiter)) {
+    for (int n : outer_range) {
+      std::cout << n;
+    }
+    std::cout << '\n';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/c0IbZh3iU7DTGZXs)
+
+実際このようなジェネリックな分割が必要になる事があるのかはわかりません・・・
+
+ジェネリックな`split_view`の*range*は外側も内側も同じカテゴリとなり、元となるシーケンス（分割対象のシーケンス）が`forward_range`以上であるときにのみ*forward range*となり、それ以外の場合は*input range*となります。
+
+### 文字列への変換
+
+`split_view`はほぼほぼ文字列に対してしか使わないと思われますが、分割結果を文字列で受け取ることができません。
+
+```cpp
+#include <ranges>
+
+int main() {
+  using namespace std::string_view_literals;
+  const auto str = "split_view takes a view and a delimiter, and splits the view into subranges on the delimiter."sv;
+
+  for (auto split_str : str | std::views::split(' ')
+                            | std::views::transform([](auto view) {
+                              return std::string{view}; // できない
+                              return std::string{view.begin(), view.end()}; // ダメ 
+                            })
+  ) {
+    std::cout << split_str << '\n';
+  }
+}
+```
+
+`split_view`の内側*range*は単純な*View*であって、`std::string`への暗黙変換を備えていません。そして、内側*range*は`begin()/end()`のイテレータ型が同じ型を示す`common_range`ではありませんので、C++17以前の設計のイテレータ範囲から構築するコンストラクタからは構築できません。かといっても1文字づつ読んで`std::string`に入れる処理を書くのは忍びない・・・
+
+`<ranges>`にはこのような時のために`common_range`ではない*range*を`common_range`に変換する*View*が用意されています（次次回紹介予定）。それを用いれば次のように書くことができます。
+
+```cpp
+#include <ranges>
+
+int main() {
+  using namespace std::string_view_literals;
+  const auto str = "split_view takes a view and a delimiter, and splits the view into subranges on the delimiter."sv;
+
+  for (auto split_str : str | std::views::split(' ')
+                            | std::views::transform([](auto view) {
+                              // common_viewを通してイテレータ範囲からコピーして構築
+                              auto common = std::views::common(view);
+                              return std::string{common.begin(), common.end()};
+                            })
+  ) {
+    std::cout << split_str << '\n';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/c0IbZh3iU7DTGZXs)
+
+`split_view`は*View*であるので元のシーケンスをコピーして処理したりしておらず、その内部イテレータの参照する要素は元のシーケンスの要素そのものです。したがって、文字列の場合は`std::string_view`を用いることができるはずです。
+
+```cpp
+#include <ranges>
+
+int main() {
+  using namespace std::string_view_literals;
+  const auto str = "split_view takes a view and a delimiter, and splits the view into subranges on the delimiter."sv;
+
+  for (auto split_str : str | std::views::split(' ')
+                            | std::views::transform([](auto view) {
+                              auto common = std::views::common(view);
+                              return std::string_view{&*common.begin(), std::size_t(std::distance(common.begin(), common.end()))};
+                            })
+  ) {
+    std::cout << split_str << '\n';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/ifUeaoJGpshSlkNA)
+
+ただ、ここで`views::transform`の引数に来ている`view`は内部*range*であり、文字列の場合それは`forward_range`です。そのため、その長さを定数時間で求めることができません。`std::string`で動的確保してコピーしてよりかは低コストだとは思いますが・・・
+
+このような絶妙な使いづらさは`split_view`が遅延評価を行うことに加えてとてもとてもジェネリックに設計されていることから来ています。このことは標準化委員会の人たちにも認識されていて、`split_view`の主たる用途は文字列の分割なのだから、汎用性を捨てて破壊的変更をしてでも文字列で扱いやすくしよう！という提案（[P2210R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2210r0.html)）が提出されています（まだ議論中です）。
+
 ## 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
