@@ -1483,6 +1483,47 @@ int main() {
 
 これらの絶妙な使いづらさは`split_view`が遅延評価を行うことに加えてとてもとてもジェネリックに設計されていることから来ています。このことは標準化委員会の人たちにも認識されていて、`split_view`の主たる用途は文字列の分割なのだから、汎用性を捨てて破壊的変更をしてでも文字列で扱いやすくしよう！という提案（[P2210R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2210r0.html)）が提出されています（まだ議論中です）。
 
+## *counted view*
+
+*counted view*は元となるシーケンスの先頭から指定された個数の要素のシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  auto iota = std::views::iota(1);
+  
+  for (int n : std::views::counted(std::ranges::begin(iota), 5)) {
+    std::cout << n; // 12345
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/eXDkHSwysFx0jkfx)
+
+この*counted view*は`std::ranges::couted_view`のようなクラスがあるわけではなく、生成するには`std::views::counted`を使用します。`views::counted`はカスタマイぜーションポイントオブジェクトであり、イテレータと生成する*View*の要素数を受け取ってその種別によって、指定された数の要素を参照する`std::span`か`std::subrange`を返します。  
+ただ、`views::counted`は*range adaptor object*ではないのでパイプラインスタイルで使用することはできません。
+
+### `take_view`との差異
+
+*counted view*はまさに`take_view`と同じことをしてくれますが、微妙に違いがあります。
+
+- `take_view`は*View*を受けるが、*counted view*はイテレータを受け取る
+- *counted view*はオーバラン防止のためのケアをしない
+
+```cpp
+int main() {
+  int arr[] = {1, 2, 3};
+
+  // 範囲を飛び越す！
+  for (int n : std::views::counted(std::ranges::begin(arr), 5)) {
+    std::cout << n;
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/hDUovanRwJ88sJvQ)
+
+*counted view*はイテレータに対して`take_view`相当のものを生成するための入り口であり、イテレータ一つではその範囲の終端は分からないのでオーバーランを防ぐことができないのです。
+
 ## 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
