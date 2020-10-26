@@ -1386,7 +1386,7 @@ int main() {
   }
 }
 ```
-- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/VB4JrSSXUTStbG8e)
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/iaDN7KjAWXyPkehn)
 
 デリミタに任意のシーケンスを使用できるので、`std::vector`を`std::list`で分割することもできます。
 
@@ -1456,7 +1456,7 @@ int main() {
   }
 }
 ```
-- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/c0IbZh3iU7DTGZXs)
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/AZZWDlEYf6SnrwWU)
 
 `split_view`は*View*であるので元のシーケンスをコピーして処理したりしておらず、その内部イテレータの参照する要素は元のシーケンスの要素そのものです。したがって、文字列の場合は`std::string_view`を用いることができるはずです。
 
