@@ -1524,6 +1524,100 @@ int main() {
 
 *counted view*はイテレータに対して`take_view`相当のものを生成するための入り口であり、イテレータ一つではその範囲の終端は分からないのでオーバーランを防ぐことができないのです。
 
+## `common_view`
+
+`common_view`は元となるシーケンスを`begin()/end()`によって取得できるイテレータと終端イテレータの型が同じとなるシーケンスに変換する*View*です。
+
+```cpp
+int main() {
+  auto even_seq = std::views::iota(1)
+    | std::views::filter([](int n) { return n % 2 == 0; })
+    | std::views::take(10);
+
+  // イテレータ型と終端イテレータ型が合わないためエラー 
+  std::vector<int> vec(std::ranges::begin(even_seq), std::ranges::end(even_seq)); // ng
+  
+  std::ranges::common_view common{even_seq};
+  
+  std::vector<int> vec(std::ranges::begin(common), std::ranges::end(common)); //ok
+
+  for (int n : vec) {
+    std::cout << n; // 2468101214161820
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/BRR6DWK4pplhMnPl)
+
+これはC++20以降のイテレータ（*range*ライブラリの*View*などのイテレータ）をC++17以前のイテレータを受け取るものに渡す際に使用します。
+
+標準コンテナのイテレータペアを受け取るコンストラクタや`<algorithm>`の各種アルゴリズム群など、C++17以前のイテレータは`begin()/end()`の型が同一である事を前提としています。しかし、C++20以降のイテレータおよび*range*は異なっていることが前提です。特に、各種*View*クラスの場合は元となる*range*の種別や構築のされ方によって`begin()/end()`の型は細かく変化するので、古いライブラリと組み合わせる際に`common_view`は必須でしょう。
+
+`<algorithm>`のイテレータアルゴリズム関数群は`std::ranges`名前空間の下にある同名の関数を利用すればC++20以降のイテレータに対してもそのまま使用できるようになっていますが、標準コンテナのイテレータペアを取るコンストラクタや`<numeric>`にあるアルゴリズム関数などでは`common_view`を使用する必要があります。
+
+`common_view`は元となる*range*が`forward_range`以上であれば*forward range*となり、それ以外の場合は*input range*となります。
+
+### `common_range`
+
+`begin()/end()`の型が同一である*range*は`std::ranges::common_range`コンセプトによって表現され、そのような*range*を*common range*と呼びます。
+
+```cpp
+template<class T>
+concept common_range =
+  range<T> && same_as<iterator_t<T>, sentinel_t<T>>;
+```
+
+C++20以降の*range*/イテレータライブラリにおいては、`begin()`から得られるものをイテレータ、`end()`から得られる終端イテレータの事を番兵（*Sentinel*）と呼び分けます。*Sentinel*という言葉は既に*range*ライブラリ周りでは当たり前のように使われています、慣れましょう。
+
+前述のように、番兵型はイテレータ型と異なっていても同一でも構いません。
+
+### `views::common`
+
+`common_view`に対応する*range adaptor object*が`std::views::common`です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  auto even_seq = std::views::iota(1)
+    | std::views::filter([](int n) { return n % 2 == 0; })
+    | std::views::take(10);
+
+  auto common1 = std::views::common(even_seq);
+  
+  std::vector<int> vec(std::ranges::begin(common1), std::ranges::end(common1)); //ok
+
+
+  for (int n : vec) {
+    std::cout << n; // 2468101214161820
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/zTm2wNubUBlL6KfY)
+
+```cpp
+#include <ranges>
+
+int main() {
+  // パイプラインスタイル
+  auto even_seq = std::views::iota(1)
+    | std::views::filter([](int n) { return n % 2 == 0; })
+    | std::views::take(10)
+    | std::views::common;
+
+  std::vector<int> vec(std::ranges::begin(even_seq), std::ranges::end(even_seq)); //ok
+  
+  
+  for (int n : vec) {
+    std::cout << n; // 2468101214161820
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/8myKZSRy0qXrllbz)
+
+`views::common`はカスタマイゼーションポイントオブジェクトであり、*range*オブジェクト（`r`）を1つ受け取り、それがすでに`common_range`ならば`std::views::all(r)`の結果を、`common_range`でないならば`r`を転送して`common_view`を構築して返します。
+
+結果の型を区別しなければ、あらゆる*range*に対して`common_view`相当のものを得ることができます。特に`common_view`は`common_range`から構築することができないので、`common_view`が欲しい際は常に`views::common`を利用するとよりジェネリックです。
+
 ## 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
