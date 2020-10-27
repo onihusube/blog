@@ -1554,6 +1554,37 @@ int main() {
 
 `<algorithm>`のイテレータアルゴリズム関数群は`std::ranges`名前空間の下にある同名の関数を利用すればC++20以降のイテレータに対してもそのまま使用できるようになっていますが、標準コンテナのイテレータペアを取るコンストラクタや`<numeric>`にあるアルゴリズム関数などでは`common_view`を使用する必要があります。
 
+```cpp
+int main() {
+  auto even_seq = std::views::iota(1)
+    | std::views::filter([](int n) { return n % 2 == 0; })
+    | std::views::take(10);
+
+  auto common = std::views::common(even_seq);
+  
+  // 古いやつ
+  auto it1 = std::find_if(common.begin(), common.end(), [](int n) { return 10 < n;});
+  std::cout << *it1 << '\n';  // 12
+  
+  // 新しいやつ
+  auto it2 = std::ranges::find_if(even_seq.begin(), even_seq.end(), [](int n) { return 10 < n;});
+  std::cout << *it2 << '\n';  // 12
+  
+  // むしろrange直接
+  auto it3 = std::ranges::find_if(even_seq, [](int n) { return 10 < n;});
+  std::cout << *it3 << '\n';  // 12
+
+  // 古いやつ
+  auto sum = std::accumulate(common.begin(), common.end(), 0u);
+  std::cout << sum << '\n';   // 110
+  
+  // まだない・・・
+  //auto sum2 = std::ranges::accumulate(even_seq.begin(), even_seq.end(), 0u);
+  //auto sum3 = std::ranges::accumulate(even_seq, 0u);
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/a7Pd1fFXYtlKZY2T)
+
 `common_view`は元となる*range*が`forward_range`以上であれば*forward range*となり、それ以外の場合は*input range*となります。
 
 ### `common_range`
