@@ -1647,6 +1647,102 @@ int main() {
 
 結果の型を区別しなければ、あらゆる*range*に対して`common_view`相当のものを得ることができます。特に`common_view`は`common_range`から構築することができないので、`common_view`が欲しい際は常に`views::common`を利用するとよりジェネリックです。
 
+## `reverse_view`
+
+`reverse_view`は元となるシーケンスを逆順にしたシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  auto seq = std::views::iota(1, 10)
+    | std::views::filter([](int n) { return n % 2 == 1; })
+    | std::views::transform([](int n) { return n * 10; });
+  
+  std::ranges::reverse_view rv{seq};
+  
+  for (int n : rv) {
+    std::cout << n; // 9070503010
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/jgP9gz23jT6i11Av)
+
+逆順にするという操作の都合上、入力となる*range*は`bidirectional_range`以上でなければなりません。`reverse_view`そのものは入力*range*と同じカテゴリになります。
+
+### 遅延評価
+
+`reverse_view`は遅延評価によって逆順範囲を生成します。とはいえ、実際の逆順範囲に関しては[`std::reverse_iterator`](https://cpprefjp.github.io/reference/iterator/reverse_iterator.html)に丸投げしているので、`reverse_view`の行うことは`begin()`によってイテレータを取得するタイミングで`std::reverse_iterator`を適切に構築することです。
+
+```cpp
+auto seq = std::views::iota(1, 10)
+  | std::views::filter([](int n) { return n % 2 == 1; })
+  | std::views::transform([](int n) { return n * 10; });
+
+// 構築の時点では何もしない
+std::ranges::reverse_view rv{seq};
+
+// イテレータ取得時に元となるシーケンスの終端一つ手前のイテレータからreverse_iteratorを構築して返す
+// bidirectional_rangeの場合、時間計算量はO(N)になる
+auto it = std::ranges::begin(rv);
+
+// イテレータの操作はreverse_iteratorと同じ
+++it;
+--it;
+int n = *it;
+
+// 元のシーケンスはcommon_rangeでなくてもok
+bool fin = it == std::ranges::end(rv);
+```
+
+また、この`reverse_view`の`begin()`の処理結果はキャッシュされることが規定されています。これによって`reverse_view`の`begin()`の計算量は償却定数となります。
+
+### `views::reverse`
+
+`reverse_view`に対応する*range adaptor object*が`std::views::reverse`です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  auto seq = std::views::iota(1, 10)
+    | std::views::filter([](int n) { return n % 2 == 1; })
+    | std::views::transform([](int n) { return n * 10; });
+  
+  for (int n : std::views::reverse(seq)) {
+    std::cout << n; // 9070503010
+  }
+  
+  std::cout << '\n';
+  
+  // パイプラインスタイル
+  for (int n : seq | std::views::reverse) {
+    std::cout << n; // 9070503010
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/HfRLaVvkZMyK3PZc)
+
+`views::reverse`はカスタマイゼーションポイントオブジェクトであり、*range*オブジェクトを1つ受け取りそれを転送して`reverse_view`を構築して返します。ただし、すでに逆順になっているシーケンス（`reverse_view`や`reverse_iterator`の`subrange`）に対してはその元になっている*range*を返す事によって、`reverse_view`を何回も適用する事を回避します。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::vector vec = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+  for (int n : vec | std::views::reverse  // vector<int> -> reverse_view
+                   | std::views::reverse  // reverse_view -> ref_view<vector<int>>
+                   | std::views::reverse  // ref_view<vector<int>> -> reverse_view
+                   | std::views::reverse  // reverse_view -> ref_view<vector<int>>
+      )
+  {
+    std::cout << n; // 123456789
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/PVL5Ppu7DcpljFUe)
+
 ## 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
