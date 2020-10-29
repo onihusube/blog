@@ -1745,6 +1745,71 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/PVL5Ppu7DcpljFUe)
 
+## `elements_view`
+
+`elements_view`は*tuple-like*な型の値のシーケンスから、指定された番号の`tuple`要素をシーケンスを生成する*View*です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  // tupleのシーケンス
+  std::vector<std::tuple<int, double, std::string_view>> vec = { {1, 1.0, "one"}, {2, 2.0, "two"}, {3, 3.0, "three"} };
+  
+  // 1つ目（int）のtuple要素のシーケンス
+  std::ranges::elements_view<std::views::all_t<decltype((vec))>, 0> ev1{vec};
+  
+  for (int n : ev1) {
+    std::cout << n; //123
+  }
+  
+  std::cout << '\n';
+
+  // 2つ目（string_view）のtuple要素のシーケンス
+  std::ranges::elements_view<std::views::all_t<decltype((vec))>, 2> ev2{vec};
+  
+  for (std::string_view sv : ev2) {
+    std::cout << sv << ' '; // one two three
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/KMhwik98s9lhfoqq)
+
+*tuple-like*な型のシーケンスのそれぞれの要素を指定された番号による`get<N>()`で射影し、その値（参照）のシーケンスを生成します。
+
+`elements_view`には抽出する`tuple`要素の番号を非型テンプレートパラメータとして渡さなければならないため、クラステンプレートの実引数推定を効かせられません。そのため、引数として渡す*range*の型を書く必要があります。`std::views::all_t`というのは`views::all`の結果を示す型エイリアスで、これを通すことによって*View*が直接*range*を所有する事を回避します（これは他の*View*でも同様です）。`decltype(())`としているのは、`views::all`に左辺値として渡すためです。
+
+これは特に、連想コンテナにおいて便利かと思われます。
+
+### `views::elements`
+
+`elements_view`に対応する*range adaptor object*が`std::views::elements`です。
+
+```cpp
+#include <ranges>
+
+int main() {
+  std::vector<std::tuple<int, double, std::string_view>> vec = { {1, 1.0, "one"}, {2, 2.0, "two"}, {3, 3.0, "three"} };
+  
+  for (int n : std::views::elements<0>(vec)) {
+    std::cout << n; //123
+  }
+  
+  std::cout << '\n';
+  
+  // パイプラインスタイル
+  for (std::string_view sv : vec | std::views::elements<2>) {
+    std::cout << sv << ' '; // one two three
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/KMhwik98s9lhfoqq)
+
+`views::elements`はカスタマイぜーションポイントオブジェクトであり、テンプレートパラメータとして抽出する`tuple`要素の番号を、引数として*tuple-like*な型のシーケンスを受け取り、それらによって`elements_view`を構築して返します。  
+`elements_view`は要素番号をテンプレートパラメータで受け取る都合上クラステンプレートの実引数推論が効かないため、テンプレートパラメータに引数*range*の型を書かなければなりませんが、`views::elements`を使うことでそれを省略できます。
+
+### `keys_view/values_view`
+
 ## 参考文献
 
 - [Standard Ranges - Eric Niebler](https://ericniebler.com/2018/12/05/standard-ranges/)
