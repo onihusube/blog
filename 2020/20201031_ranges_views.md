@@ -1674,6 +1674,8 @@ int main() {
 
 `reverse_view`は遅延評価によって逆順範囲を生成します。とはいえ、実際の逆順範囲に関しては[`std::reverse_iterator`](https://cpprefjp.github.io/reference/iterator/reverse_iterator.html)に丸投げしているので、`reverse_view`の行うことは`begin()`によってイテレータを取得するタイミングで`std::reverse_iterator`を適切に構築することです。
 
+そこではまず、元のシーケンスが`common_range`であればその番兵（`end()`で取得できるイテレータ）を使って`std::reverse_iterator`を構築します。そうでない場合は`std::ranges::next()`によって終端イテレータを求めて、それによって`std::reverse_iterator`を構築します。元のシーケンスが`common_range`ではなく`bidirectional_range`である場合、終端イテレータの取得はインクリメントによって行われるため、シーケンスの長さを`N`とした`O(N)`の時間計算量となってしまいます（そのようなイテレータはなかなかない気がしますが）。
+
 ```cpp
 auto seq = std::views::iota(1, 10)
   | std::views::filter([](int n) { return n % 2 == 1; })
@@ -1683,7 +1685,7 @@ auto seq = std::views::iota(1, 10)
 std::ranges::reverse_view rv{seq};
 
 // イテレータ取得時に元となるシーケンスの終端一つ手前のイテレータからreverse_iteratorを構築して返す
-// bidirectional_rangeの場合、時間計算量はO(N)になる
+// 元となるシーケンスがcommon_rangeではなく単にbidirectional_rangeである場合、時間計算量はO(N)になる
 auto it = std::ranges::begin(rv);
 
 // イテレータの操作はreverse_iteratorと同じ
