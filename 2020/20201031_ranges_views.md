@@ -1777,9 +1777,38 @@ int main() {
 
 *tuple-like*な型のシーケンスのそれぞれの要素を指定された番号による`get<N>()`で射影し、その値（参照）のシーケンスを生成します。
 
-`elements_view`には抽出する`tuple`要素の番号を非型テンプレートパラメータとして渡さなければならないため、クラステンプレートの実引数推定を効かせられません。そのため、引数として渡す*range*の型を書く必要があります。`std::views::all_t`というのは`views::all`の結果を示す型エイリアスで、これを通すことによって*View*が直接*range*を所有する事を回避します（これは他の*View*でも同様です）。`decltype(())`としているのは、`views::all`に左辺値として渡すためです。
+`elements_view`には抽出する`tuple`要素の番号を非型テンプレートパラメータとして渡さなければならないため、クラステンプレートの実引数推定を利用できません。そのため、引数として渡す*range*の型を書く必要があります。`std::views::all_t`というのは`views::all`の結果を示す型エイリアスで、これを通すことによって*View*が直接*range*を所有・参照する事を回避します（これは`ref_view`を除く他の*View*でも同様です）。`decltype(())`としているのは`views::all`に左辺値として渡すためです。
 
 これは特に、連想コンテナにおいて便利かと思われます。
+
+```cpp
+#include <ranges>
+
+int main() {
+  using namespace std::string_view_literals;
+
+  std::map<int, std::string_view> i2s = { {6, "six"sv}, {1, "one"sv}, {0, "zero"sv}, {2, "two"sv}, {3, "three"sv}, {5, "five"sv}, {4, "four"sv} };
+  
+  // keyのシーケンス
+  std::ranges::elements_view<std::views::all_t<decltype((i2s))>, 0> ev1{i2s};
+  
+  for (int n : ev1) {
+    std::cout << n; // 0123456
+  }
+  
+  std::cout << '\n';
+
+  // valueのシーケンス
+  std::ranges::elements_view<std::views::all_t<decltype((i2s))>, 1> ev2{i2s};
+  
+  for (std::string_view sv : ev2) {
+    std::cout << sv << ' '; // zero one two three four five six
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/QOHqHmofuslBXpEh)
+
+### 遅延評価
 
 ### `views::elements`
 
@@ -1809,6 +1838,76 @@ int main() {
 `elements_view`は要素番号をテンプレートパラメータで受け取る都合上クラステンプレートの実引数推論が効かないため、テンプレートパラメータに引数*range*の型を書かなければなりませんが、`views::elements`を使うことでそれを省略できます。
 
 ### `keys_view/values_view`
+
+`elements_view`は連想コンテナにおいてよく使用される事を想定しているためか、連想コンテナで使う際に便利なエイリアスがあらかじめ用意されています。これを用いると、冒頭の連装コンテナのサンプルは次のように書くことができます。
+
+```cpp
+#include <ranges>
+
+int main() {
+  using namespace std::string_view_literals;
+
+  std::map<int, std::string_view> i2s = { {6, "six"sv}, {1, "one"sv}, {0, "zero"sv}, {2, "two"sv}, {3, "three"sv}, {5, "five"sv}, {4, "four"sv} };
+  
+  // keyのシーケンス
+  std::ranges::keys_view ev1{i2s};
+  
+  for (int n : ev1) {
+    std::cout << n;
+  }
+  
+  std::cout << '\n';
+
+  // valueのシーケンス
+  std::ranges::values_view ev2{i2s};
+  
+  for (std::string_view sv : ev2) {
+    std::cout << sv << ' ';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/uMI7y0jwljkO2isQ)
+
+`keys_view/values_view`は`elements_view`のエイリアステンプレートで、次のように定義されます。
+
+```cpp
+namespace std::ranges {
+  template<typename R>
+  using keys_view = elements_view<views::all_t<R>, 0>;
+
+  template<typename R>
+  using values_view = elements_view<views::all_t<R>, 0>;
+}
+```
+
+C++20からはエイリアステンプレートの実引数推論が導入されているので、これらを利用すると完全に型を省略できるようになります（GCC10.1は未対応なのとGCC11はなぜかエラーが起きたため、Wandboxでは型を書いています）。
+
+さらに、`keys_view/values_view`に対応する*range adaptor object*も用意されています。
+
+```cpp
+#include <ranges>
+
+int main() {
+  using namespace std::string_view_literals;
+
+  std::map<int, std::string_view> i2s = { {6, "six"sv}, {1, "one"sv}, {0, "zero"sv}, {2, "two"sv}, {3, "three"sv}, {5, "five"sv}, {4, "four"sv} };
+  
+  // keyのシーケンスをイテレート
+  for (int n : i2s | std::views::keys) {
+    std::cout << n;
+  }
+  
+  std::cout << '\n';
+
+  // valueのシーケンスをイテレート
+  for (std::string_view sv : i2s | std::views::values) {
+    std::cout << sv << ' ';
+  }
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/uMI7y0jwljkO2isQ)
+
+これを用いると、さらに意図を明確に書くことができます。
 
 ## 参考文献
 
