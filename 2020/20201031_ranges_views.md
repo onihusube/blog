@@ -1747,7 +1747,7 @@ int main() {
 
 ## `elements_view`
 
-`elements_view`は*tuple-like*な型の値のシーケンスから、指定された番号の`tuple`要素をシーケンスを生成する*View*です。
+`elements_view`は*tuple-like*な型の値のシーケンスから、指定された番号の要素だけからなるシーケンスを生成する*View*です。
 
 ```cpp
 #include <ranges>
@@ -1765,7 +1765,7 @@ int main() {
   
   std::cout << '\n';
 
-  // 2つ目（string_view）のtuple要素のシーケンス
+  // 3つ目（string_view）のtuple要素のシーケンス
   std::ranges::elements_view<std::views::all_t<decltype((vec))>, 2> ev2{vec};
   
   for (std::string_view sv : ev2) {
@@ -1775,9 +1775,10 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/KMhwik98s9lhfoqq)
 
-*tuple-like*な型のシーケンスのそれぞれの要素を指定された番号による`get<N>()`で射影し、その値（参照）のシーケンスを生成します。
+*tuple-like*な型のシーケンスのそれぞれの要素を指定された番号による`get<N>()`で射影し、その値のシーケンスを生成します。
 
-`elements_view`には抽出する`tuple`要素の番号を非型テンプレートパラメータとして渡さなければならないため、クラステンプレートの実引数推定を利用できません。そのため、引数として渡す*range*の型を書く必要があります。`std::views::all_t`というのは`views::all`の結果を示す型エイリアスで、これを通すことによって*View*が直接*range*を所有・参照する事を回避します（これは`ref_view`を除く他の*View*でも同様です）。`decltype(())`としているのは`views::all`に左辺値として渡すためです。
+`elements_view`には抽出する`tuple`要素の番号を非型テンプレートパラメータとして渡さなければならないため、クラステンプレートの実引数推定を利用できません。そのため、引数として渡す*range*の型を書く必要があります。  
+`std::views::all_t`というのは`views::all`の結果を示す型エイリアスで、これを通すことによって*View*が直接*range*を所有・参照する事を回避します（これは`ref_view`を除く他の*View*でも同様です）。`decltype(())`としているのは`views::all`に左辺値として渡すためです。
 
 これは特に、連想コンテナにおいて便利かと思われます。
 
@@ -1808,7 +1809,30 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/QOHqHmofuslBXpEh)
 
+`std::tuple`に`get`を使用する時と同様に、指定する要素番号は`0`始まりでなければなりません。
+
 ### 遅延評価
+
+`elements_view`によるシーケンスもまた、遅延評価によって生成されます。とはいえそれは単純に、イテレータの間接参照のタイミングで元のシーケンスの要素に対して`get<N>`を適用して要素を取り出すだけです。
+
+```cpp
+std::vector<std::tuple<int, double, std::string_view>> vec = { {1, 1.0, "one"}, {2, 2.0, "two"}, {3, 3.0, "three"} };
+  
+// elements_view構築時は何もしない
+std::ranges::elements_view<std::views::all_t<decltype((vec))>, 0> ev1{vec};
+
+// イテレータ取得時も何もしない
+auto it = std::ranges::begin(ev1);
+
+// インクリメント等進行操作はほぼ元のイテレータそのまま
+++it;
+--it;
+
+// 間接参照時に元のイテレータの間接参照結果にget<N>を適用して1要素だけを取り出す
+auto&& elem = *it;
+```
+
+`elements_view`が行う殆どの事はそのイテレータの間接参照時に集中しており、そのほかの操作は元のイテレータの薄いラッパとなります。そのため、元のイテレータの性質をほぼそのまま受け継ぎ、`elements_view`の*range*カテゴリは元の*range*と同じになります。
 
 ### `views::elements`
 
@@ -1876,11 +1900,11 @@ namespace std::ranges {
   using keys_view = elements_view<views::all_t<R>, 0>;
 
   template<typename R>
-  using values_view = elements_view<views::all_t<R>, 0>;
+  using values_view = elements_view<views::all_t<R>, 1>;
 }
 ```
 
-C++20からはエイリアステンプレートの実引数推論が導入されているので、これらを利用すると完全に型を省略できるようになります（GCC10.1は未対応なのとGCC11はなぜかエラーが起きたため、Wandboxでは型を書いています）。
+C++20からはエイリアステンプレートの実引数推論が導入されているので、これらを利用すると完全に型を省略できるようになります（GCCは未対応だったためWandboxでは型を書いていますが・・・）。
 
 さらに、`keys_view/values_view`に対応する*range adaptor object*も用意されています。
 
@@ -1907,7 +1931,24 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/uMI7y0jwljkO2isQ)
 
-これを用いると、さらに意図を明確に書くことができます。
+`view::keys/views::values`はカスタマイゼーションポイントオブジェクトであり、2要素以上の*tuple-like*オブジェクトによる*range*を受け取って`keys_view/values_view`を構築して返します。  
+これらを用いると、さらに意図を明確に書くことができます。
+
+### おわりに
+
+これをもってC++20 *range*ライブラリの*View*の遊覧は終わりとなります、お疲れ様でした。
+
+他のモダンな言語でのシーケンス操作に触れたことがある人には、C++20 *range*ライブラリの*View*は物足りなく写ることでしょう。全部で17個しかない*View*の中には、例えば`zip`や`concat`等のよく利用されるものが含まれていませんから・・・
+
+とはいえ、*range*ライブラリはこれで終わりではありません。*range*ライブラリのほとんどの部分は[*range-v3*](https://github.com/ericniebler/range-v3)というライブラリでの経験をベースにしています（そもそも、提案者がその作者のEric Nieblerさんだったりします）が、それは巨大なライブラリであり、そのすべてを一度にC++に導入しようとすると膨大な作業が必要となります。ともすれば、十分な議論を尽くすことができないかもしれません。
+
+そのため、C++20では*range*ライブラリの基礎となるコンセプトとユーティリティ、及び基本的な*View*だけに範囲を絞ったうえで提案されています。C++20の*range*ライブラリが物足りないのはあえてのことです。
+
+C++23に向けては既にいくつかの*View*の提案が出されていますが、本格的に*range*ライブラリの拡張が始まる予定です。そこには*View*だけではなく、*range*に対する*Algorithm*（`accumulate, inner_product`などの様な操作）や*Action*（*range*に直接作用する`sort, copy`などの様な操作）も含まれています。[P2214R0 A Plan for C++23 Ranges](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2214r0.html)に展望が描かれています。
+
+とは言えやはり、C++は長期感使われることを見越した上で機能が安定していることを重視しており、議論は慎重に十分な時間をかけて行われます。そのため一度に全部とはいかず、優先度を付けながら、すこしづつ新しいものを導入していく事になります。
+
+もし生きていたら、C++23でお会いしましょう。
 
 ## 参考文献
 
