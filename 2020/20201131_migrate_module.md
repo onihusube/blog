@@ -522,8 +522,379 @@ namespace mylib {
 }
 ```
 
-## 3 - 単一ヘッダファイル+複数ソースファイル
-## 4 - 複数ヘッダファイル+単一ソースファイル
+## 3 - 複数ヘッダファイル+単一ソースファイル
+
+```cpp
+/// mylib1.h
+
+namespace mylib {
+
+  class S {
+    int m_num = 0;
+  public:
+
+    S();
+    S(int n);
+
+    int get() const;
+  };
+}
+```
+
+```cpp
+/// mylib2.h
+
+namespace mylib {
+
+  void print_S(const S& s);
+}
+```
+
+```cpp
+/// mylib.cpp
+
+#include <iostream>
+#include "mylib1.h"
+#include "mylib2.h"
+
+namespace mylib {
+
+  S::S() = default;
+  S::S(int n) : m_num{n} {}
+
+  inline int S::get() const {
+    return this->m_num;
+  }
+
+  void print_S(const S& s) {
+    std::cout << s.get() << std::endl;
+  }
+}
+```
+
+例えばこんな風に、ヘッダが分割されてるけど実装は1ファイルで行われているときの事です。
+
+モジュールにおいては、インターフェース単位と実装単位はそれぞれ一つづつしか存在してはいけません。そのため、インターフェース単位を複数作ることは出来ません、多分コンパイルエラーとなるはずです。
+
+しかし、何かしらの基準でもってインターフェースをいくつかのファイルに分けておきたいこともあるでしょう。そんなときのために、モジュールはパーティションによって分割することができます。2つのヘッダファイルは2つのインターフェースパーティションが対応します。
+
+```cpp
+/// mylib_interface1.ixx
+
+// mulibモジュールのインターフェースパーティションの宣言
+export module mylib:interface1;
+
+namespace mylib {
+
+  // クラスのエクスポート、暗黙に全メンバがエクスポートされる
+  export class S {
+    int m_num = 0;
+  public:
+
+    S();
+    S(int n);
+
+    int get() const;
+  };
+}
+```
+
+```cpp
+/// mylib_interface2.ixx
+
+// mulibモジュールのインターフェースパーティションの宣言
+export module mylib:interface2;
+
+// クラスSの宣言を参照するためにインポートする
+import :interface1;
+
+namespace mylib {
+
+  // フリー関数のエクスポート
+  export void print_S(const S& s);
+}
+```
+
+```cpp
+/// mylib.ixx
+
+// mulibモジュールのプライマリインターフェース単位の宣言
+export module mylib;
+
+// 全てのインターフェースパーティションの再エクスポート、必須！
+export import :interface1;
+export import :interface2;
+
+// 書くことがないので空、ここでさらに宣言をしてもいい
+```
+
+```cpp
+/// mylib.cpp
+
+module;
+
+#include <iostream>
+
+// mylibモジュールの実装単位の宣言
+module mylib;
+
+// mylibモジュールのインターフェースを暗黙にインポートしており
+// それを通して全てのパーティションも暗黙にインポートしている
+
+namespace mylib {
+
+  S::S() = default;
+  S::S(int n) : m_num{n} {}
+
+  inline int S::get() const {
+    return this->m_num;
+  }
+
+  void print_S(const S& s) {
+    std::cout << s.get() << std::endl;
+  }
+}
+```
+
+この様に、複数のヘッダファイルはインターフェースパーティションが対応します。インターフェースパーティションであることは、モジュール宣言においてモジュール名の後に`:パーティション名`を続けることで行います。
+
+```cpp
+// モジュールインターフェースパーティションの宣言
+export module mylib:interface1;
+export module mylib:interface2;
+
+// プライマリインターフェース単位の宣言
+export module mylib;
+```
+
+`:`で区切られていることがパーティションである証です。コンパイラさんもこれを見て判別します。
+
+インターフェースパーティションと区別するために、パーティションではないインターフェース単位の事をプライマリインターフェース単位と呼びます。そして、同じモジュールに属しているインターフェースパーティションは全てプライマリインターフェース単位からエクスポートする必要があります。これがなされないとモジュール外から参照できません。
+
+インターフェースパーティションのエクスポートは`export import`に続いて`:`とパーティション名を指定することで行い、これはそのパーティションをインポートしながらエクスポートも行う構文です（再エクスポートなどとも呼ばれます）。
+
+```cpp
+// インターフェースパーティションの再エクスポート
+export import :interface1;
+export import :interface2;
+
+// これはエラー、モジュール名が余計
+export import mylib:interface1;
+
+// 普通のモジュールの再エクスポート（otherlibというモジュールがあったとして）
+export import otherlib;
+```
+
+なんとなく気持ち悪いかもしれませんが、インターフェースパーティションをインポート/再エクスポートするときは、パーティション名の前に`:`が必須です。モジュール名はあってはならず、`:`は無くてはなりません。
+
+再エクスポートをする事によって、インターフェースパーティション内の宣言があたかもプライマリインターフェース単位にあるかのようにモジュールを使う側からは見えるようになります（”あたかも”であって`#include`のようにコピぺしているわけではありません）。
+
+なお、再エクスポート自体はパーティションだけでなく一般のモジュールでも行うことができます。ただし、当然ながらモジュールの外や実装単位では行えず、モジュールのインターフェース単位（パーティション含む）でだけ行うことができます。
+
+この例の`interface2`パーティションのように、他のインターフェスにある宣言を参照したいときはそのインターフェースをインポートすることができます。
+
+```cpp
+// 他インターフェースパーティションのインポート
+import :interface1;
+```
+
+プライマリインターフェース単位からはそのモジュールにあるすべてのインターフェースパーティションがエクスポートされている必要があります（チェックされるとは言ってない）。そして、モジュール実装単位はプライマリインターフェース単位を暗黙的にインポートしています。  
+従って、実装単位からはパーティションも含めたすべてのインターフェスの宣言が常に見えています。そのため、この例の場合はモジュール実装単位を書き換える必要はありません。
+
+### 別の書き方
+
+先程はヘッダファイル2つをインターフェースパーティション2つに対応させましたが、別にそれぞれを対応させる必要はなくて、1つだけをインターフェースパーティションにしてしまうだけでもokです。
+
+```cpp
+/// mylib_interface.ixx
+
+// mulibモジュールのインターフェースパーティションの宣言
+export module mylib:interface;
+
+namespace mylib {
+
+  // クラスのエクスポート、暗黙に全メンバがエクスポートされる
+  export class S {
+    int m_num = 0;
+  public:
+
+    S();
+    S(int n);
+
+    int get() const;
+  };
+}
+```
+
+```cpp
+/// mylib.ixx
+
+// mulibモジュールのプライマリインターフェース単位の宣言
+export module mylib;
+
+// インターフェースパーティションの再エクスポート
+export import :interface;
+
+namespace mylib {
+
+  // フリー関数のエクスポート
+  // :interfaceがインポート（再エクスポート）されているので、Sは参照可能
+  export void print_S(const S& s);
+}
+```
+
+こうしたとしても、先程と全く同じようにモジュールを構成できます。
+
+インターフェースパーティションをどう分けるか、プライマリインターフェースに何を書くか、あるいは何も書かないか、などは自由です。将来的に広くコンセンサスの取れた書き方ができるかもしれませんが、基本的には各人の好みで書くことができます。
+
+### 利用側
+
+利用側は全く変わりません。インターフェースパーティションへの分割以前と同じように利用することができます。
+
+```cpp
+import mylib; // mylibモジュールのインポート宣言
+
+int main() {
+  mylib::S s1{};
+  mylib::S s2{20};
+  
+  mylib::print_S(s1); // 0
+  mylib::print_S(s2); // 20
+}
+```
+
+モジュールをその内部でどうインターフェースパーティションに分割しようが、プライマリインターフェース単位からの再エクスポートを忘れさえしなければモジュール外部からそれを観測・識別する手段はありません。  
+この観点からも、モジュール内部のパーティションによる構成は自由に行うことができます。
+
+## 4 - 単一ヘッダファイル+複数ソースファイル
+
+
+```cpp
+/// mylib.h
+
+namespace mylib {
+
+  class S {
+    int m_num = 0;
+  public:
+
+    S();
+    S(int n);
+
+    int get() const;
+  };
+
+  void print_S(const S& s);
+}
+```
+
+```cpp
+/// mylib1.cpp
+
+#include "mylib.h"
+
+namespace mylib {
+
+  S::S() = default;
+  S::S(int n) : m_num{n} {}
+
+  inline int S::get() const {
+    return this->m_num;
+  }
+}
+```
+
+```cpp
+/// mylib2.cpp
+
+#include <iostream>
+#include "mylib.h"
+
+namespace mylib {
+
+  void print_S(const S& s) {
+    std::cout << s.get() << std::endl;
+  }
+}
+```
+
+例えばこんな風に、1つのヘッダに対して複数の実装ファイルが対応している場合の事です。  
+ヘッダはそのままインターフェース単位に対応しますが、ソースファイルが複数あるときもそのまま複数書いても良いのでしょうか・・・？
+
+
+
+```cpp
+/// mylib.ixx
+
+// mulibモジュールのインターフェース単位
+export module mylib;
+
+namespace mylib {
+
+  // クラスのエクスポート、暗黙に全メンバがエクスポートされる
+  export class S {
+    int m_num = 0;
+  public:
+
+    S();
+    S(int n);
+
+    int get() const;
+  };
+
+  // フリー関数のエクスポート
+  export void print_S(const S& s);
+}
+```
+
+```cpp
+/// mylib1.cpp
+
+// mulibモジュールの実装パーティション1
+module mylib:part1;
+
+// インターフェースのインポート
+import mylib;
+
+namespace mylib {
+
+  S::S() = default;
+  S::S(int n) : m_num{n} {}
+
+  inline int S::get() const {
+    return this->m_num;
+  }
+}
+```
+
+```cpp
+/// mylib2.cpp
+
+module; // グローバルモジュールフラグメント
+
+// #includeはグローバルモジュールフラグメント内で行う
+#include <iostream>
+
+// mulibモジュールの実装パーティション2
+module mylib:part2;
+
+// インターフェースのインポート
+import mylib;
+
+namespace mylib {
+
+  void print_S(const S& s) {
+    std::cout << s.get() << std::endl;
+  }
+}
+```
+
+モジュール実装パーティションであることは、モジュール宣言においてモジュール名の後に`:パーティション名`を続けることで行います。同じモジュールに含めたい場合はモジュール名を同じにします。パーティション名は被らないようにしましょう（ここでは`part1`とかいう名前にしましたけど、もっとちゃんとした名前つけましょうね）。
+
+実装単位とは異なり、実装パーティションはそのモジュールのインターフェースを暗黙にインポートしていないので、明示的にインポートする必要があります。
+
+### 実装パーティションの別の用法
+
 ## 5 - 複数ヘッダファイル+複数ソースファイル
 ## 6 - ヘッダオンリー
 ## 7 - モジュールとヘッダファイルの同時提供
