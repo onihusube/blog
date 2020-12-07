@@ -37,11 +37,11 @@ Wroding Changeの項では変更点のみを翻訳するのではなく関連す
   - [[module.reach] Clearly separate translation units in example.](https://github.com/cplusplus/draft/pull/3331)
 - [P1874R1 Dynamic Initialization Order of Non-Local Variables in Modules](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1874r1.html)
     - [US082 10.03 [module.import] Define order of initialization for globals in modules P1874](https://github.com/cplusplus/nbballot/issues/81)
+- [P2103R0 Core Language Changes for NB Comments at the February, 2020 (Prague) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2103r0.html)
+    - [NB US 033: Allow import inside linkage-specifications](https://github.com/cplusplus/nbballot/issues/32)
 
 ### 未追記
 
-- [P2103R0 Core Language Changes for NB Comments at the February, 2020 (Prague) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2103r0.html)
-    - [NB US 033: Allow import inside linkage-specifications](https://github.com/cplusplus/nbballot/issues/32)
 - [P1779R3: ABI isolation for member functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1779r3.html)
 - [P1857R3 Modules Dependency Discovery](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1857r3.html)
 - [P2109R0: US084: Disallow "export import foo" outside of module interface](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2109r0.html)
@@ -844,6 +844,13 @@ inline変数・関数がある翻訳単位でodr-usedされているとき、そ
 名前空間の定義のうちの1つがエクスポートされる場合、または名前空間がエクスポートされた宣言を含む場合、外部リンケージを持つ名前空間がエクスポートされる。  
 名前空間はモジュールに属すことはなく、エクスポートされなかったとしてもモジュールリンケージを持つことはない。
 
+### 9.11 Linkage specifications[dcl.link]
+
+#### 4
+
+モジュールインポート宣言はリンケージ指定（*linkage-specification*）に直接含まれてはならない。C++言語リンケージ以外のリンケージ指定に現れているモジュールインポート宣言は、実装定義の意味論で条件付きでサポートされる。  
+（*linkage-specification*とは`extern "C"`のこと。直接というのは`extern "C++" import M;`のような形式、ブロックで囲う形式のなかに現れているときは、C++言語リンケージだけサポート）
+
 ### 10.1 Module units and purviews [module.unit]
 
 - module-declaration:
@@ -1236,9 +1243,9 @@ import M1;              // error: 循環的なインターフェース依存関�
 
 ### 10.4 Global module fragment [module.global.frag]
 - global-module-fragment:
-	- `module;` top-level-declaration-seq(opt)
+	- `module;` declaration-seq(opt)
 
-[Note:翻訳フェーズ4より前では、トップレベル宣言（top-level-declaration-seq）にはプリプロセッサディレクティブのみが現れる  
+[Note:翻訳フェーズ4より前では、ここのdeclaration-seqにはプリプロセッサディレクティブのみが現れる  
 （すなわち、グローバルモジュールフラグメントにはプリプロセッサディレクティブしか現れてはならない）]
 
 #### 2
@@ -1275,7 +1282,8 @@ global-module-fragmentは、モジュール単位の __グローバルモジュ�
 後で例として出てくる、配列の添え字に指定された定数式が*decl-reachable*であるかは未規定というのはここの記述4による。）
 
 #### 4
-モジュール単位内のグローバルモジュールフラグメント内の宣言`D`は、その翻訳単位のtop-level-declaration-seq内のどのtop-level-declarationからも宣言的に到達可能ではないとき、__破棄される__（*discarded*）。  
+
+グローバルモジュールフラグメント内の宣言`D`は、その翻訳単位内のどの宣言からも宣言的に到達可能ではないとき、__破棄される__（*discarded*）。  
 [Note: 破棄された宣言は、たとえインスタンス化地点がモジュール単位の外側にあるテンプレートのインスタンス化時にモジュール単位がそのインスタンス化コンテキストに含まれていたとしても（インスタンス化経路上にあったとしても）、モジュール単位の外側で到達可能でも可視でもない。]
 
 #### 5
@@ -1405,7 +1413,7 @@ default指定されたクラスの特殊メンバ関数が暗黙的に定義さ�
 #### 3
 あるテンプレートのインスタンス化地点がそれを囲んでいる別のテンプレートの特殊化の中にあり、その（囲まれている）テンプレートがそこで暗黙的にインスタンス化される時のインスタンス化コンテキストは、囲んでいるテンプレートの特殊化のインスタンス化コンテキストと（もしあれば）次の点との和集合。
 
-テンプレートがモジュール`M`のインターフェース単位で定義され、インスタンス化地点が`M`のインターフェース単位内にない場合、そのインスタンス化地点は、`M`のプライマリーモジュールインターフェース単位のtop-level-declaration-seqの最後の点（すなわち翻訳単位終端）（存在する場合、プライベートモジュールフラグメントの前）である。
+テンプレートがモジュール`M`のインターフェース単位で定義され、インスタンス化地点が`M`のインターフェース単位内にない場合、そのインスタンス化地点は、`M`のプライマリーモジュールインターフェース単位のdeclaration-seqの最後の点（すなわち翻訳単位終端）（存在する場合、プライベートモジュールフラグメントの前）である。
 
 #### 4
 default指定された特殊メンバ関数の暗黙の定義中で参照されているために、暗黙にインスタンス化されているテンプレートのインスタンス化コンテキストは、そのdefault指定された特殊メンバ関数のインスタンス化コンテキストである（すなわち上記2）。
@@ -1621,8 +1629,8 @@ X x;                // ill-formed: Xは被修飾名探索において可視で�
 
 #### 7
 関数テンプレート、メンバ関数テンプレート、クラステンプレートのメンバ関数もしくは静的メンバ変数は、上記のインスタンス化地点に加えて、翻訳単位内に複数のインスタンス化地点を持つことができる。
-- それらの特殊化が、翻訳単位のtop-level-declaration-seq内（存在する場合はプライベートモジュールフラグメントの前）にインスタンス化地点を持つ場合、そのtop-level-declaration-seqの後の点（終端の次）もそのインスタンス化地点とみなされる。
-  - （top-level-declaration-seq内にインスタンス化地点を持つということは、実質プライベートモジュールフラグメントの外側にインスタンス化地点を持つということ。その場合プライベートモジュールフラグメント直前か、なければ翻訳単位の終端にインスタンス化地点を持つ。ということ）
+- それらの特殊化が、翻訳単位のdeclaration-seq内（存在する場合はプライベートモジュールフラグメントの前）にインスタンス化地点を持つ場合、そのdeclaration-seqの後の点（終端の次）もそのインスタンス化地点とみなされる。
+  - （翻訳単位のdeclaration-seq内にインスタンス化地点を持つということは、実質プライベートモジュールフラグメントの外側にインスタンス化地点を持つということ。その場合プライベートモジュールフラグメント直前か、なければ翻訳単位の終端にインスタンス化地点を持つ。ということ）
 - それらの特殊化が、プライベートモジュールフラグメント内部にインスタンス化地点を持つ場合、その翻訳単位の終端もインスタンス化地点とみなされる。
 
 クラステンプレートの特殊化は、翻訳単位内に最大1つのインスタンス化地点を持つ。  
