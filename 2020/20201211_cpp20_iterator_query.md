@@ -1,10 +1,13 @@
-# ［C++］ C++20からのイテレータ情報のクエリ
+# ［C++］ C++20からのイテレータの素行調査方法
 
-これは[C++ Advent Calendar 2020](https://qiita.com/advent-calendar/2020/cxx)のn日めの記事です。
+これは[C++ Advent Calendar 2020](https://qiita.com/advent-calendar/2020/cxx)の11日めの記事です。
 
 これまで`iterator_traits`を介して取得していたイテレータ情報は、C++20からはより簡易な手段を介して取得できるようになります。
 
 特に、C++20以降は`iterator_traits`を使わずにこれらのものを利用することが推奨されます。
+
+[:contents]
+
 
 ### `difference_type`
 
@@ -39,11 +42,11 @@ int main() {
 
 C++20からのイテレータ型は上記いずれかで取得できるようにしておけばいいわけです。
 
-なお、`difference_type`は意外に多くの場所でイテレータ判定に使用されているので必ず定義しておいたほうがいいでしょう。おそらくの多くの場合は入れ子の`difference_type`を定義するのが簡単でしょう（つまり今まで通り）。
+なお、`difference_type`は意外に多くの場所で使用されているので必ず定義しておいたほうがいいでしょう。おそらくの多くの場合は入れ子の`difference_type`を定義するのが簡単でしょう（つまり今まで通り）。
 
 ### `value_type`
 
-`value_type`はイテレータの指す要素の型を表す型です。大抵はイテレータの間接参照の戻り値型から参照を除去した型でしょう。
+`value_type`はイテレータの指す要素の型を表す型です。大抵はイテレータの間接参照の戻り値型から参照を除去した型になることでしょう。
 
 従来は`std::iterator_traits<I>::value_type`から取得していましたが、C++20からは[`std::iter_value_t<I>`](https://cpprefjp.github.io/reference/iterator/iter_value_t.html)を用いる事で同じものを取得できます。
 
@@ -71,8 +74,6 @@ int main() {
 - `I::value_type`
 - `I::element_type`
 - `std::incrementable_traits<I>`の明示的/部分特殊化
-
-C++20からのイテレータ型は上記いずれかで取得できるようにしておけばいいわけです。
 
 この`value_type`も他の場所で使用されていることがあるので必ず定義しておいたほうがいいでしょう。おそらく入れ子の`value_type`を定義するのが簡単でしょう（これも今まで通り）。
 
@@ -129,7 +130,7 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/YMbZwtsjKG1soh2m)
 
-イテレータがprvalueを返す場合はこれも素の方を示します。
+イテレータがprvalueを返す場合はこれも素の型を示します。
 
 これは少し複雑な定義をされていますが、大抵の場合は`decltype(std::move(*i))`の型を取得することになります。つまりこれも我々は何もしなくても使用できます。
 
@@ -173,7 +174,7 @@ namespace std {
 
 C++20以降、イテレータカテゴリの判定に各イテレータのタグ型を調べてどうこうするのは完全にナンセンスです。コンセプトを使いましょう。
 
-`<iterator>`ヘッダにあらかじめいくつかのイテレータコンセプトが用意されています。特に、基本的な*input iterator*とか*forward iterator*といったものにはそのままの名前でコンセプトが定義されています。
+そのために、`<iterator>`ヘッダにはあらかじめいくつかのイテレータコンセプトが用意されています。特に、基本的な*input iterator*とか*forward iterator*といったものにはそのままの名前でコンセプトが定義されています。
 
 ```cpp
 // forward_iteratorコンセプトの定義の例
@@ -223,10 +224,18 @@ int main() {
 
 #### `iterator_concept`
 
-イテレータを定義する時は従来通り`iterator_category`を用意する必要がありますが、C++20からはそこに`iterator_concept`を利用することができます。
+従来はイテレータを定義する時に`iterator_category`を用意してイテレータのカテゴリを表明していましたが、C++20からはそれを`iterator_concept`で行います。
 
-`iterator_concept`が用意されたのはC++17以前との互換性を取るためで、特にポインタ型のカテゴリが`contiguous_iterator`に変更された事に対処する面が大きいと思われます。  
-詳しくは次節で説明しますが、C++20以降でしか利用できないイテレータを定義する場合は、常に`iterator_concept`でイテレータカテゴリを宣言し`iterator_category`は定義しないようにしておきます。
+`iterator_concept`が用意されたのはC++17以前との互換性を取るためで、特にポインタ型のカテゴリが`contiguous_iterator`に変更された事に対処する面が大きいと思われます。
+
+C++17までのコードではイテレータのタグ型を判定する時にその継承関係まで調べない事が多く、特に`random_access_iterator`の場合はイコール（`is_same`）で判定される事がほとんどでした。そのため、ポインタ型の`iterator_category`を`contiguous_iterator_tag`に変えてしまうとそのようなコードがコンパイルエラーを起こすようになってしまいます。
+
+C++20以降のイテレータでは`iterator_concept`からカテゴリを取得するようにし、`iterator_category`はC++17以前のコードの互換のためにそのままにしておくことにしました。  
+また、C++20の各種イテレータコンセプトでは、`iterator_concept`があればそこから、なければ`iterator_category`からイテレータのタグ型を取得し、その継承関係も含めて判定を行う事で新しいカテゴリに対応しつつ将来的な変更に備えています。
+
+そして、ユーザーコードではコンセプトを用いることでイテレータのカテゴリタグ型からそのカテゴリを問い合わせる必要はなくなります。
+
+詳細は次回説明しますが、これらの事情より、C++20以降でしか利用できないイテレータを定義する場合は、常に`iterator_concept`でイテレータカテゴリを宣言し`iterator_category`は定義しないようにしておきます。
 
 ```cpp
 // C++20以降しか考慮しないイテレータ
@@ -237,15 +246,114 @@ struct newer_iterator {
 
 // C++17以前との互換性を確保するC++20仕様イテレータ
 struct cpp17_compatible_iterator {
-  using iterator_concept = std::random_access_iterator_tag; // C++20コードから使用したときのイテレータカテゴリ
-  using iterator_category = std::input_iterator_tag;        // C++17コードから使用したときのイテレータカテゴリ
+  using iterator_concept = std::random_access_iterator_tag; // C++20コードから使用されたときのイテレータカテゴリ
+  using iterator_category = std::input_iterator_tag;        // C++17コードから使用されたときのイテレータカテゴリ
   // 他のメンバは省略
 };
 ```
 
 ### `C::iterator`
 
+これは`iterator_traits`を使用する前段階の話ですが、任意の*range*からそのイテレータ型を取得するのに、これまでは`::iterator`という入れ子型に頼っていました。C++20からは`std::ranges::iterator_t`によってこれをより確実かつ簡易に取得できるようになります。
+
+```cpp
+#include <iterator>
+#include <vector>
+#include <ranges>
+
+int main() {
+  using vector_iter = std::ranges::iterator_t<std::vector<int>>;
+  using array_iter = std::ranges::iterator_t<double[]>;
+  using iota_view_iter = std::ranges::iterator_t<std::ranges::iota_view<unsigned int>>;
+
+  static_assert(std::same_as<vector_iter, std::vector<int>::iterator>);
+  static_assert(std::same_as<array_iter, double*>);
+  //static_assert(std::same_as<iota_view_iter, std::ranges::iota_view<unsigned int>::iterator>);
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/zXbZHlcY8cDyy8EG)
+
+
+とくに、この`iota_view`のイテレータ型のように、`<ranges>`の多くの*View*型のイテレータ型は種々の条件で変化する複雑な型で、入れ子の`::iterator`からはその型を取得できません。
+
+また、C++20からは終端イテレータの事を*sentinel*（番兵）と呼んで区別して、イテレータと番兵の型は異なっていても良くなりました。そのため、任意の*range*からその番兵型を取得する`std::ranges::sentinel_t`も用意されています。
+
+```cpp
+#include <iterator>
+#include <vector>
+#include <ranges>
+
+int main() {
+  using vector_se = std::ranges::sentinel_t<std::vector<int>>;
+  using array_se = std::ranges::sentinel_t<double[1]>;
+  using iota_view_se = std::ranges::sentinel_t<std::ranges::iota_view<unsigned int>>;
+
+  static_assert(std::same_as<vector_se, std::vector<int>::iterator>);
+  static_assert(std::same_as<array_se, double*>);
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/zXbZHlcY8cDyy8EG)
+
+
+この`iterator_t/sentinel_t`は実はとても単純に定義されています。
+
+
+```cpp
+namespace std::ranges {
+  template<class T>
+  using iterator_t = decltype(ranges::begin(declval<T&>()));
+
+  template<range R>
+  using sentinel_t = decltype(ranges::end(declval<R&>()));
+}
+```
+
+`ranges::begin/ranges::end`は従来の`std::begin/end`をよりジェネリックかつ安全に定義しなおしたカスタマイゼーションポイントオブジェクトです。要はイテレータを取得する`begin()/end()`の戻り値型を直接求めているだけで、我々は何もせずともこれを利用できます。
+
+### C++20のイテレータに必要なもの
+
+これらの事によって、C++20からのイテレータは少し記述を削減することができるようになりました。
+
+```cpp
+// C++17のイテレータ定義例
+template<typename T>
+struct cpp17_iter {
+  using difference_type = std::ptrdiff_t;
+  using value_type = T;
+  using reference = T&;
+  using pointer = T*;
+  using iterator_category = std::bidirectional_iterator_tag;
+
+  cpp17_iter& operator++();
+
+  reference operator*();
+
+  difference_type operator-(const cpp17_iter&) const;
+
+  // 以下略
+};
+
+// C++20のイテレータ定義例
+template<typename T>
+struct cpp20_iter {
+  using value_type = T;
+  using iterator_concept = std::bidirectional_iterator_tag;
+
+  cpp20_iter& operator++();
+
+  T& operator*();
+
+  std::ptrdiff_t operator-(const cpp20_iter&) const;
+
+  // 以下略
+};
+```
+
+さらに、比較演算子の自動導出もあるので`operator!=`の定義も省略できるようになっています。
 
 ### 参考文献
 
 - [`<iterator>` - cpprefjp](https://cpprefjp.github.io/reference/iterator.html)
+- [P0896R4 The One Ranges Proposal (was Merging the Ranges TS)](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0896r4.pdf)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20201211_cpp20_iterator_query.md)
