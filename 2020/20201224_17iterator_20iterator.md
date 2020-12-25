@@ -242,8 +242,8 @@ concept indirectly_writable =
 |ムーブ可能性|要求される|要求される|
 |コピー可能性|不要|要求される|
 |`difference_­type`|符号付整数型 or それと同等な型|符号付整数型 or `void`|
-|+ 右辺値イテレータからの出力|要求される|不要|
-|+ *pravlue*への出力の禁止|要求される|不要|
+|+ 右辺値イテレータからの出力可能性|要求される|不要|
+|+ *prvalue*への出力の禁止|要求される|不要|
 
 追加された二つはC++17 -> C++20で制約が厳しくなっています。したがって、C++17出力イテレータはC++20出力イテレータに対して互換性がありません。一方、C++20出力イテレータはC++17出力イテレータに対して`difference_­type`以外の所では互換性があります。
 
@@ -261,28 +261,215 @@ concept indirectly_writable =
 
 - *Cpp17InputIterator*要件を満たす
 - デフォルト構築可能
+- `I`が*mutable iterator*ならば、`reference`は`T`の参照（`T`は`I`の要素型）
+- `I`が*constant iterator*ならば、`reference`は`const T`の参照
+- マルチパス保証
 
+そして、次の式が可能であることが要求されます（ここでは*Cpp17InputIterator*要件で要求されていたものを上書きする形で含んでいます）
+
+|式|戻り値|
+|---|---|
+|`i1 != i2`|*contextually convertible to* `bool`|
+|`*i`|`referencce`、要素型`T`に変換可能であること|
+|`i->m`||
+|`++i`|`I&`|
+|`i++`|`const I&`に変換可能であること|
+|`*i++`|`referencce`|
 
 #### C++20
+
+コンセプトによって次のように定義されます。
+
+```cpp
+template<class I>
+concept forward_iterator =
+  input_iterator<I> &&
+  derived_from<ITER_CONCEPT(I), forward_iterator_tag> &&
+  incrementable<I> &&
+  sentinel_for<I, I>;
+```
+
+`std::incrementable`は`std::weakly_incrementable`を少し強くしたものです。
+
+```cpp
+template<class I>
+concept incrementable =
+  regular<I> &&
+  weakly_incrementable<I> &&
+  requires(I i) {
+    { i++ } -> same_as<I>;
+  };
+```
+
+ここで重要なのは、後置インクリメントの戻り値型が自分自身であることが要求された事です。
+
+もう一つ、`std::sentinel_for`はイテレータ自身が終端を示しうる事を表すコンセプトで、次のようなものです。
+
+```cpp
+template<class S, class I>
+concept sentinel_for =
+  semiregular<S> &&
+  input_or_output_iterator<I> &&
+  weakly-equality-comparable-with<S, I>;
+```
+
+`std::regular`は`std::semiregular`を包含しており、等値比較可能である事とコピー可能であることを要求しています。結局、`std::sentinel_for<I, I>`は自分自身との`== !=`による比較が可能である事を表します。
+
+マルチパス保証は`std::forward_iterator`の意味論的な要件によって要求されています。
+
+- [`std::incrementable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/incrementable.html)
+- [`std::sentinel_for` - cpprefjp](https://cpprefjp.github.io/reference/iterator/sentinel_for.html)
+- [`std::regular` - cpprefjp](https://cpprefjp.github.io/reference/concepts/regular.html)
+
 #### 差異
 
+結局、C++20前方向イテレータとC++17前方向イテレータの差異は次のようになります（*input iterator*での差異を含めています、追加されたものは先頭に+で表示）。
+
+|要求|C++20|C++17|
+|---|---|---|
+|`difference_­type`|符号付整数型 or それと同等な型|符号付整数型 or `void`|
+|`->`|不要|要求される|
+|後置インクリメントの戻り値型| `I` |`const I&`に変換可能な型|
+|`reference`と`value_type`との*common reference*|要求される|不要|
+
+デフォルト構築、コピー可能、等値比較可能、などが共通の性質となりました。残ったもので変わったのは後置インクリメントの戻り値型ですが、これはC++20イテレータの方がC++17イテレータに比べて厳しく指定されています。
+
+ここでもC++20前方向イテレータとC++17前方向イテレータには相互に互換性はありませんが、`difference_type`と`->`の差を無視すれば、C++20前方向イテレータはC++17前方向イテレータとして使用することができます。
 
 ### bidirectional iterator
 
 双方向イテレータとは？という事は、C++20では[`std::bidirectional_iterator`](https://cpprefjp.github.io/reference/iterator/bidirectional_iterator.html)コンセプト、C++17では[*Cpp17BidirectionalIterator*要件](https://en.cppreference.com/w/cpp/named_req/BidirectionalIterator)がそれを定義しています。
 
 #### C++17
+
+まず、次の要件が要求されています
+
+- *Cpp17ForwardIterator*要件を満たす
+
+そして、次の式が可能であることが要求されます（ここでは*Cpp17ForwardIterator*要件で要求されていたものを含んでいます）
+
+|式|戻り値|
+|---|---|
+|`i1 != i2`|*contextually convertible to* `bool`|
+|`*i`|`referencce`、要素型`T`に変換可能であること|
+|`i->m`||
+|`++i`|`I&`|
+|`i++`|`const I&`に変換可能であること|
+|`*i++`|`referencce`|
+|`--I`|`I&`|
+|`i--`|`const I&`に変換可能であること|
+|`*i--`|`referencce`|
+
 #### C++20
+
+コンセプトによって次のように定義されます。
+
+```cpp
+template<class I>
+concept bidirectional_iterator =
+  forward_iterator<I> &&
+  derived_from<ITER_CONCEPT(I), bidirectional_iterator_tag> &&
+  requires(I i) {
+    { --i } -> same_as<I&>;
+    { i-- } -> same_as<I>;
+  };
+```
+
+ここは深掘りする必要がないですね、C++17要件とほとんど同じ事を言っています。
+
 #### 差異
+
+結局、C++20双方向イテレータとC++17双方向イテレータの差異は次のようになります（*forward iterator*での差異を含めています、追加されたものは先頭に+で表示）。
+
+|要求|C++20|C++17|
+|---|---|---|
+|`difference_­type`|符号付整数型 or それと同等な型|符号付整数型 or `void`|
+|`->`|不要|要求される|
+|後置インクリメントの戻り値型| `I` |`const I&`に変換可能な型|
+|`reference`と`value_type`との*common reference*|要求される|不要|
+|+ 後置デクリメントの戻り値型| `I` |`const I&`に変換可能な型|
+
+追加されたのは後置デクリメントの戻り値型ですが、インクリメントと同様にC++20イテレータの方がC++17イテレータに比べて厳しく指定されています。
+
+互換性に関しては前方向イテレータと同様です。`difference_type`と`->`の差を無視すれば、C++20双方向イテレータはC++17双方向イテレータとして使用することができます。
 
 ### random access iterator
 
 ランダムアクセスイテレータ・・・？という事は、C++20では[`std::random_access_iterator`](https://cpprefjp.github.io/reference/iterator/random_access_iterator.html)コンセプト、C++17では[*Cpp17RandomAccessIterator*要件](https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator)がそれを定義しています。
 
 #### C++17
+
+まず、次の要件が要求されています
+
+- *Cpp17ForwardIterator*要件を満たす
+
+そして、次の式が可能であることが要求されます（ここでは*Cpp17ForwardIterator*要件で要求されていたものを含んでいます）
+
+|式|戻り値|
+|---|---|
+|`i1 != i2`|*contextually convertible to* `bool`|
+|`*i`|`referencce`、要素型`T`に変換可能であること|
+|`i->m`||
+|`++i`|`I&`|
+|`i++`|`const I&`に変換可能であること|
+|`*i++`|`referencce`|
+|`--I`|`I&`|
+|`i--`|`const I&`に変換可能であること|
+|`*i--`|`referencce`|
+|`i += n`|`I&`|
+|`i + n` <br/> `n + i`|`I`|
+|`i -= n`|`I&`|
+|`i - n`|`I`|
+|`i1 - i2`|`deference_type`|
+|`i[n]`|`reference`に変換可能であること|
+|`i1 < i2`|*contextually convertible to* `bool`|
+|`i1 > i2`|*contextually convertible to* `bool`|
+|`i1 <= i2`|*contextually convertible to* `bool`|
+|`i1 >= i2`|*contextually convertible to* `bool`|
+
+出てくる`n`は`I`の`deference_type`の値です。つまり、`deference_type`は符号付整数型である事を暗に要求しています。また、4つの順序付け比較`< > <= >=`は全順序の上での比較であることが要求されています。
+
 #### C++20
+
+コンセプトによって次のように定義されます。
+
+```cpp
+template<class I>
+concept random_access_iterator =
+  bidirectional_iterator<I> &&
+  derived_from<ITER_CONCEPT(I), random_access_iterator_tag> &&
+  totally_ordered<I> &&
+  sized_sentinel_for<I, I> &&
+  requires(I i, const I j, const iter_difference_t<I> n) {
+    { i += n } -> same_as<I&>;
+    { j +  n } -> same_as<I>;
+    { n +  j } -> same_as<I>;
+    { i -= n } -> same_as<I&>;
+    { j -  n } -> same_as<I>;
+    {  j[n]  } -> same_as<iter_reference_t<I>>;
+  };
+```
+
+`std::totally_ordered<I>`は全順序の上での4つの順序付け比較が可能である事を表し、`std::sized_sentinel_for<I, I>`は2項`-`によって距離が求められるイテレータである事を表しています。
+
+その後に並べられているものも含めて、ほぼほぼC++17イテレータに対するものと同じ要求がなされています。
+
 #### 差異
 
+結局、C++20ランダムアクセスイテレータとC++17ランダムアクセスイテレータの差異は次のようになります（*forward iterator*での差異を含めています、追加されたものは先頭に+で表示）。
+
+|要求|C++20|C++17|
+|---|---|---|
+|`difference_­type`|符号付整数型 or それと同等な型|符号付整数型|
+|`->`|不要|要求される|
+|後置インクリメントの戻り値型| `I` |`const I&`に変換可能な型|
+|`reference`と`value_type`との*common reference*|要求される|不要|
+| 後置デクリメントの戻り値型| `I` |`const I&`に変換可能な型|
+|+ `i[n]`の戻り値型| `reference` |`reference`に変換可能な型|
+
+添字演算子の戻り値型に関してC++20イテレータはより厳しく指定されています。
+
+結局互換性に関しては双方向・前方向イテレータと同様です。`difference_type`と`->`の差を無視すれば、C++20ランダムアクセスイテレータはC++17ランダムアクセスイテレータとして使用することができます。
 
 ### contiguous iterator
 
