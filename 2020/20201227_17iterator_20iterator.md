@@ -1,6 +1,6 @@
 # ［C++］ C++17イテレータ <=> C++20イテレータ != 0
 
-これは[C++ Advent Calendar 2020](https://qiita.com/advent-calendar/2020/cxx)の24日めの記事です。
+これは[C++ Advent Calendar 2020](https://qiita.com/advent-calendar/2020/cxx)の24日めの記事です（大遅刻です、すいません）。
 
 [前回](https://onihusube.hatenablog.com/entry/2020/12/14/002822)と[前々回](https://onihusube.hatenablog.com/entry/2020/12/11/000123)でC++20のイテレータは一味も二味も違うぜ！という事を語ったわけですが、具体的にどう違うのかを見てみようと思います。
 
@@ -64,16 +64,17 @@ concept weakly_incrementable =
   };
 ```
 
+- [`std::weakly_incrementable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/weakly_incrementable.html)
+- [`std::is-integer-like` - cpprefjp](https://cpprefjp.github.io/reference/iterator/is_integer_like.html)
+
 コンセプトを深さ優先探索していくとスタックオーバーフローで脳内コンパイラがしぬので適宜cpprefjpを参照してください。
 
-​`requires`式の中では、`difference_­type`がであることと、前置インクリメントに対しては先ほどのC++17と同じことが要求されています。
+​`requires`式の中では、`difference_­type`が取得可能であることと、前置インクリメントに対しては先ほどのC++17と同じことが要求されています。
 
 大きく異なる点は、デフォルト構築可能であることと、コピー可能ではなくムーブ可能であることです。また、`difference_­type`は`void`が認められない代わりに符号付き整数型と同等な任意の型が許可されており、後置インクリメントが要求されています。
 
 C++20イテレータは`iterator_traits`で使用可能である事を要求されていませんが、C++20の`iterator_traits`はC++17互換窓口としてなんとかして情報をかき集めてきてくれるのでほぼ自動で使用可能となるはずです。また、前々回に説明した`iterator_traits`に代わるイテレータ情報取得手段はイテレータの性質からその情報を取ってくるので`iterator_traits`のようなものはほぼ必要なくなっています。したがって、`iterator_traits`で使用可能かどうかは差異とはみなさないことにします。
 
-- [`std::weakly_incrementable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/weakly_incrementable.html)
-- [`std::is-integer-like` - cpprefjp](https://cpprefjp.github.io/reference/iterator/is_integer_like.html)
 
 #### 差異
 
@@ -89,9 +90,7 @@ C++20イテレータは`iterator_traits`で使用可能である事を要求さ�
 
 コピー可能 -> ムーブ可能ですが、ムーブ可能 -> コピー可能ではありません。`difference_­type`を除いて、C++20のイテレータはC++17から制約が厳しくなっています。
 
-この*iterator*とは全てのイテレータのベースとなる部分の分類です。すなわち、この時点ですでにそこそこの違いがあることが分かります。
-
-そして、殆どの要件が厳しくなっていることからC++17イテレータでしかないものをC++20イテレータとして扱うことは出来ませんが、`difference_­type`の差異を無視すればC++20イテレータをC++17イテレータとして扱うことは出来そうです。
+殆どの要件が厳しくなっていることからC++17イテレータでしかないものをC++20イテレータとして扱うことは出来ませんが、`difference_­type`の差異を無視すればC++20イテレータをC++17イテレータとして扱うことは出来そうです。
 
 `is-integer-like`が求めているものは整数型とほぼ同様にふるまうクラス型であり、通常の演算や組み込み整数型との相互の変換が可能である必要があります。すなわちジェネリックなコードにおいては何かケアの必要なく整数型として動作するものなので、この`difference_­type`の差異はほとんど気にする必要は無いでしょう。
 
@@ -151,12 +150,12 @@ concept indirectly-readable-impl =
   common_reference_with<iter_rvalue_reference_t<In>&&, const iter_value_t<In>&>;
 ```
 
-`iter_value_t`などが使用可能であると言うことは窓口が違うだけで、`iterator_traits`で取得可能と言う要件と同じ意味です。また、`std::iter_rvalue_reference_t`は`std::ranges::iter_move`を使用して右辺値参照型を取得しており、`std::ranges::iter_move`はカスタマイぜーションポイントとしてC++17イテレータに対しても作用します。したがって、これらは差異とはみなさないことにします。
-
-間接参照の戻り値型に対する要件は同じです。大きく違うのはイテレータの`reference`と`value_type`の間に*common reference*が要求されている事です。また、後置インクリメントに関しは`input_or_output_iterator`から引き継いでいるのみで、C++17イテレータが戻り値型に要求があるのに対してC++20イテレータにはそれがありません。
-
 - [`std::indirectly_readable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/indirectly_readable.html)
 - [`std::iter_rvalue_reference_t` - cpprefjp](https://cpprefjp.github.io/reference/iterator/iter_rvalue_reference_t.html)
+
+`iter_value_t`などが使用可能であると言うことは窓口が違うだけで、`iterator_traits`で取得可能と言う要件と同じ意味です。また、`std::iter_rvalue_reference_t`は`std::ranges::iter_move`を使用して右辺値参照型を取得しており、`std::ranges::iter_move`はカスタマイぜーションポイントとしてC++17イテレータに対しても作用します。したがって、これらは差異とはみなさないことにします。
+
+間接参照の戻り値型に対する要件は同じです。大きく違うのはイテレータの`reference`と`value_type`の間に*common reference*が要求されている事です。また、後置インクリメントに関しては`input_or_output_iterator`から引き継いでいるのみで、C++17イテレータが戻り値型に要求があるのに対してC++20イテレータにはそれがありません。
 
 #### 差異
 
@@ -173,7 +172,7 @@ concept indirectly-readable-impl =
 |+ 後置インクリメントの戻り値型|任意（`void`も可）|`value_type`に変換可能な型|
 |+ `reference`と`value_type`との*common reference*|要求される|不要|
 
-後置インクリメントができる事、と言う点においては一致した代わりに差異が増えました。C++17 -> C++20で緩和されたものもあれば厳しくなったものもあり、C++20入力イテレータとC++17入力イテレータの間に互換性はありません。
+後置インクリメントができる事、と言う点においては一致した代わりに差異が増えました。C++17 -> C++20で緩和されたものもあれば厳しくなったものもあり、C++20入力イテレータとC++17入力イテレータの間には相互に互換性がありません。
 
 ### ouptut iterator
 
@@ -227,12 +226,12 @@ concept indirectly_writable =
   };
 ```
 
+- [`std::indirectly_writable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/indirectly_writable.html)
+
 `*i`による出力が可能であることが求められているのですが、制約式がやたら複雑です。上2つは左辺値からでも右辺値からでも出力可能である事と言う要件でしょう。C++17までは右辺値イテレータからの出力は要求されていません。  
 下二つの`const_cast`をしている制約式は、規格書の言によれば間接参照が*prvalue*を返すようなプロクシイテレータを弾くためにあるらしいです。よくわかんない・・・
 
 また、`std::indirectly_writable`コンセプトの意味論的な制約に目を向けると、出力操作後の値の同一性が要求されています。またその一部として、出力操作の後で`i`が間接参照可能であることは要求されていません。
-
-- [`std::indirectly_writable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/indirectly_writable.html)
 
 #### 差異
 
@@ -303,6 +302,9 @@ concept incrementable =
   };
 ```
 
+- [`std::incrementable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/incrementable.html)
+- [`std::regular` - cpprefjp](https://cpprefjp.github.io/reference/concepts/regular.html)
+
 ここで重要なのは、後置インクリメントの戻り値型が自分自身であることが要求された事です。
 
 もう一つ、`std::sentinel_for`はイテレータ自身が終端を示しうる事を表すコンセプトで、次のようなものです。
@@ -315,13 +317,11 @@ concept sentinel_for =
   weakly-equality-comparable-with<S, I>;
 ```
 
+- [`std::sentinel_for` - cpprefjp](https://cpprefjp.github.io/reference/iterator/sentinel_for.html)
+
 `std::regular`は`std::semiregular`を包含しており、等値比較可能である事とコピー可能であることを要求しています。結局、`std::sentinel_for<I, I>`は自分自身との`== !=`による比較が可能である事を表します。
 
 マルチパス保証は`std::forward_iterator`の意味論的な要件によって要求されています。
-
-- [`std::incrementable` - cpprefjp](https://cpprefjp.github.io/reference/iterator/incrementable.html)
-- [`std::sentinel_for` - cpprefjp](https://cpprefjp.github.io/reference/iterator/sentinel_for.html)
-- [`std::regular` - cpprefjp](https://cpprefjp.github.io/reference/concepts/regular.html)
 
 #### 差異
 
@@ -397,7 +397,7 @@ concept bidirectional_iterator =
 
 ### random access iterator
 
-ランダムアクセスイテレータ・・・？という事は、C++20では[`std::random_access_iterator`](https://cpprefjp.github.io/reference/iterator/random_access_iterator.html)コンセプト、C++17では[*Cpp17RandomAccessIterator*要件](https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator)がそれを定義しています。
+ランダムアクセスイテレータって・・・？という事は、C++20では[`std::random_access_iterator`](https://cpprefjp.github.io/reference/iterator/random_access_iterator.html)コンセプト、C++17では[*Cpp17RandomAccessIterator*要件](https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator)がそれを定義しています。
 
 #### C++17
 
@@ -508,6 +508,9 @@ concept contiguous_iterator =
   };
 ```
 
+- [`std::to_address` - cpprefjp](https://cpprefjp.github.io/reference/memory/to_address.html)
+- [`std::add_pointer` - cpprefjp](https://cpprefjp.github.io/reference/type_traits/add_pointer.html)
+
 3つ目の制約式は間接参照の結果が*lvalue*となることを要求しており、4つ目の制約式は`I`の`reference`から`CV`修飾と参照修飾を取り除いたものが要素型になることを要求しています。
 
 最後の`requires`式にある`std::to_address`というのはC++20から追加されたもので、イテレータを含めたポインタ的な型の値からそのアドレスを取得するものです。その経路は`std::pointer_traits`が利用可能ならそこから、そうでないなら`operator->()`の戻り値を再び`std::to_address`にかけることによってアドレスを取得します（つまり、`operator->()`がスマートポインタを返していてもいいわけです・・・）。
@@ -524,9 +527,6 @@ concept contiguous_iterator =
 
 ポインタではない隣接イテレータは存在意義が良く分かりませんが、これらの制約は直接ポインタ型を要求しておらず、メモリ上の連続領域をラップした形のポインタではない隣接イテレータというのを作ろうと思えば作れることを示しています。
 
-- [`std::to_address` - cpprefjp](https://cpprefjp.github.io/reference/memory/to_address.html)
-- [`std::add_pointer` - cpprefjp](https://cpprefjp.github.io/reference/type_traits/add_pointer.html)
-
 #### 差異
 
 C++17隣接イテレータは居ないので、差異はあっても気にする必要はありません。C++20隣接イテレータはC++17コードからはC++17ランダムアクセスイテレータとしてしか扱われることはないでしょう。
@@ -541,11 +541,11 @@ C++20隣接イテレータは実質的に`->`が要求されるようになっ�
 - 全てのC++20イテレータカテゴリにおける`->`の欠如
     - 隣接イテレータも直接`->`が求められるわけではない・・・
 
-この`->`が抜け落ちているのは忘れているわけではなく、意図的なものの様です。なぜかは知りませんが・・・
+この`->`が抜け落ちているのは忘れているわけではなく、意図的なものの様です。なぜかは知りません。
 
 `->`を無視すると、C++20前方向イテレータ以上の強さのイテレータは同じカテゴリのC++17イテレータに対して後方互換性があり、必然的にC++17入力イテレータに対して後方互換性があります。また、C++20隣接イテレータは全てのC++17イテレータに対して実質的に後方互換性を持っています。
 
-一方全てのカテゴリで、C++17イテレータはC++20イテレータに対する前方互換性はありません。要件が厳しくなっているためで、中には使用できるものもないではないかもしれませんが、多くの場合はC++20イテレータコンセプトによって弾かれるでしょう・・・。
+一方全てのカテゴリで、C++17イテレータはC++20イテレータに対する前方互換性はありません。要件が厳しくなっているためで、中には使用できるものもないではないかもしれませんが、多くの場合はC++20イテレータコンセプトによって弾かれるでしょう。
 
 `<ranges>`の各種`view`に代表されるC++20イテレータでは、メンバ型として`iterator_concept`と`iterator_category`を二つ備えることでC++17互換イテレータとしての性質を表明しています（その詳細は前回参照）。そこでは、`iterator_concept`がランダムアクセスイテレータ等であっても、`iterator_category`は常に入力イテレータとする運用が良く行われているように見えます。  
 これを見るに、標準化委員会的にはC++20イテレータの`->`の欠如は対C++17互換にとって重要な事とはみなされてはいないようです。
@@ -555,3 +555,5 @@ C++20隣接イテレータは実質的に`->`が要求されるようになっ�
 - [`<iterator>` - cpprefjp](https://cpprefjp.github.io/reference/iterator.html)
 - [Iterator library - cppreference](https://en.cppreference.com/w/cpp/iterator)
 - [イテレータに->演算子オーバーロードは必要？ - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20191025/p1)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2020/20201227_17iterator_20iterator.md)
