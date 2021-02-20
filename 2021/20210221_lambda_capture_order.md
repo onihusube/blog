@@ -1,12 +1,12 @@
 # ［C++］ラムダキャプチャの記述順序
 
-ラムダ式を雰囲気で書いているので、キャプチャの正しい順序が分かりません。そのため、コンパイラに起こられて直したり怒られなかったからﾖｼ！をしています。
+ラムダ式を雰囲気で書いているので、キャプチャの正しい順序が分かりません。そのため、コンパイラに怒られて直したり怒られなかったからﾖｼ！をしています。
 
 正しい順序とは一体何なのでしょうか・・・？
 
 ### 正しいキャプチャ順序
 
-C++20現在、キャプチャには3種類の方法があります。明確に書かれているわけではありませんが、そこには確かに順序があります。
+C++20現在、キャプチャには3種類の方法があります。明確に書かれているわけではありませんがそこには確かに順序があり、次のようになります。
 
 1. デフォルトキャプチャ
       - `&`
@@ -101,3 +101,5 @@ init-capture:
 - [C++14 ラムダ式の初期化キャプチャ - cpprefjp](https://cpprefjp.github.io/lang/cpp14/initialize_capture.html)
 - [C++20 ラムダ式のキャプチャとして[=, this]を許可する - cpprefjp](https://cpprefjp.github.io/lang/cpp20/allow_lambda_capture_equal_this.html)
 - [C++20 ラムダ式の初期化キャプチャでのパック展開を許可 - cpprefjp](https://cpprefjp.github.io/lang/cpp20/allow_pack_expansion_in_lambda_init_capture.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2021/20210221_lambda_capture_order.md)
