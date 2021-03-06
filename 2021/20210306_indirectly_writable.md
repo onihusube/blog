@@ -72,7 +72,7 @@ ranges::sort(cs | ranges::view::transform([](const C& x) -> std::string& {return
 std::string() = std::string();
 ```
 
-この様な代入が可能となっているという点に行きつきます。
+の様な代入が可能となっているという点に行きつきます。
 
 この様な代入操作は代入演算子の左辺値修飾で禁止できるのですが、標準ライブラリの多くの型の代入演算子は左辺値修飾された代入演算子を持っていません。メンバ関数の参照修飾はC++11からの仕様であり、C++11以前から存在する型に対して追加することは出来ず、それらの型に倣う形で他の型でも参照修飾されてはいません。
 
@@ -88,7 +88,7 @@ std::string() = std::string();
 
 そして、イテレータ`o`について、`decltype(*o)`が真に参照を返すとき、そこに`const`を追加しても効果はありません。
 
-これらの事から、間接参照が*prvalue*を返すときにプロキシオブジェクト以外の出力操作を弾くためには、`const_cast<>`を`decltype(*o)`に対して適用して`const`を付加してから、出力操作をテストすれば良いでしょう。
+これらの事から、間接参照が*prvalue*を返すときにプロキシオブジェクト以外の出力操作を弾くためには、`const_cast`を`decltype(*o)`に対して適用して`const`を付加してから、出力操作をテストすれば良いでしょう。
 
 この結果得られたのが、`indirectly_writable`にある謎の制約式です。
 
@@ -96,7 +96,9 @@ std::string() = std::string();
 template<class Out, class T>
 concept indirectly_writable = 
   requires(Out&& o, T&& t) {
-    // 略
+    *o = std::forward<T>(t);
+    *std::forward<Out>(o) = std::forward<T>(t);
+    // ↓これ！
     const_cast<const iter_reference_t<Out>&&>(*o) = std::forward<T>(t);
     const_cast<const iter_reference_t<Out>&&>(*std::forward<Out>(o)) = std::forward<T>(t);
   };
@@ -104,11 +106,19 @@ concept indirectly_writable =
 
 `std::forward<Out>`の差で制約式が2本あるのは、`Out`に対する出力操作がその値カテゴリによらない事を示すためです。つまり、*lvalue*は当然として、イテレータそのものが*prvalue*であっても出力操作は可能であり、そうでなければなりません。これは今回の事とはあまり関係ありません。
 
-`iter_reference_t`は`Out`からその間接参照の直接の結果型（`reference`）を取得します。それが真に参照ならば（その型を`T&`あるいは`T&&`とすれば）、`iter_reference_t<Out>&&`は`T&`あるいは`T&&`となり、`iter_reference_t`が*prvalue*ならば（`T`とすれば）、`iter_reference_t<Out>&&`は`T&&`となります。
+`iter_reference_t`は`Out`からその間接参照の直接の結果型（`reference`）を取得します。
 
-そこに`const`を追加して`cost_cast`します。これによって`*o`は`const T&`か`const T&&`にキャストされ、それに対する`=`による代入がチェックされます。
+それが真に参照ならば（その型を`T&`あるいは`T&&`とすれば）、そこに`const`を追加しても何も起こらず、型は`T&`あるいは`T&&`のままとなります。しかし、`iter_reference_t`が*prvalue*ならば（`T`とすれば）素直に追加されて`const T`となります。
 
-この様にして、冒頭のコード例の様に意図せず*prvalue*を返すケースをコンパイルエラーにしつつ、意図してプロキシオブジェクトの*prvalue*を返す場合は許可するという、絶妙に難し識別を可能にしています。
+ここで起きていることは`using U = T&`に対する`const U`のようなことで、これは`T& const`（参照そのものに対する`const`修飾）となって、これは参照型には意味を持たないのでスルーされています。
+
+最後にそこに`&&`を付加するわけですが、参照が得られているときは`T&&& -> T&`、`T&&&& -> T&&`となります。`*o`が*prvalue*を返すときは`const T&&`となり、`const`右辺値参照が生成されます。
+
+最後にこの得られた型を用いて`*o`を`const_cast`しそこに対する代入をテストするわけですが、この過程をよく見てみれば`*o`が参照を返している場合は実質的に何もしておらず、すぐ上にある制約式と等価となっています。
+
+つまり、この`const_cast`を用いる制約式は`*o`が*prvalue*を返しているときにしか意味を持ちません。そして、`const T&&`なオブジェクトへの出力（代入）ができるのは`T`がプロキシオブジェクト型の時だけとみなすことができます。
+
+この様にして、冒頭のコード例の様に意図せず*prvalue*を返すケースをコンパイルエラーにしつつ、意図してプロキシオブジェクトの*prvalue*を返す場合は許可するという、絶妙に難しい識別を可能にしています。
 
 そして、これこそが問題の制約式の存在意義です。
 
@@ -139,3 +149,15 @@ C++23に向けてここを修正する動きはあるようですが、この様
 - [ericniebler/stl2 Readable types with prvalue reference types erroneously model Writable - Github](https://github.com/ericniebler/stl2/issues/381)
 - [P2214R0 A Plan for C++23 Ranges](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2214r0.html#a-tuple-that-is-writable)
 - [`std::vector<bool>::reference` - cppreference](https://en.cppreference.com/w/cpp/container/vector_bool/reference)
+
+### 謝辞
+
+この記事の99割は以下の方々のご指摘によって成り立っています
+
+- [@wx257osn2さん](https://twitter.com/wx257osn2/status/1368194050042585088)
+- [@wx257osn2さん](https://twitter.com/wx257osn2/status/1368195657496817665)
+- [@wx257osn2さん](https://twitter.com/wx257osn2/status/1368195504270581761)
+- [@yohhoyさん](https://twitter.com/yohhoy/status/1368193164247449614)
+- [@yohhoyさん](https://twitter.com/yohhoy/status/1368194722913685506)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2021/20210306_indirectly_writable.md)
