@@ -143,6 +143,106 @@ import M;
 
 - [P1766R1 : Mitigating minor modules maladies](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1766r1.html)
 
+
+この提案はモジュールによって問題となる、3つの特殊なケースのバグを修正するものです。
+
+#### 1. `using/typedef`
+
+
+
+```cpp
+/// foo.h
+#ifndef FOO_H
+#define FOO_H
+typedef struct { /*...*/ } X;
+#endif
+```
+```cpp
+module;
+#include "foo.h"
+export module A;
+X x;
+```
+```cpp
+export module B;
+import A;
+```
+```cpp
+/// main.cpp
+import B;
+#include "foo.h"
+```
+
+翻訳単位`main.cpp`では`X`の定義は到達可能ではないため、`X`の定義を含めることは許可されます。しかし、この時でもコンパイラがモジュール`A`の`X`の定義を知っている場合、`X`の定義をマージする作業が必要となります。
+
+この提案では、リンケージを与えるための`typedef`の対象となる構造体は次のものを含むことができないようにします。
+
+- 非静的データメンバ・メンバ列挙型・メンバ型（入れ子クラス）を除くすべてのメンバ
+- 基底クラス
+- データメンバに対するデフォルト初期化子
+- ラムダ式
+
+この提案によって、リンケージを与えるための`typedef`はC言語互換のためだけの機能であることが明確となり、その対象となる構造体はC互換の構造体に限定されるようになります。
+
+これはモジュールの内外を問わず適用されるため、破壊的変更となります。
+
+#### 2. エクスポートブロック内での`static_assert`
+
+モジュールにおける`export`宣言では、名前を導入しないタイプの宣言を`export`することができません。
+
+```cpp
+export static_assert(true); // error、エクスポートできない
+
+export {
+  struct Foo { /*...*/ };
+  static_assert(std::is_trivially_copyable_v<Foo>); // error、エクスポートできない
+
+  struct Bar { /*...*/ };
+
+  template<typename T>
+  struct X { T t; };
+
+  template<typename T>
+  X(T) -> X<T>;  // error、エクスポートできない
+
+  // ...
+
+#define STR(x) constexpr char x[] = #x;
+  STR(foo);  // error: can’t export empty-declaration ';'
+  STR(bar);  // error: can’t export empty-declaration ';'
+#undef X
+}
+```
+
+この提案では、このようなエクスポートブロックの内部でのみ、宣言が少なくとも1つの名前を導入しなければならない、というルールを削除します。
+
+ただし、ブロックではない通常の`export`宣言においては名前を導入しない宣言をエクスポートできないのは変わりません。
+
+#### 3. デフォルト引数の不一致
+
+`inline`ではない関数では、デフォルト引数を翻訳単位ごとに異なるものとすることができます。また、テンプレートのデフォルトテンプレート引数も翻訳単位ごとに異なるものとすることができます。
+
+```cpp
+/// a.h
+int f(int a = 123);
+```
+```cpp
+/// b.h
+int f(int a = 45);
+```
+```cpp
+import A;     // a.hを間接的にインクルードしているが、エクスポートはしていない
+import "b.h";
+
+int n = f();  // ??
+```
+
+同じ宣言に対して異なるデフォルト引数が与えられた複数の宣言が同じ翻訳単位内で出現する場合はコンパイルエラーとなりますが、モジュールにおいては一方のみが名前探索で可視であるが、両方の宣言に到達可能となる場合があります。当初の仕様ではこの場合にどう振舞うかは未規定でした。
+
+この提案では、異なる翻訳単位の同じ名前空間スコープの2つの宣言が、同じ関数引数に異なるデフォルト引数を、同じテンプレート引数に異なるデフォルトテンプレート引数を指定することをそれぞれ禁止します。ただし、異なるデフォルト引数を持つ複数の宣言が同時に到達可能とならない限り、コンパイルエラーとならない可能性があります。
+
+この変更は、その宣言がモジュールにあるかどうかにかかわらず適用されます。つまり、これは破壊的変更となります。
+
 ### Recognizing Header Unit Imports Requires Full Preprocessing
 
 - [P1703R1 : Recognizing Header Unit Imports Requires Full Preprocessing](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1703r1.html)
