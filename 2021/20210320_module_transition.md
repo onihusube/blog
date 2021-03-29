@@ -247,6 +247,168 @@ int n = f();  // ??
 
 - [P1703R1 : Recognizing Header Unit Imports Requires Full Preprocessing](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1703r1.html)
 
+この提案は、依存関係スキャンを簡易化・高速化するために、ヘッダユニットのインポートを`#include`とほとんど同等に扱えるようにするものです。
+
+当初のモジュールでは、`import`宣言はほとんどC++のコードとして解釈され、プリプロセス時にはヘッダユニットのインポートに対してマクロのエクスポートを行う以外のことをしていませんでした。そのため、ヘッダユニットのインポートを識別するには翻訳フェーズ4（プリプロセスの実行）を完了する必要がありました。
+
+すなわち、`import`宣言はほとんどどこにでも現れる可能性があり、マクロ展開を完了しなければ`import`宣言を抽出することができません。
+
+これは従来`#include`に対して行われていた依存関係スキャンに対して、実装が困難になるだけではなく、速度の面でも明らかに劣ることになります。例えば、`#include`に対する依存関係スキャンでは、プリプロセッシングディレクティブ以外の行は何もせず無視することができ、`#include`は1行で書く必要があるため行をまたぐような複雑なマクロ展開をしなくても良くなります。
+
+この提案では、`(export) import`によって開始される行をプリプロセッシングディレクティブとして扱うようにします。それによって、`(export) import`をマクロ展開によって導入する事ができなくなり、`(export) import`は空白を除いて行の先頭に来ていなければならず、`import`宣言は1行で書かなければならなくなります。
+
+プリプロセスの最初の段階ではモジュールのインポートもヘッダユニットのインポートもまとめて扱われ、その後ヘッダユニットのインポートに対してエクスポートされたマクロのインポートを行います。最後に、`import`トークンを実装定義の`import-keyword`に置き換えて、`import`ディレクティブのプリプロセスは終了します。
+
+翻訳フェーズ5以降、つまりC++コードのコンパイル時には、このように導入された`import-keyword`によるものだけが`import`宣言として扱われるようになります。
+
+なお、`(export) import`のトークンおよび`import`ディレクティブを終了する`;`と改行だけがマクロで導入できないだけで、`import`対象のヘッダ・モジュール名はマクロによって導入することができます。
+
+この提案によって可能な記述は制限される事になります。
+
+
+
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+int x; import <map>; int y;
+```
+</td>
+<td valign="top">
+
+```cpp
+// importディレクティブは1行で独立
+int x;
+import <map>;
+int y;
+```
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+import <map>; import <set>;
+```
+</td>
+<td valign="top">
+
+```cpp
+// それぞれ1行づつ書く
+import <map>;
+import <set>;
+```
+
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+export
+import
+<map>;
+```
+</td>
+<td valign="top">
+
+```cpp
+// importディレクティブは1行で完結する
+export import <map>;
+```
+
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+#ifdef MAYBE_EXPORT
+export
+#endif
+import <map>;
+```
+
+</td>
+<td valign="top">
+
+```cpp
+// importディレクティブの一部だけを#ifで変更できない
+#ifdef MAYBE_EXPORT
+export import <map>;
+#else
+import <map>;
+#endif
+```
+
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+#define MAYBE_EXPORT export
+MAYBE_EXPORT import <map>;
+```
+
+</td>
+<td valign="top">
+
+```cpp
+// (export) importはマクロによって導入できない
+#define MAYBE_EXPORT
+#ifdef MAYBE_EXPORT
+export import <map>;
+#else
+import <map>;
+#endif
+```
+
+</pre>
+</td>
+</tr>
+</table>
+
+
+この提案の内容はのちにP1857R3によって大幅に（より制限する方向に）拡張されることになります。
+
+#### 参考資料
+
+- [［C++］モジュールとプリプロセス - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2020/05/15/201112)
+
 ### Standard library header units for C++20
 
 - [P1502R1 : Standard library header units for C++20](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1502r1.html)
