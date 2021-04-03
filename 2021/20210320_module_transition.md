@@ -223,38 +223,339 @@ int n = f();  // ??
 
 - [P1703R1 : Recognizing Header Unit Imports Requires Full Preprocessing](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1703r1.html)
 
+この提案は、依存関係スキャンを簡易化・高速化するために、ヘッダユニットのインポートを`#include`とほとんど同等に扱えるようにするものです。
+
+当初のモジュールでは、`import`宣言はほとんどC++のコードとして解釈され、プリプロセス時にはヘッダユニットのインポートに対してマクロのエクスポートを行う以外のことをしていませんでした。そのため、ヘッダユニットのインポートを識別するには翻訳フェーズ4（プリプロセスの実行）を完了する必要がありました。
+
+すなわち、`import`宣言はほとんどどこにでも現れる可能性があり、マクロ展開を完了しなければ`import`宣言を抽出することができません。
+
+これは従来`#include`に対して行われていた依存関係スキャンに対して、実装が困難になるだけではなく、速度の面でも明らかに劣ることになります。例えば、`#include`に対する依存関係スキャンでは、プリプロセッシングディレクティブ以外の行は何もせず無視することができ、`#include`は1行で書く必要があるため行をまたぐような複雑なマクロ展開をしなくても良くなります。
+
+この提案では、`(export) import`によって開始される行をプリプロセッシングディレクティブとして扱うようにします。それによって、`(export) import`をマクロ展開によって導入する事ができなくなり、`(export) import`は空白を除いて行の先頭に来ていなければならず、`import`宣言は1行で書かなければならなくなります。
+
+プリプロセスの最初の段階ではモジュールのインポートもヘッダユニットのインポートもまとめて扱われ、その後ヘッダユニットのインポートに対してエクスポートされたマクロのインポートを行います。最後に、`import`トークンを実装定義の`import-keyword`に置き換えて、`import`ディレクティブのプリプロセスは終了します。
+
+翻訳フェーズ5以降、つまりC++コードのコンパイル時には、このように導入された`import-keyword`によるものだけが`import`宣言として扱われるようになります。
+
+なお、`(export) import`のトークンおよび`import`ディレクティブを終了する`;`と改行だけがマクロで導入できないだけで、`import`対象のヘッダ・モジュール名はマクロによって導入することができます。
+
+この提案によって可能な記述は制限される事になります。
+
+
+
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+int x; import <map>; int y;
+```
+</td>
+<td valign="top">
+
+```cpp
+// importディレクティブは1行で独立
+int x;
+import <map>;
+int y;
+```
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+import <map>; import <set>;
+```
+</td>
+<td valign="top">
+
+```cpp
+// それぞれ1行づつ書く
+import <map>;
+import <set>;
+```
+
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+export
+import
+<map>;
+```
+</td>
+<td valign="top">
+
+```cpp
+// importディレクティブは1行で完結する
+export import <map>;
+```
+
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+#ifdef MAYBE_EXPORT
+export
+#endif
+import <map>;
+```
+
+</td>
+<td valign="top">
+
+```cpp
+// importディレクティブの一部だけを#ifで変更できない
+#ifdef MAYBE_EXPORT
+export import <map>;
+#else
+import <map>;
+#endif
+```
+
+</pre>
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
+
+```cpp
+#define MAYBE_EXPORT export
+MAYBE_EXPORT import <map>;
+```
+
+</td>
+<td valign="top">
+
+```cpp
+// (export) importはマクロによって導入できない
+#define MAYBE_EXPORT
+#ifdef MAYBE_EXPORT
+export import <map>;
+#else
+import <map>;
+#endif
+```
+
+</pre>
+</td>
+</tr>
+</table>
+
+
+この提案の内容はのちにP1857R3によって大幅に（より制限する方向に）拡張されることになります。
+
+#### 参考資料
+
+- [［C++］モジュールとプリプロセス - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2020/05/15/201112)
+
 ### Standard library header units for C++20
 
 - [P1502R1 : Standard library header units for C++20](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1502r1.html)
 
-### Issueの解決1
+この提案は、少なくとも標準ライブラリのヘッダはヘッダユニットとしてインポート可能であることを規定するものです。
+
+C++20にモジュールが導入されるのは確定的で、そうなると標準ライブラリをモジュールとして提供する（できる）必要が生じます。この提案の時点ではその作業が間に合うかは不透明であり（実際間に合わなかった）、間に合わなかった場合は、それぞれのベンダーがそれぞれの（互換性のない）方法でモジュール化された標準ライブラリが提供され、C++エコシステムに分断をもたらす事になりかねません。
+
+この提案では、既存の標準ライブラリをモジュールとして提供するための最低限のメカニズムを提供しつつ、将来的な標準ライブラリの完全なモジュール化を妨げる事が無いようにするものです。
+
+そのために、__C++の__ 標準ヘッダは全てヘッダユニットとしてインポート可能であると規定し、標準ライブラリへのアクセス手段としての標準ヘッダのインポートを規定します。そして、モジュール単位（名前付きモジュール）の中での標準ライブラリヘッダの`#include`はグローバルモジュールフラグメントの中でのみ行える事が規定されました（診断は不要とあるので、これに従わなくてもコンパイルエラーとはならない可能性があります）。
+
+なお、C互換の標準ヘッダ（`<cmath>, <cassert>`などの`<c~~~>`系のヘッダ）はインポート可能ではありません。これらのヘッダは事前のマクロ定義に大きく影響を受けますが、ヘッダユニットも含めたモジュールは外で定義されたマクロが内部に影響を及ぼさないため、インポータブルでは無いためです。
+
+また同時に、`std`から始まる全てのモジュール名を将来の標準ライブラリモジュールのために予約します。
+
+### NBコメントへの対応1
 
 - [GB022 04.01Allow "import" for accessing standard library names](https://github.com/cplusplus/nbballot/issues/22)
     - [[intro.compliance] The standard library also offers header units. - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/3356)
+
+このIssueは、規格文書中で標準ライブラリのエンティティ名にアクセスする手段を記述している所にヘッダユニットの`import`を加えるものです。P1502R1の内容を補強するもので、P1502R1ではおそらく見落とされていたものです。
+
 - [FR039 06.05.2.4 Non-exported functions should not be visible via ADL after importing](https://github.com/cplusplus/nbballot/issues/38)
     - [[basic.lookup.argdep] Inline the definition of 'interface'. - C++ Standard Draft Sources](https://github.com/cplusplus/draft/pull/3390)
+
+このIssueは、モジュールのインターフェースという言葉を使用していたために、エクスポートしていない関数名がADLを介して表示されるかのように読めてしまっていた部分の表現を修正するものです。
+
+意味するところはこの前後で変わらず、モジュールの内部にあるエクスポートされた宣言はテンプレートのインスタンス化経路上で可視となりますが、エクスポートされていない宣言はいかなる場合にも可視になりません。
+
 - [GB 078 10.01 Harmonize "digits" referring to reserved namespace/module names](https://github.com/cplusplus/nbballot/issues/77)
     - [[namespace.future,diff.cpp14.library] Properly refer to grammar 'digit'](https://github.com/cplusplus/draft/pull/3345)
-- [P1971R0 : Core Language Changes for NB Comments at the November, 2019 (Belfast) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1971r0.html)
-    - [GB079 10.01 Add example for private-module-fragment](https://github.com/cplusplus/nbballot/issues/78)
-    - [US087 10.03 p9 Header unit imports cannot be cyclic, either](https://github.com/cplusplus/nbballot/issues/86)
-    - [US132 15.03 Macros from the command-line not exported by header units](https://github.com/cplusplus/nbballot/issues/131)
-    - [US367 6-15 Instead of header inclusion, also permit header unit import](https://github.com/cplusplus/nbballot/issues/363)
-- [P1979R0 : Resolution to US086](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1979r0.html)
-    - [US086 10.03 Treatment of non-exported imports](https://github.com/cplusplus/nbballot/issues/85)
+
+このIssueは、予約するモジュール名について名前空間の予約と記述を一貫させるものです。
+
+意味するところは変わらず、`std`に数字が続く名前空間名、`std`から始まるモジュール名は全て予約されます。
+
 - [US088 10.04 [module.global] Harmonize labels referring to the global module fragment](https://github.com/cplusplus/nbballot/issues/87)
     - [[module.global,cpp.glob.frag] Rename labels to ...global.frag.](https://github.com/cplusplus/draft/pull/3351)
+
+このIssueは、グローバルモジュールフラグメントに関する箇所の規格参照用のラベルが[module.global]だったり[cpp.glob.frag]だったりしていたのを、[xxx.global.frag]に一貫させるものです。
+
 - [GB089 10.06 [module.reach] Mark translation unit boundaries in example](https://github.com/cplusplus/nbballot/issues/88)
   - [[module.reach] Clearly separate translation units in example.](https://github.com/cplusplus/draft/pull/3331)
+
+このIssueは、モジュールに関するサンプルコードで翻訳単位の境界が曖昧だった所を明確にするものです。
+
+### Core Language Changes for NB Comments at the November, 2019 (Belfast) meeting
+
+- [P1971R0 : Core Language Changes for NB Comments at the November, 2019 (Belfast) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1971r0.html)
+
+この提案は2019年11月のベルファストの会議において採択されたコア言語のIssue解決（NBコメントについて）をまとめたものです。モジュールに関連するものは4件あります。
+
+- [GB079 10.01 Add example for private-module-fragment](https://github.com/cplusplus/nbballot/issues/78)
+
+これは、それまで規格としての記述のみで利用法が不明瞭だったプライベートモジュールフラグメントについて、サンプルコードを追加するものです。
+
+- [US087 10.03 p9 Header unit imports cannot be cyclic, either](https://github.com/cplusplus/nbballot/issues/86)
+
+これは、ヘッダユニットのインポートが再起して巡回する事が無いことを明確に記述するものです。
+
+それまで、モジュールのインポートはインターフェース依存関係という言葉を用いて巡回インポートが禁止されていましたが、ヘッダユニットについては特に規定がありませんでした。
+
+ここでは、インターフェース依存関係の対象にヘッダユニットを含めることで、モジュールと同様に巡回インポートを禁止します。あらゆる巡回インポートはコンパイラによって検出され、コンパイルエラーとなります。
+
+- [US132 15.03 Macros from the command-line not exported by header units](https://github.com/cplusplus/nbballot/issues/131)
+
+これは、コマンドラインオプション（`-D`など）によって定義されたマクロ名がヘッダユニットからエクスポートされないことを規定するものです。
+
+これによって、そのようなマクロ名が重複したり、それがコンパイラによって異なったりする事が防止されます。ただ、これはどうやら文面として強制するものでは無いようです・・・
+
+- [US367 6-15 Instead of header inclusion, also permit header unit import](https://github.com/cplusplus/nbballot/issues/363)
+
+これは、グローバル`new/delete`を使うための`<new>`や`<=>`の戻り値型を使用するための`<compare>`など、言語機能の利用のために標準ライブラリヘッダのインクルードの必要が規定されているものについて、ヘッダユニットの`import`も認めるようにするものです。
+
+### Resolution to US086
+
+- [P1979R0 : Resolution to US086](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1979r0.html)
+    - [US086 10.03 Treatment of non-exported imports](https://github.com/cplusplus/nbballot/issues/85)
+
+この提案によって解決されるIssueは、あるモジュール単位`I`を同じモジュール内の他のモジュール単位`M`がインポートする時に、`I`のグローバルモジュールフラグメントにあるインポート宣言を暗黙的にインポートしないようにするものです。
+
+同じモジュール内にあるモジュール単位をインポートするとき、インポートするモジュール単位内でインポートされているすべての翻訳単位をインポートします。2つのモジュール単位が別々のモジュールに属する場合のインポートは再エクスポート（`export imprt`）されている翻訳単位のみをインポートしますが、同じモジュール内でだけはインポート宣言がより多くの翻訳単位をインポートすることになります。
+
+グローバルモジュールフラグメントは`#include`をモジュール内で安全に行うための宣言領域であり、そこにあるインポート宣言は`#include`の`import`への置換によって導入されたものでしょう。それらはグローバルモジュールに属するものであり`I`の一部ではなく、`I`からエクスポートされ`M`から到達可能となるのは不適切です。
+
+`export`宣言はグローバルモジュールフラグメントに直接的にも間接的（`#include`やマクロ展開）にも書くことはできないので、グローバルモジュールフラグメントで`import`されている翻訳単位をインポートしてしまう可能性があるのは同じモジュール内でのモジュール単位のインポート時だけです。
+
+当初の仕様ではその考慮は抜けており（モジュールTSでは考慮されていましたが、ATOMとのマージ時にグローバルモジュールフラグメントが導入されたことで見落とされていた様子）、グローバルモジュールフラグメントのインポート宣言がモジュールのインターフェースの一部となってしまっていたため、この提案では明示的にそうならないことを規定しています。
+
+```cpp
+/// uses_vector.h
+import <vector>; // #includeからの置換である可能性がある
+```
+```cpp
+/// partition.cpp
+module;
+#include "uses_vector.h" // import <vector>; と展開される
+module A:partition;
+
+// この中でstd::vector<int>を使っているとする。
+```
+```cpp
+/// interface.cpp
+module A;
+import :partition;
+
+// 必ずコンパイルエラーになるようになる
+// ここでは<vector>はインポートもインクルードもされていない
+std::vector<int> x; 
+```
+
+以前の仕様では、最後の`std::vector`の仕様がwell-definedとなってしまっていました。
 
 ### Dynamic Initialization Order of Non-Local Variables in Modules
 - [P1874R1 Dynamic Initialization Order of Non-Local Variables in Modules](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1874r1.html)
     - [US082 10.03 [module.import] Define order of initialization for globals in modules P1874](https://github.com/cplusplus/nbballot/issues/81)
 
-### Issueの解決2
+当初の仕様では、モジュールとそれをインポートする翻訳単位の間で静的記憶域期間を持つオブジェクト（すなわちグローバル変数）の動的初期化順序が規定されていなかったために、`std::cout`の利用すら未定義動作を引き起こす可能性が潜んでいました。
+
+```cpp
+import <iostream>;  // <iostream>ヘッダユニットのインポート
+
+struct G {
+  G() {
+    std::cout << "Constructing\n";
+  }
+};
+
+G g{};  // Undefined Behaior!?
+```
+
+このような場合でも安全に利用できるようにするために、モジュールを含めた翻訳単位間での静的オブジェクトの動的初期化に一定の順序付けを規定するようにします。
+
+ある翻訳単位がヘッダユニットも含めてモジュールをインポートする時、そのモジュールに対してインターフェース依存関係が発生します。インポートが絡む場合の動的初期化順序はこのインターフェース依存関係を1つの順序として初期化順序を規定します。ただし、この初期化順序は半順序となります（すなわち、順序が規定されない場合があります）。
+
+同じ翻訳単位内での動的初期化順序はその宣言順で変わりありません。これは、別の翻訳単位をインポートしたときに、インポート先にある静的変数とインポート元の静的変数との間の動的初期化順序を最低限規定するものです。
+
+#### 参考資料
+
+- [［C++］モジュールインポート時の動的初期化順序 - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2020/02/07/205039)
+
+### Core Language Changes for NB Comments at the February, 2020 (Prague) meeting
 
 - [P2103R0 Core Language Changes for NB Comments at the February, 2020 (Prague) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2103r0.html)
     - [NB US 033: Allow import inside linkage-specifications](https://github.com/cplusplus/nbballot/issues/32)
+
+これは、言語リンケージ指定を伴うブロック内での`import`宣言を許可するものです。
+
+例えば`extern "C"`なブロック内でCのヘッダを`#include`している場合にも、そのファイルがC++としてコンパイルされていればそのヘッダを`import`に置換することができるはずです。しかし以前の仕様では`import`のリンケージ指定もリンケージブロック内での`import`も許可されていなかった（`import`宣言はグローバル名前空間スコープにのみ現れることができた）ため、その場合は常に`#include`するしかありませんでした。
+
+このIssueの解決では、直接的に書くことができないのは従来通りですが、`#include`変換の結果としてヘッダユニットの`import`が現れるのが許可されるようになります。ただし、`C++`言語リンケージ指定以外に現れる`import`宣言は実装定義の意味論で条件付きのサポートとなります。
+
+```cpp
+extern "C" import "importable_header.h" // NG、直接書けない
+
+extern "C" {
+  #include "importable_header.h"  // OK、ヘッダユニットのインポートに変換可能
+                                  // ただし、実装依存のサポート
+
+  import "importable_header.h"    // NG、直接書けない
+}
+
+extern "C++" {
+  #include "importable_header.h"  // OK、ヘッダユニットのインポートに変換可能
+  
+  import "importable_header.h"    // NG、直接書けない
+}
+```
+
+このことは、構文定義を変更してインポート宣言をおよそ宣言が書ける場所にどこでも書けるようにしたうえで、文書でインポート宣言を書ける場所をグローバル名前空間スコープに限定しておき、リンケージ指定ブロック内で（`#include`置換の結果として）インポート宣言が間接的に現れることを許可する形で表現されており、少しややこしいです。
 
 ### ABI isolation for member functions
 
