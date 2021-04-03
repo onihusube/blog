@@ -543,7 +543,9 @@ G g{};  // Undefined Behaior!?
 
 このような場合でも安全に利用できるようにするために、モジュールを含めた翻訳単位間での静的オブジェクトの動的初期化に一定の順序付けを規定するようにします。
 
-ある翻訳単位がヘッダユニットも含めてモジュールをインポートする時、そのモジュールに対してインターフェース依存関係が発生します。インポートが絡む場合の動的初期化順序はこのインターフェース依存関係を1つの順序として初期化順序を規定します。ただし、この初期化順序は半順序となります。
+ある翻訳単位がヘッダユニットも含めてモジュールをインポートする時、そのモジュールに対してインターフェース依存関係が発生します。インポートが絡む場合の動的初期化順序はこのインターフェース依存関係を1つの順序として初期化順序を規定します。ただし、この初期化順序は半順序となります（すなわち、順序が規定されない場合があります）。
+
+同じ翻訳単位内での動的初期化順序はその宣言順で変わりありません。これは、別の翻訳単位をインポートしたときに、インポート先にある静的変数とインポート元の静的変数との間の動的初期化順序を最低限規定するものです。
 
 #### 参考資料
 
@@ -553,6 +555,29 @@ G g{};  // Undefined Behaior!?
 
 - [P2103R0 Core Language Changes for NB Comments at the February, 2020 (Prague) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2103r0.html)
     - [NB US 033: Allow import inside linkage-specifications](https://github.com/cplusplus/nbballot/issues/32)
+
+これは、言語リンケージ指定を伴うブロック内での`import`宣言を許可するものです。
+
+例えば`extern "C"`なブロック内でCのヘッダを`#include`している場合にも、そのファイルがC++としてコンパイルされていればそのヘッダを`import`に置換することができるはずです。しかし以前の仕様では`import`のリンケージ指定もリンケージブロック内での`import`も許可されていなかった（`import`宣言はグローバル名前空間スコープにのみ現れることができた）ため、その場合は常に`#include`するしかありませんでした。
+
+このIssueの解決では、直接的に書くことができないのは従来通りですが、`#include`変換の結果としてヘッダユニットの`import`が現れるのが許可されるようになります。ただし、`C++`言語リンケージ指定以外に現れる`import`宣言は実装定義の意味論で条件付きのサポートとなります。
+
+```cpp
+extern "C" import "importable_header.h" // NG、直接書けない
+
+extern "C" {
+  #include "importable_header.h"  // OK、ヘッダユニットのインポートに変換可能
+                                  // ただし、実装依存のサポート
+
+  import "importable_header.h"    // NG、直接書けない
+}
+
+extern "C++" {
+  #include "importable_header.h"  // OK、ヘッダユニットのインポートに変換可能
+  
+  import "importable_header.h"    // NG、直接書けない
+}
+```
 
 ### ABI isolation for member functions
 
