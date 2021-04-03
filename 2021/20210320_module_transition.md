@@ -527,6 +527,28 @@ std::vector<int> x;
 - [P1874R1 Dynamic Initialization Order of Non-Local Variables in Modules](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1874r1.html)
     - [US082 10.03 [module.import] Define order of initialization for globals in modules P1874](https://github.com/cplusplus/nbballot/issues/81)
 
+当初の仕様では、モジュールとそれをインポートする翻訳単位の間で静的記憶域期間を持つオブジェクト（すなわちグローバル変数）の動的初期化順序が規定されていなかったために、`std::cout`の利用すら未定義動作を引き起こす可能性が潜んでいました。
+
+```cpp
+import <iostream>;  // <iostream>ヘッダユニットのインポート
+
+struct G {
+  G() {
+    std::cout << "Constructing\n";
+  }
+};
+
+G g{};  // Undefined Behaior!?
+```
+
+このような場合でも安全に利用できるようにするために、モジュールを含めた翻訳単位間での静的オブジェクトの動的初期化に一定の順序付けを規定するようにします。
+
+ある翻訳単位がヘッダユニットも含めてモジュールをインポートする時、そのモジュールに対してインターフェース依存関係が発生します。インポートが絡む場合の動的初期化順序はこのインターフェース依存関係を1つの順序として初期化順序を規定します。ただし、この初期化順序は半順序となります。
+
+#### 参考資料
+
+- [［C++］モジュールインポート時の動的初期化順序 - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2020/02/07/205039)
+
 ### Core Language Changes for NB Comments at the February, 2020 (Prague) meeting
 
 - [P2103R0 Core Language Changes for NB Comments at the February, 2020 (Prague) meeting](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2103r0.html)
