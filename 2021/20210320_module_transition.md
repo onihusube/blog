@@ -579,6 +579,8 @@ extern "C++" {
 }
 ```
 
+このことは、構文定義を変更してインポート宣言をおよそ宣言が書ける場所にどこでも書けるようにしたうえで、文書でインポート宣言を書ける場所をグローバル名前空間スコープに限定しておき、リンケージ指定ブロック内で（`#include`置換の結果として）インポート宣言が間接的に現れることを許可する形で表現されており、少しややこしいです。
+
 ### ABI isolation for member functions
 
 - [P1779R3: ABI isolation for member functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1779r3.html)
