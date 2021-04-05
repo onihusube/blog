@@ -166,7 +166,7 @@ struct S {
   static constexpr int z = 56;
 };
 
-const int S::x = 12;            //ok、constinit変数なので定数初期化される
+const int S::x = 12;            //ng、初期化宣言にconstinitがない場合、未定義動作（診断不要）
 constinit const int S::y = 34;  //ok、constinit変数なので定数初期化される
 constinit constexpr int S::z;   //ng、インライン変数に対する多重定義
                                 //constexpr静的メンバ変数に対するクラス外定義はC++17以降非推奨
