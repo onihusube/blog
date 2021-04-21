@@ -557,9 +557,24 @@ extern "C++" {
 
 このことは、構文定義を変更してインポート宣言をおよそ宣言が書ける場所にどこでも書けるようにしたうえで、文書でインポート宣言を書ける場所をグローバル名前空間スコープに限定しておき、リンケージ指定ブロック内で（`#include`置換の結果として）インポート宣言が間接的に現れることを許可する形で表現されており、少しややこしいです。
 
+
+### Translation-unit-local entities
+
+- [P1815R2: Translation-unit-local entities](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1815r2.html)
+- [US035 06.05 Referring to internal-linkage entities from certain exported ones should be ill-formed P1815](https://github.com/cplusplus/nbballot/issues/34)
+
 ### ABI isolation for member functions
 
 - [P1779R3: ABI isolation for member functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1779r3.html)
+
+これは、名前付きモジュール内で定義されたクラスについて、その定義内で定義されているメンバ関数の暗黙`inline`をしなくするものです。
+
+問題となるのは、外部/モジュールリンケージを持つ`inline`関数から内部リンケージを持つ名前が参照されてしまう時です。
+
+
+ただし、ラムダ式の作るクロージャ型の関数呼び出し演算子と変換演算子が暗黙`inline`であることは変わりません。また、暗黙に定義された特殊メンバ関数が暗黙`inline`であることおよび、（クラス定義内）最初の宣言で明示的に`default`指定された関数が暗黙`inline`であることは変化しません。
+
+それらの関数からは、内部リンケージ持つ名前（メンバ変数やメンバ変数のメンバ関数、非メンバ比較演算子）を問題なく参照することができるためです。
 
 ### Modules Dependency Discovery
 - [P1857R3 Modules Dependency Discovery](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1857r3.html)
@@ -568,7 +583,3 @@ extern "C++" {
 - [P2109R0: US084: Disallow "export import foo" outside of module interface](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2109r0.html)
 
 - [P2115R0: US069: Merging of multiple definitions for unnamed unscoped enumerations](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2115r0.html)
-
-### Translation-unit-local entities
-
-- [P1815R2: Translation-unit-local entities](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1815r2.html)
