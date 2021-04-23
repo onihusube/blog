@@ -561,7 +561,7 @@ extern "C++" {
 ### Translation-unit-local entities
 
 - [P1815R2: Translation-unit-local entities](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1815r2.html)
-- [US035 06.05 Referring to internal-linkage entities from certain exported ones should be ill-formed P1815](https://github.com/cplusplus/nbballot/issues/34)
+  - [US035 06.05 Referring to internal-linkage entities from certain exported ones should be ill-formed P1815](https://github.com/cplusplus/nbballot/issues/34)
 
 ### ABI isolation for member functions
 
