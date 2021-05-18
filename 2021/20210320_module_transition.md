@@ -565,6 +565,139 @@ extern "C++" {
   - [US133 15.03 Header units containing internal-linkage entities P2003 P1815](https://github.com/cplusplus/nbballot/issues/132)
   - [US134 15.03 Header units containing external-linkage entities P2003 P1815](https://github.com/cplusplus/nbballot/issues/133)
 
+これは名前付きモジュールのインターフェースにある内部リンケージ名がそのモジュールの外部へ露出する事を禁止するものです。
+
+これは特に、モジュール外部でインライン展開されうる関数にて問題になっていました。
+
+```cpp
+/// mymodule.cpp
+module;
+#include <iostream>
+export module mymodule;
+
+// 内部リンケージ
+static void internal_f(int n) {
+  std::cout << n << std::endl;
+}
+
+namespace {
+  // 内部リンケージ
+  int internal_g() {
+    return 10;
+  }
+}
+
+// エクスポートされている、外部リンケージ
+export inline int external_f(int n) {
+  // この関数がインライン展開されると・・・
+  internal_f(n);
+  return n + internal_g();
+}
+```
+
+名前付きモジュールにおける`inline`関数が`export`される場合、その定義はそのモジュールのインターフェースに無ければなりません。そのため、`export`された`inline`関数は`inline`指定の本来の効果（関数のインライン展開の指示）の適用対象となります。
+
+インライン展開される関数の本体から内部リンケージ名を参照していると、本来翻訳単位を超えて参照できないはずの内部リンケージ名がインライン展開によって翻訳単位の外側から参照されてしまう事になります。内部リンケージ名の翻訳単位外への暴露は望ましい動作では無いため、この提案によって禁止されました。
+
+名前付きモジュールのインターフェースに存在する外部への露出が禁止されるもののことを、翻訳単位ローカルのエンティティ（*TU-local Entities*）と呼びます。TU-localエンティティの正確な定義は複雑ですが、ほぼ内部リンケージ名を持つ関数・変数・型のことを指します。
+
+それらTU-localエンティティが`inline`関数などによって翻訳単位の外に曝露する可能性のある時、コンパイルエラーとなります。注意なのは、TU-localエンティティが曝露された時ではなく、その可能性がある段階でコンパイルエラーとなる事です。
+
+```cpp
+export module M;
+
+// 内部リンケージの関数
+static constexpr int f() { return 0; }
+
+static int f_internal() { return f(); } // 内部リンケージ、OK
+       int f_module()   { return f(); } // モジュールリンケージ、OK
+export int f_exported() { return f(); } // 外部リンケージ、OK
+
+// 外部orモジュールリンケージを持つinline関数は内部リンケージ名を参照できない
+static inline int f_internal_inline() { return f(); } // OK
+       inline int f_module_inline()   { return f(); } // NG
+export inline int f_exported_inline() { return f(); } // NG
+```
+
+もう一つ、`inline`関数では無いけれどほぼ同じ振る舞いをするものにテンプレートがあります。テンプレートの厄介なところは、インスタンス化されるまで何を参照しているかが確定しない事にあります。そのため、テンプレートでは、インスタンス化された時に内部リンケージ名を参照する可能性がある場合にコンパイルエラーとなります。
+
+```cpp
+/// mymodule.cpp
+export module mymodule;
+
+export struct S1 {};
+
+// 内部リンケージ
+static void f(S1);  // (1)
+
+export template<typename T>
+void f(T t);  // (2)
+
+// インスタンス化前はエラーにならない
+export template<typename T>
+void external_f(T t) {
+  f(t);
+}
+```
+```cpp
+/// main,cpp
+import mymodule;
+
+struct S2{};
+
+void f(S2);  // (3)
+
+int main() {
+  S1 s1{};
+  S2 s2{};
+
+  external_f(10);  // OK、(2)を呼ぶ
+  external_f(s2);  // OK、(3)を呼ぶ
+  external_f(s1);  // NG、(1)を呼ぶ
+}
+```
+
+内部リンケージ名を参照する可能性がある場合というのは、直接的に現れていなかったとしても、関数オーバーロードの候補集合に内部リンケージな関数が含まれている場合です。その場合使用する関数の決定を待たずにコンパイルエラーとなります。
+
+テンプレートに関しては例外があり、内部リンケージ名を外部から参照しエラーとなる宣言であっても、モジュールのインターフェース内で予め特殊化されインスタンス化済みである時はエラーとなりません（`inline`指定が無ければ）。
+
+```cpp
+/// mymodule.cpp
+export module mymodule;
+
+export struct S1 {};
+
+static void f(S1 s);  // (1)
+
+// 宣言はOK
+export template<typename T>
+void external_f(T t) {
+  f(t);
+}
+
+// S1に対するexternal_f()の明示的インスタンス化
+template void external_f<S1>(S1); // (2)
+```
+```cpp
+/// main,cpp
+import mymodule;
+
+int main() {
+  S1 s1{};
+
+  external_f(s1);  // OK、(2)でインスタンス化済
+}
+```
+
+この場合、モジュールは予めコンパイルされているはずなので、インスタンス化済のテンプレートのインスタンス化を省略し、通常の関数と同様にシグネチャのみで参照することができます。テンプレートは`inline`指定がなければインライン展開されるとは限らず、その必要がありません。
+
+
+このようにこの提案の後では、名前付きモジュールにおける関数に対する`inline`指定はインライン展開の対象であることをコンパイラに伝えるマーカーとしての本来の役割のみを担うようになります。
+
+#### 参考資料
+
+- [［C++］TU-local Entityをexposureするのこと（禁止） - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2021/04/30/230638)
+
 ### ABI isolation for member functions
 
 - [P1779R3: ABI isolation for member functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1779r3.html)
