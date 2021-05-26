@@ -462,6 +462,8 @@ Atom提案では`export`と`module`は文脈依存キーワードとされてい
 - preprocessing-token:
 	- header-name
 	- import-keyword
+	- module-keyword
+	- export-keyword
 	- identifier
   - pp-number
   - character-literal
@@ -490,9 +492,20 @@ Atom提案では`export`と`module`は文脈依存キーワードとされてい
       - ~~これまでに処理された一連のプリプロセッシングトークンが翻訳フェーズ4までコンパイル可能であり、結果として`import`宣言になる場合、プリプロセッシングディレクティブの外側では翻訳フェーズ4を適用する。~~
 
 #### 4
-import-keywordは`import`ディレクティブを処理することで生成され、直接記述するための文法は無い。
+import-keywordは`import`ディレクティブをプリプロセスすることで生成され、module-keywordは`module`ディレクティブをプリプロセスすることで生成され、export-keywordはその2つのディレクティブをプリプロセスする事で生成される。
+
+この他に、記述するための文法は無い。
+
+### 5.11 Keywords [lex.key]
+
+- Keywords:
+	- 表5に記載のある識別子
+	- import-keyword
+	- module-keyword
+	- export-keyword
 
 ### 6.3 One-deﬁnition rule [basic.def.odr]
+
 #### 1  
 1つの翻訳単位には、変数、関数、クラス型、列挙型、テンプレート、特定のスコープ内関数のデフォルト引数、デフォルトテンプレート引数、これらの定義を複数含めることはできない。
 
@@ -676,26 +689,8 @@ void test() {
 翻訳単位は宣言の列から成る。
 
 - translation-unit
-  - top-level-declaration-seq (opt)
-  - global-module-fragment (opt) module-declaration top-level-declaration-seq (opt) private-module-fragment (opt)
-- private-module-fragment:
-  - `module : private;` top-level-declaration-seq (opt)
-- top-level-declaration-seq:
-  - top-level-declaration
-  - top-level-declaration-seq top-level-declaration
-- top-level-declaration:
-  - module-import-declaration
-  - declaration 
-
-#### 2
-~~プライベートモジュールフラグメント（private-module-fragment）はプライマリモジュールインターフェース単位にだけ表れる。 
-private-module-fragmentを持つモジュール単位は、そのモジュールで唯一のモジュール単位となる。その診断は不要。~~
-
-#### 2
-`module`, `export module`~~, `import`, `export import`~~、のどれかで始まり、直後に`::`が続かないトークン列がtop-level-declarationのdeclarationとして扱われる事は無い。
-
-（上記top-level-declarationの形式中の2番目のdecralationとして扱われない = モジュール宣言として扱われるということ。  
-例えば、`module::C f(){}`、~~`export import::T g(int);`~~ のような形の宣言は既に存在している可能性があるので、それを考慮しての文面だと思われる。`export`は予約語なのでこの心配はない）
+  - declaration-seq (opt)
+  - global-module-fragment (opt) module-declaration declaration-seq (opt) private-module-fragment (opt)
 
 #### 3  
 ある名前が、別のスコープの宣言によって導入された名前と同じ、オブジェクト、参照、関数、型、テンプレート、名前空間、値、を指し示す場合、その名前は __リンケージ__ （*linkage*）を持つ。
@@ -1059,7 +1054,7 @@ typedef struct {
 ### 10.1 Module units and purviews [module.unit]
 
 - module-declaration:
-  - `export`(opt) `module` module-name module-partition(opt) attribute-speciﬁer-seq(opt);
+  - export-keyword(opt) module-keyword module-name module-partition(opt) attribute-speciﬁer-seq(opt);
 - module-name:
   - module-name-qualifier(opt) identifier
 - module-partition:
@@ -1182,6 +1177,7 @@ int &c = n; // OK、n は可視
 - export-declaration:
   - `export` declaration
   - `export` { declaration-seq (opt) }
+  - export-keyword module-import-declaration
 
 #### 1
 `export`宣言（export-declaration）は、モジュールインターフェース単位の本文内にある名前空間スコープでのみ現れる。  
@@ -1374,12 +1370,10 @@ export namespace N {
 
 ### 10.3 Import declaration [module.import]
 
-```ebnf
-module-import-declaration:
-  import-keyword module-name attribute-specifier-seq(opt);
-  import-keyword module-partition attribute-specifier-seq(opt);
-  import-keyword header-name attribute-specifier-seq(opt);
-```
+- module-import-declaration:
+  - import-keyword module-name attribute-specifier-seq(opt);
+  - import-keyword module-partition attribute-specifier-seq(opt);
+  - import-keyword header-name attribute-specifier-seq(opt);
 
 #### 1
 モジュールインポート宣言（*module-import-declaration*）はグローバル名前空間スコープにのみ現れる。  
@@ -1448,7 +1442,7 @@ import M1;              // error: 循環的なインターフェース依存関�
 
 ### 10.4 Global module fragment [module.global.frag]
 - global-module-fragment:
-	- `module;` declaration-seq(opt)
+	- module-keyword `;` declaration-seq(opt)
 
 [Note:翻訳フェーズ4より前では、ここのdeclaration-seqにはプリプロセッサディレクティブのみが現れる  
 （すなわち、グローバルモジュールフラグメントにはプリプロセッサディレクティブしか現れてはならない）]
@@ -2111,22 +2105,15 @@ void k() {
 
 # 15 Preprocessing directives [cpp]
 
-#### 1
-
-__プリプロセッシングディレクティブ__（*preprocessing directive*）は次の制約を満たすプリプロセッシングトークンのシーケンスで構成される。
-
-- シーケンスの最初のトークン（ディレクティブ導入トークン）は、ソースファイルの最初の文字として（改行文字を含まない任意個のホワイトスペースがあっても可）、または少なくとも1つの改行文字（new-line）を含むホワイトスペースに続いて、次のいずれかの形式で（翻訳フェーズ4の開始時に）現れる。
-  - `#プリプロセッシングトークン`
-  - `import`
-  - `export import`
-- シーケンスの最後の文字は、そのシーケンスの最初の文字に続く最初の改行文字（new-line）  
-（そのため、プリプロセッシングディレクティブは一般に「行」とよばれる。プリプロセス中の特定処理を除いて、全てのホワイトスペースは同等であるため、これらの「行」には他の構文上の意味はない）
-- 改行文字（new-line）は、意図せずに関数形式マクロ等の呼び出しの中に現われたとしても、プリプロセッシングディレクティブを終了させる
-
-（以下Preprocessing directiveの構文規則）
-
 - preprocessing-file:
   - group (opt)
+  - module-file
+- module-file:
+  - pp-global-module-fragment (opt) pp-module group (opt) pp-private-module-fragment (opt)
+- pp-global-module-fragment:
+  - `module ;` new-line group (opt)
+- pp-private-module-fragment:
+  - `module : private ;` new-line group (opt)
 - group:  
   - group-part  
   - group group-part
@@ -2137,23 +2124,64 @@ __プリプロセッシングディレクティブ__（*preprocessing directive*
   - `#` conditionally-supported-directive
 - control-line:
 	- `# include` pp-tokens new-line
-	- `export`(opt) `import` pp-tokens new-line
+	- pp-import
   - （以下略）
+
+#### 1
+
+__プリプロセッシングディレクティブ__（*preprocessing directive*）は次の制約を満たすプリプロセッシングトークンのシーケンスで構成される。
+
+翻訳フェーズ4開始の時点で、シーケンスの最初のトークン（ディレクティブ導入トークン）は、ソースファイルの最初の文字として（改行文字を含まない任意個のホワイトスペースがあっても可）、または少なくとも1つの改行文字（new-line）を含むホワイトスペースに続いて現れており、かつ
+
+1. `#`プリプロセッシングトークン
+2. `import`プリプロセッシングトークン、同じ論理行の直後にheader-name、`<`、識別子、string-literal、`:`のいずれかのプリプロセッシングトークンが続くもの
+3. `moudle`プリプロセッシングトークン、同じ論理行の直後に識別子、`:`、`;`のいずれかのプリプロセッシングトークンが続くもの
+4. `export`プリプロセッシングトークン、同じ論理行の直後に2, 3のどちらかの形式のディレクティブが続くもの
+
+シーケンスの最後のトークンは、（次の）シーケンスの最初のトークンであり、その直後には改行を含む空白文字が続く。  
+（そのため、プリプロセッシングディレクティブは一般に「行」とよばれる。プリプロセス中の特定処理を除いて、全てのホワイトスペースは同等であるため、これらの「行」には他の構文上の意味はない）
+
+[Note: 改行文字（new-line）は、意図せずに関数形式マクロ等の呼び出しの中に現われたとしても、プリプロセッシングディレクティブを終了させる]
+
+```cpp
+#                       // preprocessing directive
+module ;                // preprocessing directive
+export module leftpad;  // preprocessing directive
+import <string>;        // preprocessing directive
+export import "squee";  // preprocessing directive
+import rightpad;        // preprocessing directive
+import :part;           // preprocessing directive
+
+module                  // not a preprocessing directive
+;                       // not a preprocessing directive
+
+export                  // not a preprocessing directive
+import                  // not a preprocessing directive
+foo;                    // not a preprocessing directive
+
+export                  // not a preprocessing directive
+import foo;             // preprocessing directive (ill-formed at phase 7)
+
+import ::               // not a preprocessing directive
+import ->               // not a preprocessing directive
+```
+
+#### 2
+
+プリプロセッシングトークンのシーケンスは、ディレクティブ導入トークンで始まらない限り、text-lineにすぎない。
+
+プリプロセッシングトークンのシーケンスは、上記構文定義の`#`の後に現れるディレクティブ名のいずれでも始まらない場合にのみ、conditionally-supported-directiveとなる。
 
 #### 3
 
-プログラム内各翻訳単位をプリプロセスするときに検出される各`#define`ディレクティブは、個別のマクロ定義（*macro definition*）である。
+翻訳フェーズ4の開始時に、pp-global-module-fragmentのgroupにはtext-lineもpp-importも含まれてはならない。
 
-[Note: 事前定義されるマクロ名は`#define`ディレクティブで導入されない。追加で任意のマクロを事前定義する方法（コマンドライン引数など）を提供する処理系は、それらを`#define`で導入されたものとして扱わない事が推奨される。（すなわち、ヘッダーユニットからのマクロのエクスポートにおいて、それらの事前定義マクロはエクスポートされない。もしくはしない事が推奨される）]
-
-（以下略）
-
-#### 4
+#### 5
 プリプロセッシングディレクティブ内（ディレクティブ導入トークンの直後から終端改行文字の直前までの間）のプリプロセッシングトークン間に現れる空白文字は、半角スペースと水平タブのみである。
 
 （ディレクティブ導入トークンは1に書かれている3つのもののうちどれか）
 
-#### 5
+#### 6
 実装は、ソースファイルのセクションを条件付きで処理・スキップしたり、他のソースファイルをincludeしたり、ヘッダーユニットからマクロをインポートしたり、マクロを置換したりできる。  
 これらの（プリプロセッサで）出来ることは、概念的には翻訳単位の翻訳（コンパイル処理）前に行われるため、__プリプロセッシング__（前処理 : *preprocessing*）と呼ばれる。
 
@@ -2184,6 +2212,27 @@ header-nameで識別されるヘッダーがインポート可能なヘッダで
 
 （header-nameとは""か<>で囲まれた文字列の事、ここでのプリプロセッサディレクティブは`#include header-name`を指す。すなわち、`#include`を`import`に置き換えることを意味する。この置換は実装定義）
 
+### 15.4 Module directive [cpp.module]
+
+- pp-module:
+  - `export`(opt) `module` pp-tokens (opt) `;` new-line
+
+#### 1
+
+pp-moduleは、`module`または`export`（pp-moduleの最初のトークンである場合のみ）がオブジェクトマクロとして定義された識別子である文脈で現れてはならない。
+
+#### 2
+
+`module`ディレクティブ内の`module`プリプロセッシングトークンの後にあるプリプロセッシングトークンは、通常のテキストと同様に処理される。
+
+[Note: そこでマクロ名として定義されている各識別子は、プリプロセッシングトークンの置換リストに置き換えられる]
+
+#### 3
+
+`module`と`export`（存在する場合）プリプロセッシングトークンは、それぞれmodule-keywordとexport-keywordに置き換えられる。
+
+[Note: これにより、その行はプリプロセッシングディレクティブではなくなるため、翻訳フェーズ4の終了時に削除されない。]
+
 ### 15.3 Header unit importation [cpp.import]
 
 - pp-import:
@@ -2193,28 +2242,39 @@ header-nameで識別されるヘッダーがインポート可能なヘッダで
 
 #### 1
 
+pp-importは、`import`または`export`（pp-importの最初のトークンである場合のみ）がオブジェクトマクロとして定義された識別子である文脈で現れてはならない。
+
+#### 2
+
 `import` control-lineの`import`プリプロセッシングトークンの後のプリプロセッシングトークンは通常のテキストと同様に処理される（つまり、その時点でマクロ名として定義されている各識別子は、プリプロセッシングトークンの置換リストによって置換される）。
 
-pp-importの最初の2つの形式にマッチする`import`ディレクティブは、header-nameで指定されるヘッダーユニットからマクロをインポートするように、プリプロセッサーに指示する。
-
-~~pp-importは`import`トークンまでの翻訳フェーズ4によって形成されたトークンシーケンスが、import-seqを形成し、かつ`import`トークンが別のheader-name-tokensか別のpp-import内のpp-import-suffixに無い場合のみ（pp-importとして）認識される。  
-pp-importを終了する`;`プリプロセッシングトークンは、マクロ置換によって生成されたものではない。~~
+[Note: pp-importの最初の2つの形式にマッチする`import`ディレクティブは、header-nameで指定されるヘッダーユニットからマクロをインポートするように、プリプロセッサーに指示する。]
 
 pp-importによってインポートされるマクロのインポート点は、pp-importの最初の2つの形式ではそのpp-importを終了する改行（new-line）の直後の点。
 
-pp-importの最後の形式は、最初の2つの形式がマッチしなかった時にのみ考慮される。  
+pp-importの最後の形式は、最初の2つの形式がマッチしなかった時にのみ考慮され、マクロのインポート点を持たない。  
 （この形式には、名前付きモジュールの`import`宣言がマッチする。それは次の規則によってimport-keywordに置換され、`import`宣言としてプリプロセス後に処理される。）
 
-#### 2
-pp-importの3つの形式全てで、`import`トークンはimport-keywordトークンに置換される。  
-（これにより、モジュールとしての処理はプリプロセス後にヘッダーユニット等の区別なく実行される。）
+#### 3
+
+module-fileのgroup処理中に、ソースファイルのインクルード（`#include`がインポート可能なヘッダを指定する時に行われる書き換えも含めて）によってpp-importが生成される場合、プログラムはill-formed。
+
+#### 4
+
+pp-importの3つの形式全てで、`import`と`export`（存在する場合）プリプロセッシングトークンは、それぞれimport-keywordとexport-keywordに置き換えられる。（これにより、モジュールとしての処理はプリプロセス後にヘッダーユニット等の区別なく実行される。）
+
+[Note: これにより、その行はプリプロセッシングディレクティブではなくなるため、翻訳フェーズ4の終了時に削除されない。]
 
 さらに、pp-importの2つ目の形式では、header-name-tokensが`#include`ディレクティブのpp-tokensであるかのように、header-nameトークンが生成される。  
 そして、header-name-tokensは（生成された）header-nameトークンに置き換えられる。  
 [Note:これにより、インポートはプリプロセッサ及びその後の翻訳フェーズで（１つ目の形式として）一貫して処理される。]
 
-#### 3
-プログラム内の各翻訳単位においてのプリプロセッシング時に現れた`#define`ディレクティブは、それぞれ異なる __マクロ定義__（*macro definition*）が得られる。  
+#### 5
+
+プログラムの各翻訳単位のプリプロセス時に現れた`#define`ディレクティブは、それぞれ個別の __マクロ定義__（*macro definition*）である。
+
+[Note: 事前定義されるマクロ名は`#define`ディレクティブで導入されない。追加で任意のマクロを事前定義する方法（コマンドライン引数など）を提供する処理系は、それらを`#define`で導入されたものとして扱わない事が推奨される。（すなわち、ヘッダーユニットからのマクロのエクスポートにおいて、それらの事前定義マクロはエクスポートされない。もしくはしない事が推奨される）]
+
 ヘッダーユニットからマクロをインポートすると、その翻訳単位（その翻訳単位におけるヘッダーユニット）からのマクロ定義が、他の（インポートした）翻訳単位において可視となる（使えるようになる）。
 
 それぞれのマクロ定義は、次のように各翻訳単位において最大1つの定義点及び未定義点をもつ。
@@ -2261,25 +2321,6 @@ import "c.h";   // d.hにおける、#4,#5の定義点
 int a = Y;      // OK, アクティブなマクロ定義#2と#4、#4はYの有効な再定義
 int c = Z;      // error: クティブなマクロ定義#3と#5、#5はZの有効な再定義ではない
 ```
-
-### 15.4 Global module fragment [cpp.global.frag]
-- pp-global-module-fragment:
-	- `module ;` pp-balanced-token-seq `module`
-- pp-balanced-token-seq:
-	- pp-balanced-token
-	- pp-balanced-token-seq pp-balanced-token
-- pp-balanced-token:
-	- pp-ldelim pp-balanced-token-seq(opt) pp-rdelim
-  - pp-ldelimまたはpp-rdelim以外のプリプロセッシングトークン
-- pp-ldelim: 次のいずれか  
-	`(`    `[`    `{`    `<:`    `<%`
-- pp-rdelim: 次のいずれか  
-	`)`    `]`    `}`    `:>`    `%>`
-
-翻訳フェーズ4の開始前に、最初の2つのプリプロセッシングトークンが`module ;`の場合、プリプロセッシングの結果は、pp-balanced-token-seq内の全てのプリプロセッシングトークンがソースファイルのインクルードによって直接・間接的に生成されたpp-global-module-fragmentで始まり、2つ目の`module`プリプロセッシングトークンは、ソースファイルのインクルードもしくはマクロの置換によって生成されなかったものである（2つ目の`module`は`#include`やその他マクロによって生成されたものであってはならない）。  
-そうではない場合、翻訳フェーズ4の終了時の最初の2つのプリプロセッシングトークンは`module ;`ではない。
-
-[参考](https://twitter.com/tetzrom/status/1145236250007232512)
 
 ### 16.5.1.2 Headers [headers]
 #### 4
@@ -2330,15 +2371,16 @@ import<int> f();                // ill-formed;（ヘッダーユニットのイ�
 ::import<int> g();              // OK
 ```
 
-### C.5.2 [basic]: basics [diff.cpp17.basic]
-Affected subclauses: [basic.link], [module.unit], and [module.import]  
+### C.1.2 [lex]: lexical conventions [diff.cpp17.lex]
+
+Affected subclauses: [lex.pptoken], [module.unit], [module.import], [cpp.pre], [cpp.module], and [cpp.import]  
 Change: 特別な意味を持つ新しい識別子  
 Rationale: 新機能に必要  
-Effect on original feature: `module`または`import`で始まるトップレベル宣言は、この国際規格（C++20）では、ill-fomredとなるか解釈が異なることがある。
+Effect on original feature: `module`または`import`で始まる論理行は、この国際規格（C++20）では解釈が異なることがある。
 ```cpp
-class module;
-module *m1;         // ill-formed;（モジュール宣言とみなされる）以前は有効
-::module *m2;       // OK
+class module {};
+module m1;        // 以前は変数宣言、現在はモジュール宣言
+module *m2;       // OK
 
 class import {};
 import j1;          // 以前は変数宣言、現在はインポート宣言
