@@ -743,7 +743,115 @@ export struct c_exported {
 ただし、このことはモジュールの外側（グローバルモジュール）においては従来通りです。モジュールではないところで定義されたクラスのクラス定義内で定義されたメンバ関数は相変わらず暗黙`inline`です。
 
 ### Modules Dependency Discovery
+
 - [P1857R3 Modules Dependency Discovery](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1857r3.html)
+
+これは、`module`と`import`を書くことのできる場所や形式を制限するものです。
+
+P1703R1も同様の目的の変更でしたが、`module`はなんら制限されておらず、`import`を使用する既存のコードへの影響が小さくありませんでした。この提案はP1703R1のアプローチをさらに進めて、`module`を用いる構文についても書き方や書ける場所を制限し、かつ`import`と`module`を使用している既存のコードへの影響を減らそうとするものです。
+
+この提案では、次の条件を満たすもので始まる行は、`inport`ディレクティブと`module`ディレクティブとして扱われるようになります。
+
+- `import` : 以下のいずれかが同じ行で後に続くもの
+    - `<`
+    - 識別子（*identifier*）
+    - 文字列リテラル
+    - `:`（`::`とは区別される）
+- `module` : 以下のいずれかが同じ行で後に続くもの
+    - 識別子
+    - `:`（`::`とは区別される）
+    - `;`
+- `export` : 上記2つの形式のどちらかの前に現れるもの
+
+これらは新しいプリプロセッシングディレクティブとして扱われますが、プリプロセッシングディレクティブの扱いは従来通りであるため、ここでの`import, module, export`はマクロによって置換されたり導入されたりせず、ディレクティブは1行で書く必要があります。
+
+```cpp
+// これらは各行がプリプロセッシングディレクティブとみなされる
+#                     
+module ;              
+export module leftpad;
+import <string>;      
+export import "squee";
+import rightpad;      
+import :part;
+
+// これらの行はプリプロセッシングディレクティブではない
+module            
+;                     
+export                
+import                
+foo;                  
+export                
+import foo;           
+import ::             
+import ->             
+```
+
+これによってまず、インポート宣言、モジュール宣言、グローバルモジュールフラグメント、プライベートモジュールフラグメントの構文は、マクロによって導入されず、1行で書かなければなりません。ただし、インポート対象の名前やモジュール名はマクロによって導入することができます。
+
+なお、通常の`export`宣言はこれらの処理の対象ではありません。`export`から始まるプリプロセッシングディレクティブはあくまで、すぐ後に`import/module`が現れるものです。
+
+これらのディレクティブに含まれる`import, module, export`はプリプロセッサによって`import-keyword, module-keyword, export-keyword`に置き換えられ、この`*-keyword`によるものがC++コードとしてのインポート宣言やモジュール宣言として扱われるようになります。
+
+例えば次のようなコードは
+
+```cpp
+module; // グローバルモジュールフラグメント
+#include <iosream>
+export module sample_module;  // モジュール宣言
+
+// インポート宣言
+import <vector>;
+export import <type_traits>;
+
+// エクスポート宣言
+export int f();
+
+// プライベートモジュールフラグメント
+module : private;
+
+int f() {
+  return 20;
+}
+```
+
+プリプロセス後（翻訳フェーズ4の後）に、おおよそ次のようになります。
+
+```cpp
+__module_keyword;
+#include <iosream>
+__export_keyword __module_keyword sample_module;
+
+__import_keyword <vector>;
+__export_keyword __import_keyword <type_traits>;
+
+// export宣言はプリプロセッシングディレクティブでは無い
+export int f();
+
+__module_keyword : private;
+
+int f() {
+  return 20;
+}
+```
+
+`__import_keyword`などは実装定義なので実際にどう書き換えられるかは分からず、それを直接書くための構文は用意されていません。
+
+そしてもう一つの大きな変更は、プリプロセスの一番最初の段階でソースファイルがモジュールファイルなのか通常のファイルなのかを判定し、モジュール宣言、グローバルモジュールフラグメントとプライベートモジュールフラグメントはモジュールファイルだけに現れることが出来るように規定されている事です。
+
+この判定は、ファイルの一番最初に現れる非空白文字が`module`あるいは`export module`で始まっているかどうかをチェックすることで行われ、それがある場合にのみモジュールディレクティブに対応するディレクティブ（の処理方法）が定義されます。
+
+通常のファイルとして処理された場合でもインポートディレクティブを処理することはできますが、モジュールディレクティブは対応するディレクティブが定義されないため、コンパイルエラーとなります。
+
+この事は、`#ifdef`などによってあるファイルがモジュールであるかヘッダファイルであるかを切り替える、ような事ができないことを意味しています。
+
+これらの事はCプリプロセッサのEBNFによる構文定義の中で表現されており、少し複雑です。
+
+
+
+#### 参考資料
+
+- [［C++］モジュールとプリプロセス - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2020/05/15/201112)
 
 ### Issueの解決3
 - [P2109R0: US084: Disallow "export import foo" outside of module interface](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2109r0.html)
