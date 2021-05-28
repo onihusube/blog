@@ -1077,3 +1077,49 @@ int main() {}
 
 - [P2115R0: US069: Merging of multiple definitions for unnamed unscoped enumerations](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2115r0.html)
     - [US069 09.06 Merging of multiple definitions for unnamed unscoped enumerations](https://github.com/cplusplus/nbballot/issues/68)
+
+これは、異なるモジュールから到達可能となっている同じ無名のスコープ無し列挙型の定義をマージするためのルールを定めるものです。
+
+無名のスコープ無し列挙型はヘッダファイルで一般的であり、同じものが複数のモジュールから到達可能となるとき、それが同一であることを判定しマージできなければODR違反となります。
+
+これはヘッダユニットのインポートで特に問題となり得るため、そのような複数の定義が同じものであることを認識する方法を指定することでODR違反とならないようにします。
+
+```cpp
+/// importable.h
+namespace X { 
+  enum { A }; // 無名のスコープ無し列挙型 (1)
+
+  enum {};  // (2)
+}
+```
+```cpp
+/// M.cpp
+
+export module M;
+
+export import "importable.h"
+```
+```cpp
+/// main.cpp
+
+// (1)の定義が異なる経路で到達可能となる
+// どちらも全く同じ定義を参照しているためマージされODR違反は起きない
+// (2)は翻訳単位毎に別の型として扱われるためODR違反は起きない
+import "importable.h"
+import M;
+
+int main() {}
+```
+
+これは従来からあるテンプレートのためのODRの例外規則を拡張する形で表現されています。つまり、定義が異なる翻訳単位から到達可能になっているときでも、その定義が意味的に完全に同一である場合にのみODRの例外を適用し定義が一つにマージされます。
+
+列挙型としての名前がないので、これらの識別では最初の列挙子がその列挙型の名前として使用されます。そのため、列挙子を持たない無名の列挙型は常に異なる型として扱われます。
+
+### おわり
+
+おおよそ時系列に沿っているはずです。細かいIssue解決は見逃しているかもしれません。あとGithubのリポジトリに直接コミットする形のeditorialな修正は追い切れていません・・・
+
+あと、[P1787R6 Declarations and where to find them](https://wg21.link/P1787R6)の変更は直接的にはモジュールに対するものではなく、C++23での採択であるので省いています（それでも影響はそこそこありますが）。
+
+もし見落としや間違いなどを発見されたら教えてくださいませ・・・
+
