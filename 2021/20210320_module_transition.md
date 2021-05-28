@@ -1044,5 +1044,36 @@ int main(){}
 
 ### Issueの解決3
 - [P2109R0: US084: Disallow "export import foo" outside of module interface](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2109r0.html)
+    - [US084 10.03 Disallow "export import foo" outside of module interface](https://github.com/cplusplus/nbballot/issues/83)
+
+これは、エクスポートされたインポート宣言がモジュールインターフェース以外の場所で現れることを禁止するものです。
+
+```cpp
+/// M.cpp
+
+export module M;
+
+// OK、モジュールAをインポートしつつエクスポート
+export import A;
+```
+```cpp
+/// M_impl.cpp
+
+module M; // Mの実装単位（not インターフェース単位）
+
+// NG、export importはここにかけない
+export import B;
+```
+```cpp
+/// main.cpp
+
+// NG、export importはここにかけない
+export import M;
+
+int main() {}
+```
+
+以前は特にケアされていなかったのでコンパイルエラーになっていませんでしたが、この変更によって明確にエラーにされます。
 
 - [P2115R0: US069: Merging of multiple definitions for unnamed unscoped enumerations](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2115r0.html)
+    - [US069 09.06 Merging of multiple definitions for unnamed unscoped enumerations](https://github.com/cplusplus/nbballot/issues/68)
