@@ -1177,18 +1177,20 @@ int &c = n; // OK、n は可視
 - export-declaration:
   - `export` declaration
   - `export` { declaration-seq (opt) }
-  - export-keyword module-import-declaration
+  - export-keyword module-import-declaration（`import`宣言）
 
 #### 1
-`export`宣言（export-declaration）は、モジュールインターフェース単位の本文内にある名前空間スコープでのみ現れる。  
-`export`宣言は、無名名前空間又はプライベートモジュールフラグメント内に直接的にも間接的にも現れてはならない。  
-`export`宣言は、その宣言（存在する場合は、declaration-seq）の宣言的効果を持つ。  
-`export`宣言は、スコープを導入することはなく、その宣言又はdeclaration-seqは再帰的に`export`宣言を含んではならない。
+
+`export`宣言（export-declaration）は、モジュールインターフェース単位の本文内にある名前空間スコープでのみ現れる。`export`宣言は、無名名前空間又はプライベートモジュールフラグメント内に直接的にも間接的にも現れてはならない。`export`宣言は、その宣言、declaration-seq（存在する場合）、又は`import`宣言の宣言的効果を持つ。`export`宣言のdeclaration及びdeclaration-seqには、`export`宣言もしくは`import`宣言を含んではならない。
+
+[Note: `export`宣言はスコープを導入しない]
 
 #### 2
+
 宣言は以下のいずれかに該当する場合に __エクスポート__（*exported*）される。
+
 - `export`宣言内で宣言された名前空間スコープ
-- `export`を伴うモジュールの`import`宣言
+- `export`宣言内の`import`宣言
 - エクスポートされた宣言を含む名前空間定義
 - 少なくとも1つの名前を導入するヘッダーユニット内の宣言
 
@@ -1205,7 +1207,8 @@ namespace A {                   // exported
 このモジュール`M`のインターフェースは、名前空間`A`と関数`A::f()`からなる。
 
 #### 3
-エクスポートされた宣言は少なくとも1つの名前を宣言しなければならない。そのような宣言がヘッダーユニット内に無い場合、内部リンケージで名前を宣言してはならない。
+
+エクスポートされた宣言が`import`宣言ではない場合、少なくとも1つの名前を宣言しなければならない。そのような宣言がヘッダーユニット内に無い場合、内部リンケージで名前を宣言してはならない。
 
 ```cpp
 //a.h
@@ -1371,13 +1374,14 @@ export namespace N {
 ### 10.3 Import declaration [module.import]
 
 - module-import-declaration:
-  - import-keyword module-name attribute-specifier-seq(opt);
-  - import-keyword module-partition attribute-specifier-seq(opt);
-  - import-keyword header-name attribute-specifier-seq(opt);
+  - import-keyword module-name attribute-specifier-seq(opt) `;`
+  - import-keyword module-partition attribute-specifier-seq(opt) `;`
+  - import-keyword header-name attribute-specifier-seq(opt) `;`
 
 #### 1
-モジュールインポート宣言（*module-import-declaration*）はグローバル名前空間スコープにのみ現れる。  
-モジュール単位におけるすべてのモジュールインポート宣言（*module-import-declaration*）およびモジュールインポート宣言をエクスポートするエクスポート宣言（*export-declaration*）は、その翻訳単位及び（存在する場合は）プライベートモジュールフラグメントにおける*declaration-seq*内にあり、かつそこに含まれる他の全て宣言よりも前に宣言されなければならない。  
+
+モジュールインポート宣言（*module-import-declaration*）はグローバル名前空間スコープに存在していなければならない。  
+モジュール単位におけるすべてのモジュールインポート宣言およびモジュールインポート宣言をエクスポートするエクスポート宣言（*export-declaration*）は、その翻訳単位及び（存在する場合は）プライベートモジュールフラグメントにおける*declaration-seq*内にあり、かつそこに含まれる他の全ての宣言（*declaration*）よりも前に現われなければならない。  
 モジュールインポート宣言に対する属性指定（*attribute-specifier-seq*）はモジュールインポート宣言に作用する。
 
 #### 2
