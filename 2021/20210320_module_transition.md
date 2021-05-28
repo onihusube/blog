@@ -847,7 +847,196 @@ int f() {
 
 これらの事はCプリプロセッサのEBNFによる構文定義の中で表現されており、少し複雑です。
 
+<table>
+<tr>
+<th>Before</th>
+<th>After</th>
+</tr>
+<tr>
+<td valign="top">
 
+```cpp
+// OK、モジュール宣言
+export
+module x
+;
+```
+
+```cpp
+// -Dm="export module x;"
+m   // OK
+```
+
+```cpp
+module;
+#define m x
+export module m;  // OK
+```
+
+```cpp
+module;
+#if FOO
+export module foo;  // OK
+#else
+export module bar;  // OK
+#endif
+```
+
+```cpp
+module;
+#define EMPTY
+EMPTY export module m;  // OK
+```
+
+```cpp
+#if MODULES
+module;
+export module m;  // NG
+#endif
+```
+
+```cpp
+#if MODULES
+export module m;  // OK
+#endif
+```
+
+```cpp
+module y = {};         // NG
+
+::import x = {};       // OK
+::module y = {};       // OK
+
+import::inner xi = {}; // NG、インポートディレクティブ
+module::inner yi = {}; // OK
+
+namespace N {
+  module a;            // OK
+  import b;            // NG、インポートディレクティブ
+}
+
+#define MAYBE_IMPORT(x) x
+MAYBE_IMPORT(
+  import <a>;          // UB
+)
+#define EAT(x)
+EAT(
+  import <a>;          // UB
+)
+
+void f(Import *import) {
+  import->doImport();  // NG、インポートディレクティブ
+}
+```
+
+</td>
+<td valign="top">
+
+```cpp
+
+export
+module x  // NG、モジュールディレクティブ
+; 
+```
+
+```cpp
+// -Dm="export module x;"
+m   // NG
+```
+
+```cpp
+module;
+#define m x
+export module m;  // OK
+```
+
+```cpp
+module;
+#if FOO
+export module foo;  // NG
+#else
+export module bar;  // NG
+#endif
+```
+
+```cpp
+module;
+#define EMPTY
+EMPTY export module m;  // NG
+```
+
+```cpp
+#if MODULES
+module;
+export module m;  // NG
+#endif
+```
+
+```cpp
+#if MODULES
+export module m;  // NG
+#endif
+```
+
+```cpp
+module y = {};         // NG
+
+::import x = {};       // OK
+::module y = {};       // OK
+
+import::inner xi = {}; // OK
+module::inner yi = {}; // OK
+
+namespace N {
+  module a;            // NG、モジュールディレクティブ
+  import b;            // NG、インポートディレクティブ
+}
+
+#define MAYBE_IMPORT(x) x
+MAYBE_IMPORT(
+  import <a>;          // UB
+)
+#define EAT(x)
+EAT(
+  import <a>;          // UB
+)
+
+void f(Import *import) {
+  import->doImport();  // NG、インポートディレクティブ
+}
+```
+
+</pre>
+</td>
+</tr>
+</table>
+
+
+さらに、モジュールファイル内においては`#include`によって`import`ディレクティブが現れる事が禁止されます。これは`#include`によって展開されたファイル内に`import`ディレクティブがあってはならないという事ですが、インポート可能ヘッダの`#include`をヘッダユニットのインポートに置換する事が行われないことも意味します。
+
+```cpp
+/// header.hpp
+
+import <iostream>;
+```
+```cpp
+/// mymodule.cpp
+
+export module mymodule;
+
+#include "header.h"  // NG
+import "header.h";   // OK
+```
+```cpp
+/// main.cpp
+
+#include "header.h"  // OK
+import "header.h";   // OK
+
+int main(){}
+```
+
+これは検出されコンパイルエラーとなります。この事は、プリプロセスにおいてモジュールファイルが識別される事で、通常ファイルとの扱いを変化させるものです。
 
 #### 参考資料
 
