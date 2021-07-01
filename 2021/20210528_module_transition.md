@@ -199,8 +199,32 @@ export {
 }
 ```
 
-この提案では、このようなエクスポートブロックの内部でのみ、宣言が少なくとも1つの名前を導入しなければならない、というルールを削除します。そのため、上記の例は全てエラーではなくなります。
+この提案では、このようなエクスポートブロックの内部でのみ、宣言が少なくとも1つの名前を導入しなければならない、というルールを削除します。
 
+```cpp
+export static_assert(true); // error、エクスポートできない
+
+export {
+  struct Foo { /*...*/ };
+  static_assert(std::is_trivially_copyable_v<Foo>); // OK
+
+  struct Bar { /*...*/ };
+
+  template<typename T>
+  struct X { T t; };
+
+  template<typename T>
+  X(T) -> X<T>;  // OK
+
+  // ...
+
+#define STR(x) constexpr char x[] = #x;
+  // 両方OK
+  STR(foo);
+  STR(bar);
+#undef X
+}
+```
 ただし、ブロックではない通常の`export`宣言においては名前を導入しない宣言をエクスポートできないのは変わりません。
 
 #### 3. デフォルト引数の不一致
@@ -1050,11 +1074,15 @@ import <iostream>;
 ```
 ```cpp
 /// mymodule.cpp
-
+module:
+#include "header.h"  // NG
 export module mymodule;
 
 #include "header.h"  // NG
 import "header.h";   // OK
+
+module : private;
+#include "header.h"  // NG
 ```
 ```cpp
 /// main.cpp
