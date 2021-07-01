@@ -2,9 +2,9 @@
 
 [:contents]
 
-### コンパイル時フォーマットチェック
+### コンパイル時フォーマット文字列チェック
 
-[{fmt}ライブラリ](https://github.com/fmtlib/fmt)および[`<format>`](https://cpprefjp.github.io/reference/format.html)には、コンパイル時のフォーマットチェック機能が実装されています。
+[{fmt}ライブラリ](https://github.com/fmtlib/fmt)および[`<format>`](https://cpprefjp.github.io/reference/format.html)には、コンパイル時のフォーマット文字列チェック機能が実装されています。
 
 ```cpp
 #include <format>
@@ -69,7 +69,7 @@ public:
 > Effects: Direct-non-list-initializes str with s.  
 > Remarks: A call to this function is not a core constant expression ([expr.const]) unless there exist args of types Args such that str is a format string for args.
 
-この3つめの*Remarks*指定がまさに、コンパイル時フォーマットチェックを規定しています。
+この3つめの*Remarks*指定がまさに、コンパイル時フォーマット文字列チェックを規定しています。
 
 ### `consteval`コンストラクタ
 
@@ -87,15 +87,15 @@ public:
 
 ### 実装例
 
-規定は分かりましたが、それだけでフォーマットチェックができるわけではありません。結局、ユーザーランドで規定に沿うように実装することが可能なのかどうかが知りたいことです。
+規定は分かりましたが、それだけでフォーマット文字列チェックができるわけではありません。結局、ユーザーランドで規定に沿うように実装することが可能なのかどうかが知りたいことです。
 
-C++20に強い人ならここまでのことで実装イメージが浮かんでいるでしょうが、一応書いてみることにします。なお、フォーマットチェック実装については主題ではないので深入りしません。
+C++20に強い人ならここまでのことで実装イメージが浮かんでいるでしょうが、一応書いてみることにします。なお、フォーマット文字列チェック実装については主題ではないので深入りしません。
 
 ```cpp
 // 定数式で呼べない関数
 void format_error();
 
-// フォーマットチェック処理
+// フォーマット文字列チェック処理
 // 詳細は省略するが定数式で実行可能なように実装されているとする
 template<typename CharT, typename... Args>
 consteval void fmt_checker(std::basic_string_view<CharT> str) {
@@ -142,9 +142,9 @@ std::string format(format_string<Args...> fmt, const Args&... args) {
 
 一応標準ライブラリのものを使っているところには`std::`を付加していますが、実際はこのような実装も`std`名前空間内で実装されるので不要です。
 
-`format()`の引数として構築された`basic_format_string`（`format_string`）のコンストラクタ本体において、フォーマットチェックを行う`fmt_checker()`を呼び出します。`fmt_checker()`が行うフォーマットチェック機能は定数式で実行可能なように実装されているものとして、受け取ったフォーマット文字列`basic_format_string::str`をそこに渡して`fmt_checker()`が完了すればフォーマット文字列チェックは完了です。
+`format()`の引数として構築された`basic_format_string`（`format_string`）のコンストラクタ本体において、フォーマット文字列チェックを行う`fmt_checker()`を呼び出します。`fmt_checker()`が行うフォーマット文字列チェック機能は定数式で実行可能なように実装されているものとして、受け取ったフォーマット文字列`basic_format_string::str`をそこに渡して`fmt_checker()`が完了すればフォーマット文字列チェックは完了です。
 
-`basic_format_string`のコンストラクタおよび`fmt_checker()`は`consteval`関数であるので、一連のフォーマットチェック機能は定数式で必ず実行される事になります。
+`basic_format_string`のコンストラクタおよび`fmt_checker()`は`consteval`関数であるので、一連のフォーマット文字列チェック機能は定数式で必ず実行される事になります。
 
 `fmt_checker()`においてフォーマット文字列エラーが発生した場合コンパイルエラーとしなければなりませんが、実行環境が`consteval`コンテキストなので、定数式で実行できない事をしようとすればコンパイルエラーを引き起こすことができます。それは例えば、非`constexpr`関数の呼び出しや`throw`式の実行などがあります。
 
