@@ -261,9 +261,139 @@ public:
 
 ### コピー/ムーブコンストラクタ
 
+
+### デフォルトコンストラクタ
+
+`optional`はその実装の都合上、デフォルトコンストラクタをトリビアルにすることができません。そのため`optional`以外を例にすると、次のように書くことで要素型の*trivially default constructible*性を継承できます。
+
+```cpp
+template<typename T>
+class wrap {
+  T t;  // 初期化しない
+
+public:
+  wrap() = default;
+};
+```
+
+他のコンストラクタが存在するとデフォルトコンストラクタは暗黙`delete`されるため、`default`で書いておきます。この時、メンバに持っている`T`のオブジェクトをに対してデフォルトメンバ初期化してしまうとトリビアルにならないので注意が必要です。
+
+```cpp
+int main() {
+  static_assert(std::is_trivially_default_constructible_v<wrap<int>>);  // パスする
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/tgDiKULdlA3F7SUV)
+
+またおそらく、このような単純な型ではその他の部分のトリビアル性継承時にも先程までのような謎のテクニックを駆使する必要はないはずです。
+
 ### C++20からは・・・
 
 ### なぜにトリビアル？
+
+型（の特殊メンバ関数）がトリビアルであることは、ABIにとってとても重要です。
+
+例えば、型`T`が*trivially default constructible*であれば`T t;`のような変数宣言時に初期化処理を省略することができ、*trivially destructible*であれば`t`の破棄時（スコープ外になる時）にデストラクタ呼び出しを省略できます。この2つのトリビアル性は`std::vector`などコンテナに格納した際にも活用されます。そして、型`T`のコピー/ムーブコンストラクタがトリビアルであれば、`T`のコピーは`memcpy`相当の簡易な方法によってコピーすることができ、それは代入演算子でも同様です。
+
+もしそれらがトリビアルでは無い時、コンパイラはそれらの呼び出しが必要になる所で必ずユーザー定義の関数を呼び出すようにしておく必要があります。それが実質的にトリビアル相当のことをしていたとしても、トリビアルでない限りは何らかの関数呼び出しが必要になります。もっともそのような場合、インライン展開をはじめとする最適化によってそのような呼び出しは実質的に省略されるでしょう。
+
+より重要なのは（あるいは問題となるのは）、トリビアルでない型のオブジェクトが関数引数として値渡しされる時、あるいは戻り値として直接返される時、静かなオーバーヘッドを埋め込んでしまうことです。
+
+どういうことかというと、`T`のオブジェクトを値渡しした時に、`T`がトリビアル型であればレジスタに配置されて渡される（可能性がある）のに対し、`T`が非トリビアル型であるとスタック上に配置したオブジェクトのポインタ渡しになります。これはC++コード上からは観測できず、出力されたアセンブラを確認して初めて観測できます。
+
+```cpp
+struct trivial {
+  int n;
+};
+
+struct non_trivial {
+  int n;
+
+  ~non_trivial() {}
+};
+
+int f(trivial t);
+
+int f(non_trivial t);
+
+trivial g1() {
+  return {20};
+}
+
+non_trivial g2() {
+  return {20};
+}
+
+void h(int);
+
+int main() {
+  int n1 = f(trivial{10});
+  int n2 = f(non_trivial{10});
+}
+```
+- [godbolt](https://godbolt.org/z/nv5TTMrsh)
+
+
+GCCのものをコピペすると、次のようなコードが生成されています。
+
+```asm
+g1():
+        mov     eax, 20
+        ret
+g2():
+        mov     DWORD PTR [rdi], 20
+        mov     rax, rdi
+        ret
+main:
+        sub     rsp, 24
+        # f(trivial)の呼び出し
+        mov     edi, 10
+        call    f(trivial)
+        # f(not_trivial)の呼び出し
+        lea     rdi, [rsp+12]
+        mov     DWORD PTR [rsp+12], 10
+        call    f(non_trivial)
+        # main()の終了
+        xor     eax, eax
+        add     rsp, 24
+        ret
+```
+
+godbolt上で見ると対応がより分かりやすいかと思います。
+
+`f(trivial)`の呼び出し時は`edi`レジスタ（32bit）に即値`10`を配置して（`trivial`型を構築して）呼び出しているのに対し、`f(not_trivial)`の呼び出し時は、`rdi`レジスタ（64bit）に`rsp`（スタックポインタ）の値に`12`を足したアドレスをロードし、その領域に即値`10`を配置して（`non_trivial`型を構築して）から呼び出しを行なっています。  
+`rdi`レジスタはx64の呼び出し規約において整数/ポインタ引数に対して最初に使用されるレジスタであり、`edi`レジスタは`rdi`の下位32bitの部分で役割は同様です。したがって、`f(trivial)`の呼び出しでは`trivial`型をレジスタに構築して渡しているのに対して、`f(not_trivial)`の呼び出し時は`non_trivial`型をスタック上に配置してそのポインタを渡しています。
+
+今度は、`g1(), g2()`の定義について生成されたコードを見てみると、`trivial`型を返す`g1()`は`eax`レジスタ（32bit）に即値`20`を配置して（`trivial`型を構築して）`return`しているのに対し、`non_trivial`型を返す`g2()`は`rdi`レジスタ（64bit）の値をポインタとして読みその領域に即値`20`を配置し（`non_trivial`型を構築し）、`rax`レジスタ（64bit）に`rdi`の値をコピーしてから`return`しています。  
+`rax`レジスタはx64の呼び出し規約において戻り値を返すのに使用されるレジスタであり、`eax`はその下位32bit部分で役割は同様です。したがって、`g1()`の`return`では`trivial`型をレジスタに構築して返しているのに対して、`g2()`の`return`では`non_trivial`型をスタック上に配置してそのポインタを渡しています。
+
+MSVCは`f()`の呼び出しがどちらも同じコードを生成していますが、`g1(), g2()`はGCC/clangと同じことをしているのが分かります。
+
+このトリビアル型と非トリビアル型の扱いの差異は、ABIによって規定され要求されている事です（MSVCとGCC/clangの差異も使用しているABIの違いによります）。そしておそらく、C++における各種トリビアル性はこうしたABIからの要請によって生まれた規定でしょう。また、ABIの規定するトリビアルな型とは
+
+有名な所では、`std::unique_ptr`がトリビアル型ではないために生ポインタと比較した時にこの種のオーバーヘッドを発生させてしまっています。このことによるオーバーヘッドは微々たるものですが、例えばそれがヘビーループの中で起こっていると問題となるかもしれません。しかもこの事は非常に認識しづらく、よく知られてはいません。このため、`std::optional/std::variant`に見られるように、標準ライブラリのクラス型はトリビアル性に注意を払って設計されます（あるいは、されるようになりました）。
+
+とはいえ、MSVC ABIにおける`std::span`のように（`std::span`は常にトリビアル型）、ABIの別の事情によってこの種のオーバーヘッドが発生してしまっていたりと、ABIにまつわる問題は複雑で把握しづらいものがあります・・・
+
+### 各種ABIでのトリビアル
+
+#### Itanium C++ ABI
+
+> A type is considered non-trivial for the purposes of calls if:
+>
+> - it has a non-trivial copy constructor, move constructor, or destructor, or  
+> - all of its copy and move constructors are deleted.
+
+
+さらにすぐ下にはこう書かれています。
+
+> This definition, as applied to class types, is intended to be the complement of the definition in [class.temporary]p3 of types for which an extra temporary is allowed when passing or returning a type. A type which is trivial for the purposes of the ABI will be passed and returned according to the rules of the base C ABI, e.g. in registers; often this has the effect of performing a trivial copy of the type.
+
+#### System V AMD64 ABI
+
+#### Windows x64 ABI (MSVC ABI)
+
+MSVC ABIではトリビアルという言葉は出現しません。
 
 ### 参考文献
 
@@ -272,3 +402,9 @@ public:
 - [P0848R0 Conditionally Trivial Special Member Functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0848r0.html)
 - [P0848R3 Conditionally Trivial Special Member Functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0848r3.html)
 - [Conditionally Trivial Special Member Functions - C++ Team Blog](https://devblogs.microsoft.com/cppblog/conditionally-trivial-special-member-functions/)
+- [C++20 コンセプト - cpprefjp](https://cpprefjp.github.io/lang/cpp20/concepts.html)
+- [Why does std::tuple break small-size struct call convention optimization in C++? - stackoverflow](https://stackoverflow.com/a/63723752)
+- [`std::span` is not zero-cost because of the ms abi. - Developer Community](https://developercommunity.visualstudio.com/t/std::span-is-not-zero-cost-because-of-th/1429284)
+- [Itanium C++ ABI](https://itanium-cxx-abi.github.io/cxx-abi/abi.html)
+- [System V Application Binary Interface AMD64 Architecture Processor Supplement (With LP64 and ILP32 Programming Models) Version 1.0](https://github.com/hjl-tools/x86-psABI/wiki/x86-64-psABI-1.0.pdf)
+- [x64 での呼び出し規則 - Microsoft Docs](https://docs.microsoft.com/ja-jp/cpp/build/x64-calling-convention?view=msvc-160)
