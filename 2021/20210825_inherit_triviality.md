@@ -25,7 +25,7 @@ void f(wrap<T>) {
 
 トリビアルというのは、クラスの特殊メンバ関数がユーザーによって定義されていないことを言います（単純には）。これによって、[*trivially copyable*](https://cpprefjp.github.io/reference/type_traits/is_trivially_copyable.html)ならば`memcpy`できるようになるとか、[*trivially destructible*](https://cpprefjp.github.io/reference/type_traits/is_trivially_destructible.html)ならばデストラクタ呼び出しを省略できる、などの保証が得られます。
 
-上記の`wrpa<T>`型のように単純な型であれば単純にメンバとして保持しただけでも継承していますが、`std::optional`のように複雑な型ではそうは行きません。しかしそれをなんとかする方法がちゃんと存在しています。
+上記の`wrap<T>`型のように単純な型であれば単純にメンバとして保持しただけでも継承していますが、`std::optional`のように複雑な型ではそうは行きません。しかしそれをなんとかする方法がちゃんと存在しています。
 
 ### `optional<T>`簡易実装
 
