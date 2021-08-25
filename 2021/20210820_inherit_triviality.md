@@ -455,10 +455,200 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/auMdxpScR5Dn2yBk)
 
-ちゃんとトリビアル性が伝播されてる事がわかります。
+`int`は当然トリビアルなクラスであり`std::string`は全ての特殊メンバ関数がそうではないので、この`static_assert`群によってちゃんとトリビアル性が伝播されてる事がわかります。
 
 ### 代入演算子
 
+残ったのはコピー/ムーブ代入演算子です。これは特別な事をする必要はほぼなく、コンストラクタの時と同様のアプローチによって実装できます。
+
+```cpp
+// デストラクタがトリビアルでない場合のストレージ
+template<typename T, bool = std::is_trivially_destructible_v<T>>
+struct optional_storage {
+
+  // 中略
+
+  template<typename Self>
+  void asign_from(Self&& that) {
+    if (that.has_value) {
+      if (this->has_value) {
+        this->data = std::forward<Self>(that).data;
+      } else {
+        this->construct(std::forward<Self>(that).data);
+      }
+    } else {
+      this->reset();
+    }
+  }
+  
+  void reset() {
+    if (this->has_value) {
+      this->data.~T();
+      this->has_value = false;
+    }
+  }
+};
+
+// デストラクタがトリビアルである場合のストレージ
+template<typename T>
+struct optional_storage<T, true> {
+
+  // 中略
+
+  template<typename Self>
+  void asign_from(Self&& that) {
+    if (that.has_value) {
+      if (this->has_value) {
+        this->data = std::forward<Self>(that).data;
+      } else {
+        this->construct(std::forward<Self>(that).data);
+      }
+    } else {
+      this->reset();
+    }
+  }
+  
+  void reset() {
+    this->has_value = false;
+  }
+};
+
+// 中略
+
+template<typename T>
+struct enable_copy_asign : check_move_ctor<T> {
+  using base = check_move_ctor<T>;
+  
+  // ユーザー定義コピー代入演算子
+  enable_copy_asign& operator=(const enable_copy_asign& that) {
+    this->asign_from(static_cast<const base&>(that));
+  }
+
+  enable_copy_asign() = default;
+  enable_copy_asign(const enable_copy_asign&) = default;
+  enable_copy_asign(enable_copy_asign&&) = default;
+  enable_copy_asign& operator=(enable_copy_asign&&) = default;
+};
+
+template<typename T>
+using check_copy_asign = std::conditional_t<
+  std::is_trivially_copy_assignable_v<T>,
+  check_move_ctor<T>,
+  enable_copy_asign<T>
+>;
+
+template<typename T>
+class my_optional : private check_copy_asign<T> {
+public:
+  // 他略
+
+  // コピー代入演算子
+  my_optional& operator=(const my_optional&) = default;
+};
+```
+
+代入演算子では自身の状態を一度無効化する必要がありますが、その処理は`T`のデストラクタがトリビアルであるかによって変化しますので、代入に伴うあれこれと共に`optional_storage`に実装しておきます（`asign_from()/reset()`）。
+
+それを用いて`enable_~_asign`クラスで代入演算子を実装します。まあ、難しいところはないですね（とてもめんどくさいですね・・・）。
+
+ムーブ代入演算子も同じように実装できます。
+
+```cpp
+template<typename T>
+struct enable_move_asign : check_copy_asign<T> {
+  using base = check_copy_asign<T>;
+  
+  // ユーザー定義ムーブ代入演算子
+  enable_move_asign& operator=(enable_move_asign&& that) {
+    this->asign_from(static_cast<base&&>(that));
+  }
+
+  enable_move_asign() = default;
+  enable_move_asign(const enable_move_asign&) = default;
+  enable_move_asign(enable_move_asign&&) = default;
+  enable_move_asign& operator=(const enable_move_asign&) = default;
+};
+
+template<typename T>
+using check_move_asign = std::conditional_t<
+  std::is_trivially_move_assignable_v<T>,
+  check_copy_asign<T>,
+  enable_move_asign<T>
+>;
+
+template<typename T>
+class my_optional : private check_move_asign<T> {
+public:
+  // 他略
+
+  // ムーブ代入演算子
+  my_optional& operator=(my_optional&&) = default;
+};
+```
+
+やることは同じです。これによってほぼ全ての特殊メンバ関数のトリビアル性継承を実装することができました・・・
+
+```cpp
+int main() {
+  // 全てトリビアル
+  static_assert(std::is_trivially_destructible_v<my_optional<int>>);
+  static_assert(std::is_trivially_copy_constructible_v<my_optional<int>>);
+  static_assert(std::is_trivially_move_constructible_v<my_optional<int>>);
+  static_assert(std::is_trivially_copy_assignable_v<my_optional<int>>);
+  static_assert(std::is_trivially_move_assignable_v<my_optional<int>>);
+    
+  // 全て非トリビアル
+  static_assert(std::is_trivially_destructible_v<my_optional<std::string>> == false);
+  static_assert(std::is_trivially_copy_constructible_v<my_optional<std::string>> == false);
+  static_assert(std::is_trivially_move_constructible_v<my_optional<std::string>> == false);
+  static_assert(std::is_trivially_copy_assignable_v<my_optional<std::string>> == false);
+  static_assert(std::is_trivially_move_assignable_v<my_optional<std::string>> == false);
+
+  // しかしユーザー定義されている
+  static_assert(std::is_destructible_v<my_optional<std::string>>);
+  static_assert(std::is_copy_constructible_v<my_optional<std::string>>);
+  static_assert(std::is_move_constructible_v<my_optional<std::string>>);
+  static_assert(std::is_copy_assignable_v<my_optional<std::string>>);
+  static_assert(std::is_move_assignable_v<my_optional<std::string>>);
+}
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/w5S86GgbOj7ecrCv)
+
+
+確かに、トリビアル性を継承しつつそうでない場合はユーザー定義、というようになっています。
+
+実はもう少し厳密にやると、そもそも`T`がコピー可能でない場合に適切に`delete`するとかのハンドルが必要となりますが、主題ではないのでここではやりません。
+
+このような複雑怪奇なテクニックはしかし、`std::optional`や`std::variant`の実装で実際に使用されています。少なくともGCC/MSVCの実装はこうなっているはずです（MSVCは将来的に変更するかもしれませんが）。そして、`std::expected`など類似のクラスでも同じ事をする必要が出てくるでしょう。
+
+※ このあたりを書くにあたってはMSVCの実装（[`<optional>`](https://github.com/microsoft/STL/blob/main/stl/inc/optional)と、[`xsmf_control.h`](https://github.com/microsoft/STL/blob/main/stl/inc/xsmf_control.h)）を大変参考にしています。特に、`xsmf_control.h`にはこのテクニックが一般化されまとまっていて、MSVCの`optional/variant`はどちらも同じものを使用しています。これはある程度TMPがわかればなんとか読めるので、気になった人はそちらを参照してください。
+
+#### 階層構造
+
+`check_xxxxx`みたいなエイリアステンプレートは、`xxxxx`に対応する特殊メンバ関数がトリビアルでない場合にユーザー定義する層を挿入し、そうでないならスキップします。したがって、`int`のような全トリビアルなクラスでは階層は最小になります。
+
+- `my_optional<int>`
+  - `optional_storage<int>`
+
+一方、`std::string`のように全部トリビアルではないクラスではフルで挿入されることになります。
+
+- `my_optional<std::string>`
+  - `enable_move_asign<std::string>`
+    - `enable_copy_asign<std::string>`
+      - `enable_move_ctor<std::string>`
+        - `enable_copy_ctor<std::string>`
+          - `optional_storage<std::string>`
+
+例えばムーブだけトリビアルでないような型（`move_non_trivial`）なら
+
+- `my_optional<move_non_trivial>`
+  - `enable_move_asign<move_non_trivial>`
+      - `enable_move_ctor<move_non_trivial>`
+          - `optional_storage<move_non_trivial>`
+
+のようなクラス階層になります。
+
+一部のデバッガでは、このようなクラス階層を直接観測することができます（VSのデバッガだと多分途中が省略されるので見られない気がします）。あるいは観測してなんだこれ？と思ったことがあるかもしれません。
 
 ### デフォルトコンストラクタ
 
@@ -485,7 +675,7 @@ int main() {
 
 またおそらく、このような単純な型ではその他の部分のトリビアル性継承時にも先程までのような謎のテクニックを駆使する必要はないはずです。
 
-### C++20からは・・・
+### C++20 Conditionally Trivial Special Member Functions
 
 C++20ではコンセプトが導入され、それを利用した[Conditionally Trivial Special Member Functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0848r3.html)という機能が追加されました。これはまさに、ここまで見てきた事をコンセプトによって簡易に実現するための機能です。
 
@@ -551,34 +741,46 @@ public:
   }
 
   my_optional& operator=(my_optional&& that) {
-    if (this->has_value) {
-      this->data.~T();
-    }
-
-    this->has_value = that.has_value;
-
     if (that.has_value) {
-      new (&this->data) T(std::move(that.data));
+      if (this->has_value) {
+        this->data = std::move(that.data);
+      } else {
+        new (&this->data) T(std::move(that.data));
+      }
+    } else {
+      this->reset();
     }
 
     return *this;
   }
 
   ~my_optional() {
-    if (has_value) {
+    this->reset();
+  }
+  
+  // reset()の定義も同様の記法で分岐できる
+
+  void reset() requires std::is_trivially_destructible_v<T> {
+    this->has_value = false;
+  }
+
+  void reset() {
+    if (this->has_value) {
       this->data.~T();
     }
+    this->has_value = false;
   }
 };
 ```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/njKEinFJ5lfI610L)
 
-`default`な特殊メンバ関数に対して`requires`による制約を付加する事で、テンプレートパラメータの性質によって定義するしないを分岐することができます。
+`default`な特殊メンバ関数に対して`requires`による制約を付加する事で、テンプレートパラメータの性質によって定義するしないを分岐することができ、100行以上も謎のコードを削減することができました・・・
 
 ここでは、オーバーロード解決時の制約式による半順序に基づいて、特殊メンバ関数定義にも制約によって順序が付けられ、最も制約されている（かつそれを満たしている）1つだけが資格のある（*eligible*）特殊メンバ関数として定義され、それ以外は`delete`されます。
 
 この場合、`my_optional`の`default`な特殊メンバ関数定義は`is_trivially_~`によって制約されており、`T`の対応する特殊メンバ関数がトリビアルである時`my_optional`の対応する特殊メンバ関数もトリビアルな方が選択され、ユーザー定義のものは無制約なので`delete`されます。逆に、`T`の対応する特殊メンバ関数がトリビアルではない時、制約を満たさないことから`default`のものが`delete`され、結果的に適切な一つだけが定義されています。
 
-先ほどまで書いていたものすごく労力のかかった意味のわからないコードはこれによって不要になります。このConditionally Trivial Special Member Functionsという機能がいかに強力で、どれほどマイナーなのかがわかるでしょう！
+先ほどまで書いていたものすごく労力のかかった意味のわからないコードはこれによって不要になります。このConditionally Trivial Special Member Functionsという機能がいかに強力で素晴らしく、どれほどマイナーなのかがわかるでしょう！
 
 そしてC++20以降、あのようなテクニックは忘れ去られていく事でしょう。この記事は、失われいく謎のテクニックを後世に伝えるとともに、理解しづらいConditionally Trivial Special Member Functionsという機能の解説を試みるものでした・・・
 
