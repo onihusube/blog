@@ -801,3 +801,5 @@ public:
 - [P0848R3 Conditionally Trivial Special Member Functions](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0848r3.html)
 - [Conditionally Trivial Special Member Functions - C++ Team Blog](https://devblogs.microsoft.com/cppblog/conditionally-trivial-special-member-functions/)
 - [C++20 コンセプト - cpprefjp](https://cpprefjp.github.io/lang/cpp20/concepts.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2021/20210825_inherit_triviality.md)
