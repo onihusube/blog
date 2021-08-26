@@ -2,6 +2,8 @@
 
 `std::optional`や`std::variant`は保持する型がトリビアルな型であれば、そのトリビアル性を継承することが規格によって求められており、その実装には非常に難解なテクニックが使用されます。しかし、C++20以降、このテクニックは過去のものとなり忘れ去られていく事でしょう。この記事はそんなロストテクノロジーの記録です。
 
+[:contents]
+
 ### メンバ型のトリビアル性を継承、とは？
 
 テンプレートパラメータで指定された型の値をメンバとして保持するときに、そのテンプレートパラメータの型のトリビアル性を継承する事です。
@@ -23,7 +25,7 @@ void f(wrap<T>) {
 
 トリビアルというのは、クラスの特殊メンバ関数がユーザーによって定義されていないことを言います（単純には）。これによって、[*trivially copyable*](https://cpprefjp.github.io/reference/type_traits/is_trivially_copyable.html)ならば`memcpy`できるようになるとか、[*trivially destructible*](https://cpprefjp.github.io/reference/type_traits/is_trivially_destructible.html)ならばデストラクタ呼び出しを省略できる、などの保証が得られます。
 
-上記の`wrpa<T>`型のように単純な型であれば単純にメンバとして保持しただけでも継承していますが、`std::optional`のように複雑な型ではそうは行きません。しかしそれをなんとかする方法がちゃんと存在しています。
+上記の`wrap<T>`型のように単純な型であれば単純にメンバとして保持しただけでも継承していますが、`std::optional`のように複雑な型ではそうは行きません。しかしそれをなんとかする方法がちゃんと存在しています。
 
 ### `optional<T>`簡易実装
 
@@ -396,7 +398,7 @@ public:
 
 C++11以降の共用体は内包する型の特殊メンバ関数がトリビアルでないならば、対応する自身の特殊メンバ関数が暗黙`delete`されます。従って、`optional_storage`ではデストラクタ以外をとりあえず全部`default`定義しておけば、トリビアルの時だけは定義されていることになります。
 
-それを利用し、`T`が*trivially copyable*の時だけ、`optional_storage`に至るクラス階層にコピーコンストラクタ定義を追加し、そうでなければ`optional_storage`を直接利用します。すると、最上位`my_optional`クラスからはその基底クラスのコピーコンストラクタは常に何かしら定義されているように見えるため、`my_optional`のコピーコンストラクタは`default`で定義する事ができます。
+それを利用し、`T`が*trivially copyable*の時だけ、`my_optional`から`optional_storage`に至るクラス階層にコピーコンストラクタをユーザー定義するクラスを追加し、そうでなければ`optional_storage`を直接利用します。すると、最上位`my_optional`クラスからはその基底クラスのコピーコンストラクタは常に何かしら定義されているように見えるため、`my_optional`のコピーコンストラクタは`default`で定義する事ができます。
 
 派生クラスのコンストラクタ初期化子リストからは最基底の`optional_storage`のメンバは触れませんので、`optional_storage`にはコンストラクタが必要です。また、フラグの管理とか構築周りのことを共通化するために`optional_storage`に`construct()/construct_from()`関数を追加しておきます。
 
@@ -455,7 +457,7 @@ int main() {
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/auMdxpScR5Dn2yBk)
 
-`int`は当然トリビアルなクラスであり`std::string`は全ての特殊メンバ関数がそうではないので、この`static_assert`群によってちゃんとトリビアル性が伝播されてる事がわかります。
+`int`は当然トリビアルなクラスであり`std::string`は全ての特殊メンバ関数がそうではないので、この`static_assert`群によってちゃんとトリビアル性が伝播されている事がわかります。
 
 ### 代入演算子
 
