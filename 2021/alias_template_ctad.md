@@ -109,7 +109,7 @@ pair(T1, T2) -> pair<T1, T2>;
 先ほど得た内容（`T1 = int, T2 = T`と`typename T2 = typename T`）をフィードバックします。
 
 ```cpp
-template<typename int, typename T>
+template<typename T1 = int, typename T>
 pair(int, T) -> pair<int, T>;
 ```
 
@@ -134,7 +134,7 @@ template<typename T>
 using P = pair<int, T>;
 ```
 
-の対応から、エイリアステンプレートのテンプレート実引数を推論し、推論補助を完成します。
+の対応から、エイリアステンプレートのテンプレート実引数を推論し、推論補助を完成します。ここでは、エイリアスを戻すような形で推論補助の型を置き換えます。
 
 ```cpp
 template<typename T>
@@ -182,13 +182,13 @@ using MyAbbrev = VeryLongNameXXXXXX<A>;
 ところでそれは、関数テンプレートの引数推論と同様に行われるのでしたから
 
 ```cpp
-template<typename T>
+template<class T>
 void f(decay_t<T>);
 
 f(A{});
 ```
 
-のように呼んだ時と同じ推論が行われます。ご存知のように？これは推論できないコンテキストとされ、`T`の推論はできません。したがって、ここでは何の情報も得られません（`T = A`の対応は自明ですが、それはここでは求められません）。
+のように呼んだ時と同じ推論が行われます。ご存知のように？これは推論できないコンテキストとされ、`T`の推論はできません。したがって、ここでは何の情報も得られません。
 
 #### 3. 2で暫定的に得られた`A`の内容を、元の推論補助`B`にフィードバックして置き換える
 
@@ -317,9 +317,115 @@ template<class V, class U>
 C(V*, U) -> C<V*, std::type_identity_t<U>> requires std::same_as<V*, std::type_identity_t<U>>;
 ```
 
-実際は、エイリアステンプレートに対して推論補助を導出するのか、あくまで元の型に対するものを導出するのかは実装定義というか未規定ではあります。GCCは元の型に対する推論補助を導出し使用するようです。
+実際は、エイリアステンプレートに対して推論補助を導出するのか、あくまで元の型に対するものを導出するのかは実装定義というか未規定です。GCCは元の型に対する推論補助を導出し使用するようです。
 
-### `std::array`のエイリアステンプレートに対するCTADがうまく動かない理由
+### `std::array`のエイリアステンプレート1
+
+`std::array<T, N>`の`T`を束縛するエイリアス
+
+```cpp
+// 要素型を束縛するエイリアス
+template<auto N>
+using std_array_with_int = std::array<int, N>;
+```
+
+について導出される推論補助を求めてみます。
+
+`std::array`には推論補助が1つしかありません。
+
+```cpp
+namespace std {
+  template <class T, class... U>
+  array(T, U...) -> array<T, 1 + sizeof...(U)>;
+}
+```
+
+この推論補助とエイリアスから、テンプレートパラメータの対応を求めます。
+
+```cpp
+template <class T, class... U>
+void f(T, 1 + sizeof...(U));
+
+f(int{}, N);
+```
+
+関数テンプレートとして書くと色々おかしいですが、つまりはこれは推論できないコンテキストということで何の情報も得られません。得られるのは、`T = int`という対応です。
+
+これを推論補助へフィードバックすると
+
+```cpp
+template <auto N, class... U>
+array(int, U...) -> array<int, 1 + sizeof...(U)>;
+```
+
+が得られます。ここで注意点は、元のエイリアステンプレートのパラメータは（`auto N`）は宙ぶらりんとなりますが勝手に消すことはせず、これも含めてフィードバックします（どうやらその際、エイリアステンプレートのパラメータを先頭に持ってくるみたい）。
+
+そしてエイリアスを推定する（戻す）と
+
+```cpp
+template <auto N, class... U>
+std_array_with_int(int, U...) -> std_array_with_int<1 + sizeof...(U)>;
+```
+
+省略していますが、`std::array`の元の推論補助には`T`と`U...`のすべての型が同じであることが制約されているので、それも継承されています。
+
+そして、この推論補助の問題点は`auto N`を解決できないことです。どのような初期化式が与えられてもこの`N`が推論されることはなく、そのためコンパイルエラーを起こします。
+
+#### GCCの導出する推論補助
+
+GCCは、CTADでエラーが起きた時に使用して推論補助の候補をエラーメッセージ中に出力してくれます。
+
+```
+prog.cc: In function 'int main()':
+prog.cc:12:53: error: class template argument deduction failed:
+   12 |     [[maybe_unused]] std_array_with_int ar2 = {1,2,3};//ng
+      |                                                     ^
+prog.cc:12:53: error: no matching function for call to 'array(int, int, int)'
+In file included from prog.cc:1:
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:267:5: note: candidate: 'template<auto N, class _Tp, class ... _Up> std::array(_Tp, _Up ...)-> std::array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, (1 + sizeof... (_Up))> requires  __is_same(std::std_array_with_int<N>, std::array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, 1 + sizeof ... (_Up ...)>)'
+  267 |     array(_Tp, _Up...)
+      |     ^~~~~
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:267:5: note:   template argument deduction/substitution failed:
+prog.cc:12:53: note:   couldn't deduce template parameter 'N'
+   12 |     [[maybe_unused]] std_array_with_int ar2 = {1,2,3};//ng
+      |                                                     ^
+
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/ZYpj0t8CFK4ALCOm)
+
+
+今回のケースでGCCが導出して使用している推論補助は
+
+```cpp
+template<auto N, class _Tp, class ... _Up>
+array(_Tp, _Up ...) -> array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, (1 + sizeof... (_Up))>
+  requires  __is_same(std::std_array_with_int<N>,
+                      std::array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, 1 + sizeof ... (_Up ...)>)
+```
+
+というものです（見やすいように改変しています）。先ほどは省略していた関連制約が見えていますが、ここで重要なことはテンプレートパラメータが1つ多いことです。
+
+GCCの推論補助は次のように宣言されています。
+
+```cpp
+template<typename _Tp, typename... _Up>
+array(_Tp, _Up...) -> array<enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp>, 1 + sizeof...(_Up)>;
+```
+
+`_Tp`と`_Up`の各型が同じであることを`enable_if`によって制約しているわけです。CTADとこの推論補助はともにC++17で導入されたものであるため、この実装は妥当です。そして、テンプレートパラメータ名的に、先ほどエラーメッセージから拾い上げた推論補助に含まれる余分なテンプレートパラメータ`_Tp`はここからのもので、`_Tp = int`の対応が取れていないことがうかがえます。
+
+これは、2ステップ目のテンプレートパラメータの対応を求める際に
+
+```cpp
+template <class T, class... U>
+void f(enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp>, 1 + sizeof...(U));
+
+f(int{}, N);
+```
+
+となってしまっていることから`T = int`の対応すら取れていないために起きています。そのためそれがフィードバックされず、導出された推論補助のテンプレートパラメータは`auto N, class _Tp, class ... _Up`の3つになっています。ただ、ステップ4では`enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp> = int`の対応が取れることが分かるため、それについての制約が追加の`requires`節にておこなわれているようです。
+
+とはいえ、そうであっても結論は変わらず、結局`auto N`が推定できないためこの推論補助は使い物になりません。そしてそれは、先ほどのGCCのエラーメッセージにも表示されています（最後のほうの「couldn't deduce template parameter 'N'」）。
 
 ### 参考文献
 
