@@ -519,12 +519,12 @@ array(_Tp, _Up ...) -> array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...
                       std::array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, 1 + sizeof ... (_Up ...)>)
 ```
 
-先ほどど同じ理由で、エイリアステンプレートの`T`と`std::array`の推論補助の`_Tp`の対応が取れない結果、エイリアステンプレートの`T`が推論補助にフィードバックされてしまい、テンプレートパラメータが`class T, class _Tp, class ... _Up`の3つになります。しかも、`T`に対応する仮引数はないので、結局`auto N`と同じように`T`を実引数から推論できず、コンパイルエラーを起こしています。
+先ほどど同じ理由で、エイリアステンプレートの`T`と`std::array`の推論補助の`_Tp`の対応が取れない結果、エイリアステンプレートの`T`が推論補助にフィードバックされてしまい、テンプレートパラメータが`class T, class _Tp, class ... _Up`の3つになります。しかも、`T`に対応する仮引数はないので（推論補助の左辺に`T`が現れていない）、結局`auto N`と同じように`T`を実引数から推論できず、コンパイルエラーを起こしています。
 
 エラーメッセージを見ると、MSVCもほぼ同じ理由によってエラーとなっている様子です。
 - [godbolt](https://godbolt.org/z/s19PKsaGx)
 
-これは、推論補助に対する制約（`_Tp`と`_Up`のすべての型が等しい）をSFINAEによって行なっていることから生じています。
+これは、推論補助に対する制約（`_Tp`と`_Up...`のすべての型が同じ型である）をSFINAEによって行なっていることから生じています。
 
 #### SFINAEを使わなくしたら行ける？
 
@@ -569,7 +569,7 @@ int main() {
 
 無事正しく動きました。つまり、`std::array`の推論補助の実装でSFINAEを避ければ要素型の推論はできそうです。
 
-（ただし、[MSVCさんは受け入れてくれないようです](https://godbolt.org/z/f6rh3x4T4)）
+（ただし、[MSVCは受け入れてくれない](https://godbolt.org/z/f6rh3x4T4)ようです）
 
 ここでGCCがやっていることを確かめるために、わざとエラーを起こしてエラーメッセージを見てみます。
 
@@ -633,3 +633,4 @@ my_array(T, Us ...) -> my_array<T, (sizeof... (Us) + 1)>
 - [P1814R0 Wording for Class Template Argument Deduction for Alias Templates](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1814r0.html)
 - [CTAD for alias templates algorithm examples](https://htmlpreview.github.io/?https://github.com/mspertus/CTAD_POST_CPP17/master/CTAD_alias_examples.html)
 - [Template argument deduction - cppreference](https://en.cppreference.com/w/cpp/language/template_argument_deduction)
+- [12.4.1.8 Class template argument deduction [over.match.class.deduct] - N4861](https://timsong-cpp.github.io/cppwp/n4861/over.match.class.deduct)
