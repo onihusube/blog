@@ -13,17 +13,17 @@ using std_array_with_3 = std::array<T,3>;
 
 int main() {
   [[maybe_unused]] std::array ar1 = { 1, 2, 3 };          // ok
-  [[maybe_unused]] std_array_with_int ar2 = { 1, 2, 3 };  // ng
-  [[maybe_unused]] std_array_with_3 ar3 = { 1, 2, 3 };    // ng
+  [[maybe_unused]] std_array_with_int ar2 = { 1, 2, 3 };  // ng、なして？
+  [[maybe_unused]] std_array_with_3 ar3 = { 1, 2, 3 };    // ng、なして？
 }
 ```
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/ZYpj0t8CFK4ALCOm)
 
-ようするに、`std::array`のテンプレートパラメータの一部だけを束縛したエイリアステンプレートでCTADを期待すると、謎のコンパイルエラーに悩まされています。
+ようするに、`std::array`のテンプレートパラメータの一部だけを束縛したエイリアステンプレートで[CTAD](https://cppmap.github.io/articles/acronyms/#ctad-class-template-argument-deduction)を期待すると、謎のコンパイルエラーに悩まされています。
 
 エイリアステンプレートのCTADが絡み非常に複雑な問題であり、簡易に回答できなさそうなのでこの記事を書きました。
 
-### CTADの仕組み（簡易）
+### CTADの仕組み（雑）
 
 あるクラステンプレート`C`についてのCTADは、`C`のコンストラクタを変換して得た関数テンプレート（引数はそのコンストラクタの引数、テンプレートパラメータは`C`のテンプレートパラメータにそのコンストラクタのテンプレートパラメータを合併したもの、戻り値型はそのコンストラクタのテンプレートパラメータのうち`C`のものに対応するパラメータで特殊化された`C<Ts...>`）と、`C`に定義された推論補助を関数テンプレートとして抽出し、初期化式（`C = c{args...};`）に与えられている実引数列（`args...`）を用いてそれらの関数テンプレートを呼び出したかのようにオーバーロード解決を行い、最適にマッチした1つの関数テンプレートの戻り値型からテンプレートパラメータが補われた`C<Ts...>`を取得するものです。
 
@@ -35,7 +35,7 @@ CTADはコンストラクタ呼び出しよりも前に行われ、必ずしも�
 
 エイリアステンプレートのCTADは、元の型の推論補助を変換してエイリアステンプレートの推論補助を導出し、それを利用することで行われます。そのアルゴリズムはおおよそ次のようになります（以下では、導出したいエイリアステンプレートの推論補助を`A`、元の型に存在する推論補助を`B`と表します）。
 
-1. エイリアステンプレートの元の型に定義された推論補助`B`を全て取得する
+1. エイリアステンプレートの元の型のコンストラクタと推論補助`B`を（関数テンプレートとして）全て取得する
       - 以下の手順はそうして取得した`B`1つ1つに対してそれぞれ行われる
 2. エイリアステンプレートの右辺と`B`の右辺から、`A`のテンプレートパラメータを推論する
       - この処理は、関数テンプレートのテンプレートパラメータ推論と同様に行われる（ただし、推論できないパラメータがある場合でも失敗しない）
@@ -45,7 +45,7 @@ CTADはコンストラクタ呼び出しよりも前に行われ、必ずしも�
 4. 結果の型（3で得られた推論補助の右辺）からエイリアスを推定し、3で得られた推論補助を書き換えることで、エイリアステンプレートに対する推論補助`A`を生成する
       - 結果の型からエイリアスを推定するか、またどのように推定するかは実引数型に依存するため、追加の制約が必要となる場合がある
 
-このような導出（あるいは推論補助の変換）は、エイリアステンプレートの元の型に定義されている推論補助1つづつに対して行われ、そうして無事に導出できた（中には失敗するものがありうる）推論補助を、通常の推論補助と同じように扱ってエイリアステンプレートのCTADは行われます。
+このような導出（あるいは推論補助の変換）は、エイリアステンプレートの元の型のコンストラクタと推論補助から抽出した関数テンプレート1つづつに対して行われ、そうして無事に導出できた（中には失敗するものがありうる）推論補助を、通常の推論補助と同じように扱ってエイリアステンプレートのCTADは行われます。
 
 ### 例1、単純な例
 
@@ -55,17 +55,13 @@ CTADはコンストラクタ呼び出しよりも前に行われ、必ずしも�
 // 今回の例の対象エイリアステンプレート
 template<typename T>
 using P = std::pair<int, T>;
-
-int main() {
-  P p = {1, 2}; // ok、CTADがエイリアステンプレートに対して行われる
-}
 ```
 
 このコードで、`P`に対する推論補助がどのように導出されるかを先ほどの手順に沿って見てみます（以下、`std::pair`の`std`を省略します）。
 
 #### 2. エイリアステンプレートの右辺と`B`の右辺から、`A`のテンプレートパラメータを推論する
 
-`pair`の推論補助は1つだけが用意されています
+`pair`の推論補助は1つだけが用意されています（コンストラクタからのものは今回は無視します）
 
 ```cpp
 namespace std {
@@ -230,14 +226,14 @@ struct C {
 template<class T, class U>
 C(T, U) -> C<T, std::type_identity_t<U>>;
 
-// 今回のお客様
+// 今回のエイリアステンプレート
 template<class V>
 using A = C<V*, V*>;
 ```
 
 #### 2. エイリアステンプレートの右辺と`B`の右辺から、`A`のテンプレートパラメータを推論する
 
-`C`の推論補助は1つだけです。
+`C`の推論補助は1つだけです（コンストラクタからのものは無視）。
 
 ```cpp
 template<class T, class U>
@@ -317,11 +313,13 @@ template<class V, class U>
 C(V*, U) -> C<V*, std::type_identity_t<U>> requires std::same_as<V*, std::type_identity_t<U>>;
 ```
 
-実際は、エイリアステンプレートに対して推論補助を導出するのか、あくまで元の型に対するものを導出するのかは実装定義というか未規定です。GCCは元の型に対する推論補助を導出し使用するようです。
+実際は、エイリアステンプレートに対して推論補助を導出するのか、あくまで元の型に対するものを導出するのかは実装定義というか未規定で、GCCは元の型に対する推論補助を導出し使用するようです。
 
 ### `std::array`のエイリアステンプレート1
 
-`std::array<T, N>`の`T`を束縛するエイリアス
+エイリアステンプレートに対するCTADがどうなっているのかを理解したところで、本題に戻ります。
+
+まずは、`std::array<T, N>`の`T`を束縛するエイリアス
 
 ```cpp
 // 要素型を束縛するエイリアス
@@ -331,7 +329,7 @@ using std_array_with_int = std::array<int, N>;
 
 について導出される推論補助を求めてみます。
 
-`std::array`には推論補助が1つしかありません。
+`std::array`には推論補助が1つしかなく、コンストラクタ（集成体初期化）からの推論補助相当のものは得られません（要素1つに対して初期化子複数となるため）。
 
 ```cpp
 namespace std {
@@ -358,7 +356,7 @@ template <auto N, class... U>
 array(int, U...) -> array<int, 1 + sizeof...(U)>;
 ```
 
-が得られます。ここで注意点は、元のエイリアステンプレートのパラメータは（`auto N`）は宙ぶらりんとなりますが勝手に消すことはせず、これも含めてフィードバックします（どうやらその際、エイリアステンプレートのパラメータを先頭に持ってくるみたい）。
+が得られます。ここで注意点は、元のエイリアステンプレートのパラメータは（`auto N`）は宙ぶらりんとなりますが勝手に消すことはせず、これも含めてフィードバックします（どうやらその際、エイリアステンプレートのパラメータを先頭に持ってくる様子？）。
 
 そしてエイリアスを推定する（戻す）と
 
@@ -373,7 +371,7 @@ std_array_with_int(int, U...) -> std_array_with_int<1 + sizeof...(U)>;
 
 #### GCCの導出する推論補助
 
-GCCは、CTADでエラーが起きた時に使用して推論補助の候補をエラーメッセージ中に出力してくれます。
+GCCは、CTADでエラーが起きた時に使用した推論補助の候補をエラーメッセージ中に出力してくれます。
 
 ```
 prog.cc: In function 'int main()':
@@ -426,6 +424,208 @@ f(int{}, N);
 となってしまっていることから`T = int`の対応すら取れていないために起きています。そのためそれがフィードバックされず、導出された推論補助のテンプレートパラメータは`auto N, class _Tp, class ... _Up`の3つになっています。ただ、ステップ4では`enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp> = int`の対応が取れることが分かるため、それについての制約が追加の`requires`節にておこなわれているようです。
 
 とはいえ、そうであっても結論は変わらず、結局`auto N`が推定できないためこの推論補助は使い物になりません。そしてそれは、先ほどのGCCのエラーメッセージにも表示されています（最後のほうの「couldn't deduce template parameter 'N'」）。
+
+### `std::array`のエイリアステンプレート2
+
+次に、`std::array<T, N>`の`N`を束縛するエイリアス
+
+```cpp
+// 要素数を束縛するエイリアス
+template<typename T>
+using std_array_with_3 = std::array<T, 3>;
+```
+
+について導出される推論補助を求めてみます。
+
+```cpp
+namespace std {
+  template <class T, class... U>
+  array(T, U...) -> array<T, 1 + sizeof...(U)>;
+}
+```
+
+この推論補助とエイリアスから、テンプレートパラメータの対応を求めます。
+
+```cpp
+template <class T, class... U>
+void f(T, 1 + sizeof...(U));
+
+f(T, 3);
+```
+
+要素数の方は推論できないコンテキストなので、得られるのは、`T = T`と`class T = typename T`という対応です。
+
+これを推論補助へフィードバックすると
+
+```cpp
+template <typename T, class... U>
+array(T, U...) -> array<T, 1 + sizeof...(U)>;
+```
+
+そしてエイリアスを推定する（戻す）と
+
+```cpp
+template <typename T, class... U>
+std_array_with_3(T, U...) -> std_array_with_3<T> requires (1 + sizeof...(U) == 3);
+```
+
+省略していますが、`std::array`の元の推論補助には`T`と`U...`のすべての型が同じであることが制約されているので、それも継承されています。
+
+あれ？これはなんかいけそうな雰囲気がしていますが・・・？
+
+#### GCCの導出する推論補助
+
+実際エラーとなってるGCCの出力を見てみましょう。
+
+```
+prog.cc: In function 'int main()':
+prog.cc:13:51: error: class template argument deduction failed:
+   13 |     [[maybe_unused]] std_array_with_3 ar3 = {1,2,3};//ng
+      |                                                   ^
+prog.cc:13:51: error: no matching function for call to 'array(int, int, int)'
+In file included from prog.cc:1:
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:267:5: note: candidate: 'template<class T, class _Tp, class ... _Up> std::array(_Tp, _Up ...)-> std::array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, (1 + sizeof... (_Up))> requires  __is_same(std::std_array_with_3<T>, std::array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, 1 + sizeof ... (_Up ...)>)'
+  267 |     array(_Tp, _Up...)
+      |     ^~~~~
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:267:5: note:   template argument deduction/substitution failed:
+prog.cc:13:51: note:   couldn't deduce template parameter 'T'
+   13 |     [[maybe_unused]] std_array_with_3 ar3 = {1,2,3};//ng
+      |                                                   ^
+In file included from prog.cc:1:
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:95:12: note: candidate: 'template<class T> array(std::array<T, 3>)-> std::array<T, 3>'
+   95 |     struct array
+      |            ^~~~~
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:95:12: note:   template argument deduction/substitution failed:
+prog.cc:13:51: note:   mismatched types 'std::array<T, 3>' and 'int'
+   13 |     [[maybe_unused]] std_array_with_3 ar3 = {1,2,3};//ng
+      |                                                   ^
+In file included from prog.cc:1:
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:95:12: note: candidate: 'template<class T> array()-> std::array<T, 3>'
+   95 |     struct array
+      |            ^~~~~
+/opt/wandbox/gcc-head/include/c++/12.0.0/array:95:12: note:   template argument deduction/substitution failed:
+prog.cc:13:51: note:   candidate expects 0 arguments, 3 provided
+   13 |     [[maybe_unused]] std_array_with_3 ar3 = {1,2,3};//ng
+      |     
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/nt5lW7TPqUjVo3m2)
+
+使用されている推論補助は
+
+```cpp
+template<class T, class _Tp, class ... _Up>
+array(_Tp, _Up ...) -> array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, (1 + sizeof... (_Up))>
+  requires  __is_same(std::std_array_with_3<T>,
+                      std::array<typename std::enable_if<(is_same_v<_Tp, _Up> && ...), _Tp>::type, 1 + sizeof ... (_Up ...)>)
+```
+
+先ほどど同じ理由で、エイリアステンプレートの`T`と`std::array`の推論補助の`_Tp`の対応が取れない結果、エイリアステンプレートの`T`が推論補助にフィードバックされてしまい、テンプレートパラメータが`class T, class _Tp, class ... _Up`の3つになります。しかも、`T`に対応する仮引数はないので、結局`auto N`と同じように`T`を実引数から推論できず、コンパイルエラーを起こしています。
+
+エラーメッセージを見ると、MSVCもほぼ同じ理由によってエラーとなっている様子です。
+- [godbolt](https://godbolt.org/z/s19PKsaGx)
+
+これは、推論補助に対する制約（`_Tp`と`_Up`のすべての型が等しい）をSFINAEによって行なっていることから生じています。
+
+#### SFINAEを使わなくしたら行ける？
+
+C++20からはコンセプトが使用でき、コンセプトによって制約してやれば`requires`節で（すなわち推論補助の右辺の外で）パラメータに対する制約を行えます。`std::array`の要素数を束縛するエイリアステンプレートの場合、そのようにすればCTADが正しく働く気がしてなりません。実験してみましょう。
+
+```cpp
+#include <concepts>
+
+template<typename T, std::size_t N>
+struct my_array {
+  T arr[N];
+};
+
+template<typename T, typename... Us>
+  requires (std::same_as<T, Us> && ...)
+my_array(T, Us...) -> my_array<T, sizeof...(Us) + 1>;
+
+
+template<typename T>
+using myarray_3 = my_array<T, 3>;
+```
+
+`std::array`相当のクラスを作成して、これに対して要素数を束縛するエイリアステンプレートを書いて試してみます。
+
+```cpp
+int main() {
+  // ok
+  [[maybe_unused]]
+  my_array a1 = {1, 2, 3, 4};
+
+  // これは制約に引っかかって正しくエラーになる
+  [[maybe_unused]]
+  my_array a2 = {1, 2.0, 3, 4};
+  
+  // ok!
+  [[maybe_unused]]
+  myarray_3 a3 = {1, 2, 3};
+}
+```
+
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/NE0B6BKZ2TONPfBV)
+
+無事正しく動きました。つまり、`std::array`の推論補助の実装でSFINAEを避ければ要素型の推論はできそうです。
+
+（ただし、[MSVCさんは受け入れてくれないようです](https://godbolt.org/z/f6rh3x4T4)）
+
+ここでGCCがやっていることを確かめるために、わざとエラーを起こしてエラーメッセージを見てみます。
+
+```
+prog.cc: In function 'int main()':
+prog.cc:24:28: error: class template argument deduction failed:
+   24 |   myarray_3 a3 = {1, 2, 3.0};
+      |                            ^
+prog.cc:24:28: error: no matching function for call to 'my_array(int, int, double)'
+prog.cc:10:1: note: candidate: 'template<class T, class ... Us>  requires (same_as<T, Us> && ...) my_array(T, Us ...)-> my_array<T, (sizeof... (Us) + 1)> requires  __is_same(myarray_3<T>, my_array<T, sizeof ... (Us ...) + 1>)'
+   10 | my_array(T, Us...) -> my_array<T, sizeof...(Us) + 1>;
+      | ^~~~~~~~
+prog.cc:10:1: note:   template argument deduction/substitution failed:
+prog.cc:10:1: note: constraints not satisfied
+prog.cc: In substitution of 'template<class T, class ... Us>  requires (same_as<T, Us> && ...) my_array(T, Us ...)-> my_array<T, (sizeof... (Us) + 1)> requires  __is_same(myarray_3<T>, my_array<T, sizeof ... (Us ...) + 1>) [with T = int; Us = {int, double}]':
+prog.cc:24:28:   required from here
+prog.cc:10:1:   required by the constraints of 'template<class T, class ... Us>  requires (same_as<T, Us> && ...) my_array(T, Us ...)-> my_array<T, (sizeof... (Us) + 1)> requires  __is_same(myarray_3<T>, my_array<T, sizeof ... (Us ...) + 1>)'
+prog.cc:10:1: note: the expression '(same_as<T, Us> && ...) [with T = int; Us = {int, double}]' evaluated to 'false'
+prog.cc:4:8: note: candidate: 'template<class T> my_array(my_array<T, 3>)-> my_array<T, 3>'
+    4 | struct my_array {
+      |        ^~~~~~~~
+prog.cc:4:8: note:   template argument deduction/substitution failed:
+prog.cc:24:28: note:   mismatched types 'my_array<T, 3>' and 'int'
+   24 |   myarray_3 a3 = {1, 2, 3.0};
+      |                            ^
+prog.cc:4:8: note: candidate: 'template<class T> my_array()-> my_array<T, 3>'
+    4 | struct my_array {
+      |        ^~~~~~~~
+prog.cc:4:8: note:   template argument deduction/substitution failed:
+prog.cc:24:28: note:   candidate expects 0 arguments, 3 provided
+   24 |   myarray_3 a3 = {1, 2, 3.0};
+      |   
+```
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/45BUfScvGe9YzEQL)
+
+ここでGCCが使用している推論補助は
+
+```cpp
+template<class T, class ... Us>
+  requires (same_as<T, Us> && ...)
+my_array(T, Us ...) -> my_array<T, (sizeof... (Us) + 1)>
+  requires  __is_same(myarray_3<T>, my_array<T, sizeof ... (Us ...) + 1>)
+```
+
+これは先ほど手（脳内CTADマシーン）で求めてみた推論補助の想定とほぼ一致しています。
+
+### `std::array`のエイリアステンプレートでCTADするには結局どうすればいいんですか？
+
+この質問は2つのパターンに分岐し、それぞれで答えが異なります。
+
+1. 要素数を束縛したエイリアスの場合
+     - 無理です（もしかしたら、推論補助の形を工夫すれば行けるかもしれませんが、わかりません・・・）
+2. 要素型を束縛したエイリアスの場合
+     - 実装の推論補助をSFINAEを使わない形で書き直させれば行けます
+
+1をなんとかするアイデアをお持ちの方がいましたら教えて欲しいです（多分LWG Issueとして提出できます）。
 
 ### 参考文献
 
