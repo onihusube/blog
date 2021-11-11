@@ -84,16 +84,16 @@ using P = pair<int, T>;
 
 の右辺から、テンプレートパラメータのペア`<T1, T2>`と`<int, T>`から、`T1 = int, T2 = T`（と`typename T2 = typename T`）の対応を得ます。
 
-ここでは通常の関数テンプレートのテンプレートパラメータ推論とほぼ同じことを行なってテンプレートパラメータの対応を得ます。`B`のテンプレートパラメータを持ち右辺の`<>`内の型を引数としてとる関数テンプレート`f`に対して、エイリアステンプレート`P`の右辺の`<>`内の型を引数として与えた時
+ここでは、`pair`の推論補助`B`のテンプレートパラメータを持ち、`B`の右辺の型（`pair<T1, T2>`）を引数型とする関数テンプレートに対して、エイリアステンプレート`P`の右辺の型（`pair<int, T>`）の値を引数として渡したときの関数テンプレートのテンプレートパラメータ推論とほぼ同じことを行なって、テンプレートパラメータの対応を得ます。
 
 ```cpp
 template<typename T1, typename T2>
-void f(T1, T2);
+void f(pair<T1, T2>);
 
-f(int{}, T{});
+f(pair<int, T>{});
 ```
 
-に、`f`の`T1, T2`に推論される型を求めることで対応を得ます。この時、`T`のように具体的な型ではないテンプレートパラメータに対しても推論を行い、テンプレートパラメータのまま対応させます。それによって、`T1 = int, T2 = T`の対応が得られます。
+このような`f`の`T1, T2`に推論される型を求めることで対応を得ます。この時、`T`のように具体的な型ではないテンプレートパラメータに対しても推論を行い、テンプレートパラメータのまま対応させます。それによって、`T1 = int, T2 = T`の対応が得られます。
 
 #### 3. 2で暫定的に得られた`A`の内容を、元の推論補助`B`にフィードバックして置き換える
 
@@ -106,7 +106,7 @@ pair(T1, T2) -> pair<T1, T2>;
 
 に、先ほど得た対応（`T1 = int, T2 = T`）とエイリアステンプレートのテンプレートパラメータをフィードバックします。
 
-まずエイリアステンプレートのテンプレートパラメータをそのままフィードバックすると
+まずエイリアステンプレートのテンプレートパラメータをそのまま、推論補助のテンプレートパラメータリストの先頭にフィードバックすると
 
 ```cpp
 template<typename T, typename T1, typename T2>
@@ -177,18 +177,16 @@ template<class A>
 using MyAbbrev = VeryLongNameXXXXXX<A>;
 ```
 
-これらの右辺からテンプレートパラメータの対応を求めます。
-
-ところでそれは、関数テンプレートの引数推論と同様に行われるのでしたから
+これらの右辺からテンプレートパラメータの対応を求めます。それは、関数テンプレートの引数推論と同様に行われるので、
 
 ```cpp
 template<class T>
-void f(decay_t<T>);
+void f(VeryLongNameXXXXX<decay_t<T>>);
 
-f(A{});
+f(VeryLongNameXXXXXX<A>{});
 ```
 
-のように呼んだ時と同じ推論が行われます。ご存知のように？これは推論できないコンテキストとされ、`T`の推論はできません。したがって、ここでは何の情報も得られません。
+このように呼んだ時の`T`の推論によって対応を求めますが、ご存知のように？これは推論できないコンテキストとされ、`T`の推論はできません。したがって、ここでは何の対応も得られません。
 
 #### 3. 2で暫定的に得られた`A`の内容を、元の推論補助`B`にフィードバックして置き換える
 
@@ -257,12 +255,12 @@ using A = C<V*, V*>;
 
 ```cpp
 template<class T, class U>
-void f(T, std::type_identity_t<U>);
+void f(C<T, std::type_identity_t<U>>);
 
-f(V*{}, V*{});
+f(C<V*, V*>{});
 ```
 
-のように呼んだ時と同じ推論が行われます。
+のように呼んだ時の`T, U`に行われるのと同じ推論が行われます。
 
 ここで得られる対応は、`T = V*`のみで、`U`との対応は得られません（推論できないコンテキストです）。
 
@@ -355,12 +353,12 @@ namespace std {
 
 ```cpp
 template <class T, class... U>
-void f(T, 1 + sizeof...(U));
+void f(array<T, 1 + sizeof...(U)>);
 
-f(int{}, N);
+f(std::array<int, N>{});
 ```
 
-関数テンプレートとして書くと色々おかしいですが、つまりはそこは推論できないコンテキストということで何の情報も得られません。得られるのは、`T = int`という対応です。
+明らかに要素数は推論できないコンテキストなので、得られるのは`T = int`という対応のみです。
 
 対応が得られているので、まずエイリアステンプレートのテンプレートパラメータを推論補助へフィードバックし
 
@@ -434,12 +432,12 @@ array(_Tp, _Up...) -> array<enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp>, 1 + 
 
 ```cpp
 template <class T, class... U>
-void f(enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp>, 1 + sizeof...(U));
+void f(array<enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp>, 1 + sizeof...(_Up)>);
 
-f(int{}, N);
+f(std::array<int, N>{});
 ```
 
-となってしまってい、これは推論できないコンテキストのため、`T = int`の対応すら取れていないために起きています。そのためそれがフィードバックされず、導出された推論補助のテンプレートパラメータは`auto N, class _Tp, class ... _Up`の3つになっています。ただ、ステップ4では`enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp> = int`の対応が取れることが分かるため、それについての制約が追加の`requires`節にておこなわれているようです。
+となり、`T`も推論できないコンテキストとなって`T = int`の対応が取れなくなるため起きています。そのためそれがフィードバックされず、導出された推論補助のテンプレートパラメータは`auto N, class _Tp, class ... _Up`の3つになっています。ただ、ステップ4では`enable_if_t<(is_same_v<_Tp, _Up> && ...), _Tp> = int`の対応が取れることが分かるため、それについての制約が追加の`requires`節にておこなわれているようです。
 
 とはいえ、そうであっても結論は変わらず、結局`auto N`が推定できないためこの推論補助は使い物になりません。そしてそれは、先ほどのGCCのエラーメッセージにも表示されています（最後のほうの「couldn't deduce template parameter 'N'」）。
 
@@ -466,9 +464,9 @@ namespace std {
 
 ```cpp
 template <class T, class... U>
-void f(T, 1 + sizeof...(U));
+void f(array<T, 1 + sizeof...(U)>);
 
-f(E{}, 3);
+f(std::array<E, 3>);
 ```
 
 要素数の方は推論できないコンテキストなので、得られるのは、`T = E`という対応です。
@@ -657,5 +655,12 @@ my_array(T, Us ...) -> my_array<T, (sizeof... (Us) + 1)>
 - [CTAD for alias templates algorithm examples](https://htmlpreview.github.io/?https://github.com/mspertus/CTAD_POST_CPP17/master/CTAD_alias_examples.html)
 - [Template argument deduction - cppreference](https://en.cppreference.com/w/cpp/language/template_argument_deduction)
 - [12.4.1.8 Class template argument deduction [over.match.class.deduct] - N4861](https://timsong-cpp.github.io/cppwp/n4861/over.match.class.deduct)
+
+### 謝辞
+
+この記事の9割は次の方のご指摘によって成り立っています。
+
+- [@yohhoyさん](https://twitter.com/yohhoy/status/1458739193262215172)
+- [@nus_mizさん](https://twitter.com/nus_miz/status/1458751881858015240)
 
 [この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2021/20211110_alias_template_ctad.md)
