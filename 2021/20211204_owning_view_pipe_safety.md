@@ -21,9 +21,11 @@ namespace std::ranges {
     // 専ら使用するコンストラクタ
     constexpr owning_view(R&& t) : r_(std​::​move(t)) {}
 
+    // ムーブコンストラクタ/代入演算子
     owning_view(owning_view&&) = default;
     owning_view& operator=(owning_view&&) = default;
 
+    // 保持するRのオブジェクトを取得する
     constexpr R& base() & noexcept { return r_; }
     constexpr const R& base() const& noexcept { return r_; }
     constexpr R&& base() && noexcept { return std::move(r_); }
@@ -81,13 +83,13 @@ namespace std::ranges {
 ```cpp
 using namespace std::ranges;
 
-// 任意のviewとする
+// 任意のview
 template<view V>
 class xxx_view {
   V base_;
 
 public:
-  // viewを受け取るコンストラクタ
+  // 入力viewを受け取るコンストラクタ
   xxx_view(V v) : base_(std::move(v)) {}
 
 };
@@ -107,7 +109,7 @@ namespace std::ranges::views {
 }
 ```
 
-先ほどの`xxx_view`を`xxx_view{r}`のように使用した時、クラステンプレートの実引数推定が起こることによって1つだけ定義されている推論補助が使用され、`r`の型`R`を`views::all_t<R>`のように通して、`views::all(r)`の戻り値型を`xxx_view`のテンプレートパラメータ`V`として取得します。`views::all`の戻り値型は、`R`が`view`ならその`view`型（*prvalue*としての素の型）、`R`が左辺値なら`ref_view{r}`、`r`が右辺値なら`owning_view{r}`を返します。つまり、`views::all_t<R>`は常に`R`を変換した`view`のCV修飾なし参照なしの素の型（*prvalue*）を得ます。
+先ほどの`xxx_view`を`xxx_view{r}`のように使用した時、クラステンプレートの実引数推定が起こることによって1つだけ定義されている推論補助が使用され、`r`の型`R`を`views::all_t<R>`のように通して、`views::all(r)`の戻り値型を`xxx_view`のテンプレートパラメータ`V`として取得します。`views::all`の戻り値型は、`r`が`view`ならその`view`型（*prvalue*としての素の型）、`r`が左辺値なら`ref_view{r}`、`r`が右辺値なら`owning_view{r}`を返します。つまり、`views::all_t<R>`は常に`R`を変換した`view`のCV修飾なし参照なしの素の型（*prvalue*）を得ます。
 
 そうして得られた型を`V`とすると、`xxx_view{r}`は`xxx_view<V>{r}`のような初期化式になります。`xxx_view`（および標準Rangeアダプタ）の`view`を受け取るコンストラクタは`explicit`がなく、テンプレートパラメータに指定された`view`型（`V`、これは実引数`r`の型`R`に対して`views::all_t<R>`の型）を直接受けるものであるため、そのコンストラクタ引数では`R -> V`の暗黙変換によって`views::all(r)`を通したのと同じことが起こり、ここでようやく`views::all`の自動適用が行われます。
 
@@ -142,7 +144,7 @@ int main() {
 
 ### パイプラインで起こること
 
-個別の`view`型で起こることはわかったかもしれませんが、実際に起こることはイメージしづらいものがあります。
+個別の`view`型で起こることはわかったかもしれませんが、実際に使用した時に起こることはイメージしづらいものがあります。
 
 ```cpp
 #include <ranges>
