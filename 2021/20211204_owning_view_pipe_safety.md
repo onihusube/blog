@@ -151,14 +151,16 @@ int main() {
 #include <vector>
 
 auto f() -> std::vector<int>;
+auto even = [](int n) { return 0 < n; };
+auto sq = [](int n) { return n * n; };
 
 using namespace std::views;
 
 int main() {
   // pipesの型は？構造は？？
   auto pipes = f() | drop(2)
-                   | filter([](int n) { return 0 < n; })
-                   | transform([](int n) { return n * n; })
+                   | filter(even)
+                   | transform(sq)
                    | take(5);
 
   // 安全、f()の戻り値はowning_viewによって寿命延長されている
@@ -169,6 +171,77 @@ int main() {
 ```
 
 例えばこのようなRangeアダプタによるパイプラインの結果として得られた`pipes`は、どんな型を持ちどんな構造になっているのでしょうか？また、`f()`の結果（右辺値）は`owning_view`によって安全に取り回されているはずですが、`pipes`のどこにそれは保持されているのでしょうか？
+
+先程の`views::all/views::all_t`の標準Rangeアダプタの使われ方を考慮すると、`pipes`の型はわかりそうです。
+
+1行目の`f() | drop(2)`では[`drop_view`](https://cpprefjp.github.io/reference/ranges/drop_view.html)（`views::drop(2)`による）の構築が行われ、`f()`の戻り値を`r`とすると`drop_view{r, 2}`が構築されます。前述の通り、そこでは`views::all`が自動適用され、`r`は右辺値なのでその結果は`owning_view{r}`が帰ります。したがって、この行で生成されるオブジェクトの型は`drop_view<owning_view<std::vector<int>>>`となります。
+
+その結果を`v1`として、次の行`v1 | filter(even)`では[`filter_view`](https://cpprefjp.github.io/reference/ranges/filter_view.html)が、`filter_view{v1, even}`のように構築されます。ここでも`views::all`が自動適用されていますが、`views::all(v1)`は`v1`が既に`view`であるため、それがそのまま（decay-copyされて）帰ります。したがって、この行で生成されるオブジェクトの型は`filter_view<drop_view<owning_view<std::vector<int>>>, even_t>`となります（述語`even`のクロージャ型を`even_t`としています）。
+
+後の行およびその他のRangeアダプタの適用時に起きることも同じようになっているため、この2行目で起きている事がわかれば後は簡単です。ただし、Rangeアダプタオブジェクトの返す型に注意は必要ではあります。
+
+```cpp
+auto pipes = f() | drop(2)        // V1 = drop_view<owning_view<std::vector<int>>>
+                 | filter(even)   // V2 = filter_view<V1, even_t>
+                 | transform(sq)  // V3 = transform_view<V2, sq_t>
+                 | take(5);       // V4 = take_view<V3>
+```
+
+全部あえて書くと`decltype(pipes) = take_view<transform_view<filter_view<drop_view<owning_view<std::vector<int>>>, even_t>, sq_t>>`となります。標準`view`型は入力の`view`をテンプレートの1つ目の引数として取るので、パイプライン前段の`view`型が、次の段の`view`型の第一テンプレート引数としてはまっていきます。マトリョーシカみたいです。
+
+パイプラインの2段目以降では`views::all`の適用はほぼ恒等変換となるため、`views::all_t`の型を気にする必要があるのはパイプラインの一番最初の`|`による適用時だけです。
+
+型がわかれば、そのオブジェクト構造がなんとなく見えてきます。しかし、標準`view`型の個々のクラス構造がわからないとこのパイプライン全体の構造も推し量る事ができません。
+
+標準`view`型（主にRangeアダプタ）の型としての構造（第一テンプレート引数に入力`view`をとる、`views::all`を自動適用する）がある程度一貫していたように、そのクラス構造もまたある程度の一貫性があります。そこでは、入力の`view`型をコンストラクタで値として受け取って、メンバ変数にムーブして保持しています。
+
+```cpp
+using namespace std::ranges;
+
+// 任意のview
+template<view V, ...>
+class xxx_view {
+  // 入力viewをメンバとして保持
+  V base_ = V();
+
+public:
+  // 入力view（と追加の引数）を受け取るコンストラクタ
+  xxx_view(V v, ...) : base_(std::move(v)) {}
+
+};
+```
+
+[`view`コンセプト](https://cpprefjp.github.io/reference/ranges/view.html)の定義する`view`とは、ムーブ構築が`O(1)`で行えて、ムーブされた回数`N`と要素数`M`から`N`個のオブジェクト（ムーブ後`view`を含む）の破棄が`O(N+M)`で行えて、ムーブ代入の計算量は構築と破棄を超えない程度、であるような型です。`owning_view`のような例外を除けば、これは任意の範囲を所有せずに`range`となる型を指定しており、ムーブ構築のコストは範囲の要素数と無関係に行える、すなわち`std::vector`のムーブ構築/代入相当である事を示しています（ここでは`view`のコピーについては考えないことにします）。
+
+`views::all_t<R>`は`R`が`view`である時に`R`の素の型（*prvalue*としての型）を返します。それは右辺値`R&&`と左辺値`R&`および`const R`に対して、`R`となる型です。このようなCV修飾なし参照なしの型が`view`型の入力`V`となるため、`V`のオブジェクト`rv`（これはパイプライン内では右辺値）はコンストラクタ引数`v`に対してまずムーブされ、メンバ`base_`として保持するためにもう一度ムーブされます。`V`が`ref_view`をはじめとする範囲を所有しないタイプの`view`である時、その参照ごとメンバとして保存されます。`V`が`owning_view`のように範囲を所有する`view`の場合、その所有する範囲ごとメンバとして保存されます。その後、`ref_view or owning_view`を保持した`view`オブジェクトは、パイプラインの次の段で同様に次の`view`オブジェクト内部にムーブされます。
+
+パイプラインの格段でこのような一時`view`オブジェクトのムーブ構築が起きているため、最初に構築された`ref_view or owning_view`オブジェクトは最後まで捨てられることなく、パイプラインの一番最後に作成されたオブジェクト内に保持されます。本当にマトリョーシカですね。
+
+```cpp
+#include <ranges>
+#include <vector>
+
+auto f() -> std::vector<int>;
+auto even = [](int n) { return 0 < n; };
+auto sq = [](int n) { return n * n; };
+
+using namespace std::views;
+
+int main() {
+  // f()の戻り値はpipesの奥深くにしまわれている・・・
+  auto pipes = f() | drop(2)
+                   | filter(even)
+                   | transform(sq)
+                   | take(5);
+
+  // 安全
+  for (int m : pipes) {
+    std::cout << n << ',';
+  }
+}
+```
+
+このようにして、`f()`の戻り値である右辺値の`std::vector`オブジェクトの寿命は、パイプラインを通しても延長されています。`views::filter`が受け取る述語オブジェクトなども対応する層（`view`オブジェクト内部）に保存されており、同様に安全に取り回し、使用する事ができます。
 
 ### 参考文献
 
