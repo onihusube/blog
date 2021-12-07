@@ -217,7 +217,9 @@ public:
 
 `views::all_t<R>`は`R`が`view`である時に`R`の素の型（*prvalue*としての型）を返します。それは右辺値`R&&`と左辺値`R&`および`const R`に対して、`R`となる型です。このようなCV修飾なし参照なしの型が`view`型の入力`V`となるため、`V`のオブジェクト`rv`（これはパイプライン内では右辺値）はコンストラクタ引数`v`に対してまずムーブされ、メンバ`base_`として保持するためにもう一度ムーブされます。`V`が`ref_view`をはじめとする範囲を所有しないタイプの`view`である時、その参照を含む`view`オブジェクトごとムーブ（コピー）されメンバとして保存されます。`V`が`owning_view`のように範囲を所有する`view`の場合、その所有権ごと`view`オブジェクトをムーブしてメンバとして保存します。その後、そうして構築された`view`オブジェクトは、パイプラインの次の段で同様に次の`view`オブジェクト内部にムーブして保持されます。
 
-パイプラインの格段でこのような一時`view`オブジェクトのムーブが起きているため、最初に構築された`ref_view or owning_view`オブジェクトは最後まで捨てられることなく、パイプラインの一番最後に作成されたオブジェクト内に保持されます。イメージとしてはマトリョーシカとか玉ねぎとかそんな感じで、一番中心にパイプラインの起点となった入力`range`を参照or所有する`view`オブジェクトが居て、それは通常`ref_view`か`owning_view`のどちらかとなります。
+パイプラインの格段でこのような一時`view`オブジェクトのムーブが起きているため、最初に構築された`ref_view or owning_view`オブジェクトは最後まで捨てられることなく、パイプラインの一番最後に作成されたオブジェクト内に保持されます。そして、パイプラインの段が重なるごとに、それを包むようにRangeアダプタの`view`の層が積み重なっていきます。
+
+イメージとしてはマトリョーシカとか玉ねぎとかそんな感じで、一番中心にパイプラインの起点となった入力`range`を参照or所有する`view`オブジェクトが居て、それは通常`ref_view`か`owning_view`のどちらかとなります。
 
 ```cpp
 #include <ranges>
@@ -348,3 +350,6 @@ namespace std::ranges {
 - [P2415R2 What is a view?](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2415r2.html)
 - [What is `std::views::all` introduced for in C++20?](https://stackoverflow.com/questions/67335254/what-is-stdviewsall-introduced-for-in-c20)
 - [`<ranges>` - cpprefjp](https://cpprefjp.github.io/reference/ranges.html)
+
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2021/20211207_owning_view_pipe_safety.md)
