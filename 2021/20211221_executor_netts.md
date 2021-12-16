@@ -128,7 +128,67 @@ namespace boost::asio {
 
 Asioでの動きを受けてかそれとは別かはわかりませんが、2012〜2015にかけていくつかの異なるExecutorの提案がSG1（Study Group1 : Concurrency Study Group）に提出されました。
 
-これを受けてSG1では、これらのニーズとユースケースを満たしつつそれぞれの提案の問題点を解決するような統一的なExecutorモデルを模索され、2016年10月に最初のUnified Executorである[P0443R0 A Unified Executors Proposal for C++](https://wg21.link/P0443R0)が提案されました。
+1つはgoogleからのもの
+
+```cpp
+class executor {
+public:
+  virtual void add(function<void()> closure) = 0;
+
+  virtual void add_at(time_point abs_time,
+                      function<void()> closure) = 0;
+
+  virtual void add_after(duration rel_time,
+                         function<void()> closure) = 0;
+  ...
+};
+
+class thread_pool : public executor { ... };
+```
+
+1つはAsioからのもの
+
+```cpp
+class my_executor {
+public:
+  template<class Function, class Allocator>
+  void dispatch(Function&& f, const Allocator& alloc);
+  
+  template<class Function, class Allocator>
+  void post(Function&& f, const Allocator& alloc);
+
+  template<class Function, class Allocator>
+  void defer(Function&& f, const Allocator& alloc);
+
+  execution_context& context() noexcept;
+  
+  ...
+};
+```
+
+1つはNVIDIAからのもの
+
+```cpp
+template<class Executor>
+struct executor_traits {
+  template<class Function>
+  static future<auto> async_execute(Executor& ex, Function f);
+
+  template<class Function>
+  static future<auto> async_execute(Executor& ex, Function f, shape_type shape);
+  
+  template<class Function>
+  static auto execute(Executor& ex, Function f);
+ 
+  template<class Function>
+  static auto execute(Executor& ex, Function f, shape_type shape);
+  ...
+};
+```
+
+AsioはExecutorとExecution Contextが分かれていたり、NVIDIAはおそらくGPUでの実行を意識してバルク実行インターフェースを備えていたりと、それぞれが必要とするユースケースによって提案されたExecutorの設計は微妙に異なっていました。
+
+これを受けてSG1では、これらのニーズとユースケースを満たしつつそれぞれの提案の問題点を解決するような統一的なExecutorモデルが模索され、2016年10月に最初のUnified Executorである[P0443R0 A Unified Executors Proposal for C++](https://wg21.link/P0443R0)が提案されました。
 
 P0443R0はかなりNetworking TSのExecutorの影響が見られるものでしたが、その後議論を経て洗練されていきコンセプトとCPOベースの非常にジェネリックなライブラリとして進化していきました。
 
@@ -140,9 +200,15 @@ C++標準化において、ライブラリ提案は各SG->LEWG->LWGの3段階の
 
 なかなか巨大なこともあってC++20には間に合わず、その後COVID-19パンデミックが直撃したこともありレビューは遅れ、2020年夏頃からLEWGのリソースを全力投入する形で、P0443をいくつかの部分に分割して個別のグループによってレビューされました。提案が巨大で歴史のあるものであったこともありレビューは困難を極めたようで、Executorの設計とその歴史についてLEWGのメンバに周知を図る必要性が提起されました。とはいえレビューは為され、[そこそこの数の問題が報告](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2219r0.pdf)されました。
 
+2020年8月ごろには、AsioはP0443のExecutorを実装してリリースされました。これはP0443の実装経験を得るためでもあるようです。
+
+- [Boost 1.74.0リリースノート - boostjp](https://boostjp.github.io/document/version/1_74_0.html#asio)
+
 その後2020年12月のLEWGのレビューで、P0443からいくつかの部分が別の提案に分離されることが決定された他はほぼ設計が固まったように見え、一部の人から実装経験について心配する声が上がっていましたが、C++23に向けて作業されていました。
 
-#### P2300
+#### P2300 `std::execution`
+
+そこから半年ほどは目立った（外部から観測できる）動きはなかったのですが、2021年6月、P0443を置き換える新しいExecutorライブラリである[P2300R0 `std::execution`](https://wg21.link/p2300r0)が提案されました。P2300はP0443をベースとしていくつかの問題を解決した上で、分離して提案されていた非同期アルゴリズムライブラリを含むさらに大きなライブラリ提案です。P2300はP0443の正統進化の形ではあります。
 
 ### P0443
 
