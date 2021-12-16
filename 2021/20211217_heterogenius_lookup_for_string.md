@@ -48,7 +48,7 @@ int main() {
 
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/nBGVJlhRqZFp5MJn)
 
-`std::string_view`をそのまま受け取れないのは、`std::string_view`から変換する`std::string`のコンストラクタに`explicit`が付加されているためです。静かなパフォーマンス低下を（イミフな）コンパイルエラーという長文で教えてくれるのでとても親切だといえるでしょう・・・
+`std::string_view`をそのまま受け取れないのは、`std::string_view`から変換する`std::string`のコンストラクタに`explicit`が付加されているためです。静かなパフォーマンス低下を長文コンパイルエラーで教えてくれるのでとても親切だといえるでしょう・・・
 
 #### `std::unordered_map<std::string, T>`
 
@@ -83,6 +83,7 @@ int main() {
 #include <string>
 #include <unordered_map>
 #include <map>
+#include <functional> // ranges::lessとかはここにある
 
 using namespace std::literals;
 
@@ -111,6 +112,7 @@ int main() {
 #include <string>
 #include <unordered_map>
 #include <map>
+#include <functional>
 
 using namespace std::literals;
 
@@ -137,6 +139,8 @@ int main() {
 
 少し面倒ですが、`std::hash`をそのまま利用してやればハッシュを独自実装する必要はありません。ハッシュクラス（`string_hash`）の`operator()`の引数型を`std::string_view`にしておけば、`const char*, std::string, std::string_view`の3つを受け取ることができます。
 
+`std::string`系の文字列クラスならこうすればいいのですが、他の型の場合はハッシュ共通化が難しい場合もあるかもしれません。そういう場合は自分でハッシュ実装をする必要がありそうです。
+
 #### `const char*, std::string, std::string_view`のハッシュ一貫性保証
 
 ところで、上記のように`const char*, std::string`のハッシュ値を`std::string_view`から計算することに問題はないのでしょうか？
@@ -154,7 +158,7 @@ int main() {
 
 > The hash value of a string view object is equal to the hash value of the corresponding string object ([basic.string.hash]). 
 
-と、同じことを逆方向から確認しています。`const char*`の文字列も`std::string`を経由して考えれば同じ結論となるので、各種文字列のハッシュ値はその型によらず一致することが分かります。
+と、同じことを逆方向から確認しています。`const char*`の文字列も`std::string/std::string_view`を経由して考えれば同じ結論となるので、各種文字列のハッシュ値はその型によらず一致することが分かります。
 
 どうやらこれはC++17から規定されたもののようですが、この規定によって変更が必要になるとすればそれは破壊的となるはずなので、おそらく実装がそうなっていたことを規格に反映しただけで、以前から同様の保証は暗黙的に存在していたと思われます。
 
@@ -174,3 +178,5 @@ C++23ではさらに、全ての連想コンテナの削除（`erase()`）とノ
 - [P2363R1 Extending associative containers with the remaining heterogeneous overloads](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2363r1.html)
 - [`std::unordered_map<Key, T, Hash, KeyEqual, Allocator>::find` - cppreference](https://en.cppreference.com/w/cpp/container/unordered_map/find)
 - [`std::hash (std::string, std::wstring, std::u16string, std::u32string, std::u8string, std::pmr::string, std::pmr::wstring, std::pmr::u16string, std::pmr::u32string, std::pmr::u8string)` - cppreference](https://en.cppreference.com/w/cpp/string/basic_string/hash)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2021/20211217_heterogenius_lookup_for_string.md)
