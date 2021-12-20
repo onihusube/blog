@@ -11,6 +11,7 @@ Executorライブラリは、非同期並行処理の制御のための基盤と
 標準インターフェースを介して様々なハードウェアリソースへアクセスする方法と非同期処理のグラフを表現する方法を提供し、処理がいつどこで行われるのかをプログラマが制御可能とするためのライブラリです。
 
 - [P2300R2 `std::execution`](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2300r2.html)
+- [P2470R0 Slides for presentation of P2300R2: `std::execution` (`sender/receiver`)](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2470r0.pdf)
 - [［翻訳］P0443R13 A Unified Executors Proposal for C++ - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2020/05/24/205222)
 
 #### Networking TS
@@ -228,7 +229,61 @@ R1に改稿されLEWGで議論を重ねていたのですが、2021年7月ごろ
 2021年9月の2回目のLEWGレビューではNetworking TSとP2300をどう進めていくかについて本格的に議論されることになり、Networking TSとP2300を切り離した場合に後からP2300とNetworking TSを相互運用可能なようにラッパーを書くことができるか、あるいは（Asioが必要とする）プロパティ指定方法なしでP2300をC++23に導入した場合に後でそれを追加できるか？などが議論されたようです。  
 ここでも方向性を探るための投票が行われ、大統一非同期モデルの必要性についてはコンセンサスが得られず、Networking TSとP2300のC++23入りについても前回同様の結果となりました。
 
+2021年10月公開の提案文書では、このP2300とNetworkingTSの問題に関連する提案（報告書）がいくつも提出されました。
 
+- [P2464R0 Ruminations on networking and executors](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2464r0.html)
+    - Networking TSをP0443ベースで標準化すべきではない
+    - P2300の開発に専念し、完成後にそれにフィットするネットワークライブラリを標準化したほうがいい
+- [P2469R0 Response to P2464: The Networking TS is baked, P2300 Sender/Receiver is not.](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2469r0.pdf)
+    - ↑に反論する文書
+    - P2300は非同期モデルを提案するものではなく非同期DSLを提案するものにすぎない
+    - ASIOは実装経験に裏打ちされた非同期モデルをもっており、P2300の実質スーパーセットである
+- [P2479R0 Slides for P2464](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2479r0.pdf)
+    - P2464を紹介するスライドだが、↑に対する批判を含む
+    - P2469はP2300が提供する共通化されたAPIとモデルによる非同期処理の構成を可能とするAPIを持たない
+- [P2471R1 NetTS, ASIO and Sender Library Design Comparison](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2471r1.pdf)
+    - Networking TSとAsioとP2300を比較するもの
+- [P2480R0 Response to P2471: "NetTS, Asio, and Sender library design comparison" - corrected and expanded](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2480r0.pdf)
+    - ↑に対して間違いを指摘する提案
+
+これを受けて、10月のLEWGレビューでもP2464とP2469について議論されたようです。両方の支持者は、互いが互いの上に構築できる（P2300の上にNetworking TSを構築できるし、Networking TSの上にP2300を構築できる）と主張していて、議論の主題はエラー処理に関することでした。Networking TSのExecutorモデル（およびP0443の`exeecutor`）はエラー通知に関するチャネルを持たず、特に処理が実行コンテキストに投入されてから実行されるまでの間に起きるエラーをハンドルする方法を提供しないことが懸念されたようです。もう一つの論点はパフォーマンスに関することで、P2300のモデルでは`sender/reciever`オブジェクトの構築に伴う受け入れがたいオーバーヘッドが発生すると考えている人が多いようです。
+
+これらの問題についてP2300/Networking TSをどう進めていくかを判断するために、LEWGおよびSG1のメンバで次の項目について投票を行いました
+
+1. Networking TS/Asioの非同期モデルは、ネットワーキング・並列処理・GPUなどのほとんどの非同期ユースケースの優れた基盤である
+      - 弱い否決
+2. P2300の非同期モデルは、ネットワーキング・並列処理・GPUなどのほとんどの非同期ユースケースの優れた基盤である
+      - コンセンサス
+3. C++の標準ネットワークライブラリとして、Networking TSを追求するのをやめる
+      - 否決
+4. C++標準ネットワークライブラリは、P2300をベースとすべき
+      - 弱いコンセンサス
+5. C++標準ネットワークライブラリを、TLS/DTLSサポートなしで出荷することを容認する
+      - 否決
+
+2番目の投票は反対9に対して賛成40と大差がついています。3番目の投票は反対16に対して賛成26でしたが、賛成票を投じた人の多くはNetworking TSを白紙に戻したいのではなく、P2300の上に構築したいという意図のようです。
+
+これによって、LEWG/SG1およびSG4の方向性は
+
+1. Networking TS/Asioの非同期モデルをベースとしてP2300を構築しない
+2. Networking TS/Asioの非同期モデルはネットワーキングのためのモデルとして追及したほうがいい（するなら
+3. LEWGはC++23に向けてP2300の作業を続行する
+4. Networking TSは死んでいない
+5. Networking TSを標準に導入するためには、非同期モデルとセキュリティについての作業が必要となる
+      - この作業は重く、C++23に間に合う可能性は低い
+6. Networking TSがP2300ではない非同期モデルを採用するなら、説得力のある提案が必要となる
+
+一応はこれで決着を見たはずです、火種は残ってる気がしますが・・・
+
+この結果に従って、12月まではP2300がLEWGにて引き続きレビューされていますがLWGに進めてはいません。今のところ、Networking TS絡みで大きな問題はないようです。
+
+#### C++23 Feature Complete
+
+まだ2023年までは時間がありますが、あらかじめ決められているスケジュール（[P1000R4](https://isocpp.org/files/papers/P1000R4.pdf)）として、C++23に導入する機能の設計は2022年2月7日までに完了していることが求められています。
+
+LEWGの予定表（[P2489R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2489r0.html)）によれば、P2300のLEWGにおけるレビューの機会はあと一回（2022年1月11日）で、LWGへ進めるための投票の機会もあと一度（2022年1月14日～）です。
+
+前述のように、Networking TSは実質的に作業がストップしており、非同期モデルとセキュリティという2つの重い課題を抱えているので、C++23には間に合わないでしょう。Executorが間に合うかは来年2週目のLEWGのテレコンレビューで設計を完了できるかで決まります。
 
 ### Executor?
 
