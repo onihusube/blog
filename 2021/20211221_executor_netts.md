@@ -126,7 +126,7 @@ namespace boost::asio {
 }
 ```
 
-ここで出てくる`ex`こそが今日Executorと呼ばれているものです。`associated_executor`は非同期操作の完了ハンドラ型に対して部分特殊化しておくことでカスタムすることができ、その`::get()`から得られるExecutorによって完了ハンドラが実行される場所を指定します。何もカスタムしなければ、デフォルトの`system_executor`が使用され、デフォルトは現在のスレッド（`ex.dispatch()`の呼び出された場所）でそのまま実行されます。
+ここで出てくる`ex`こそが今日Executorと呼ばれているものです。`associated_executor`は非同期操作の完了ハンドラ型に対して部分特殊化しておくことでカスタムすることができ、その`::get()`から得られるExecutorによって完了ハンドラが実行される場所を指定します。何もカスタムしなければデフォルトの`system_executor`が使用され、これは別のスレッド（スレッドプール内の任意のスレッド）で完了ハンドラを実行します。
 
 #### WG21 SG1におけるUnified Executorの追求
 
@@ -190,7 +190,7 @@ struct executor_traits {
 };
 ```
 
-AsioはExecutorとExecution Contextが分かれていたり、NVIDIAはおそらくGPUでの実行を意識してバルク実行インターフェースを備えていたりと、それぞれが必要とするユースケースによって提案されたExecutorの設計は微妙に異なっていました。
+Googleのものは任意のスレッドプールの共通インターフェースとして設計されており、AsioはExecutorとExecution Contextが分かれていたり、NVIDIAのものはおそらくGPUでの実行を意識してバルク実行インターフェースを備えていたりと、それぞれが必要とするユースケースによって提案されたExecutorの設計は微妙に異なっていました。
 
 これを受けてSG1では、これらのニーズとユースケースを満たしつつそれぞれの提案の問題点を解決するような統一的なExecutorモデルが模索され、2016年10月に最初のUnified Executorである[P0443R0 A Unified Executors Proposal for C++](https://wg21.link/P0443R0)が提案されました。
 
@@ -241,10 +241,12 @@ R1に改稿されLEWGで議論を重ねていたのですが、2021年7月ごろ
 - [P2479R0 Slides for P2464](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2479r0.pdf)
     - P2464を紹介するスライドだが、↑に対する批判を含む
     - P2469はP2300が提供する共通化されたAPIとモデルによる非同期処理の構成を可能とするAPIを持たない
-- [P2471R1 NetTS, ASIO and Sender Library Design Comparison](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2471r1.pdf)
+- [P2471R0 NetTS, ASIO and Sender Library Design Comparison](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2471r0.pdf)
     - Networking TSとAsioとP2300を比較するもの
 - [P2480R0 Response to P2471: "NetTS, Asio, and Sender library design comparison" - corrected and expanded](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2480r0.pdf)
     - ↑に対して間違いを指摘する提案
+- [P2471R1 NetTS, ASIO and Sender Library Design Comparison](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2471r1.pdf)
+    - ↑を受けての修正版
 
 これを受けて、10月のLEWGレビューでもP2464とP2469について議論されたようです。両方の支持者は、互いが互いの上に構築できる（P2300の上にNetworking TSを構築できるし、Networking TSの上にP2300を構築できる）と主張していて、議論の主題はエラー処理に関することでした。Networking TSのExecutorモデル（およびP0443の`exeecutor`）はエラー通知に関するチャネルを持たず、特に処理が実行コンテキストに投入されてから実行されるまでの間に起きるエラーをハンドルする方法を提供しないことが懸念されたようです。もう一つの論点はパフォーマンスに関することで、P2300のモデルでは`sender/reciever`オブジェクトの構築に伴う受け入れがたいオーバーヘッドが発生すると考えている人が多いようです。
 
@@ -285,16 +287,154 @@ LEWGの予定表（[P2489R0](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/
 
 前述のように、Networking TSは実質的に作業がストップしており、非同期モデルとセキュリティという2つの重い課題を抱えているので、C++23には間に合わないでしょう。Executorが間に合うかは来年2週目のLEWGのテレコンレビューで設計を完了できるかで決まります。
 
-### Executor?
+### 各ライブラリの雰囲気
 
 #### P0443
+
+P0443におけるExecutorとは次のように使用される何かです。
+
+```cpp
+// P0443のAPIはstd::execution名前空間の下に定義される
+using namespace std::execution;
+
+// 任意の場所（たとえばスレッドプール）で処理を実行するexecutorを取得する
+std::static_thread_pool pool(16);
+executor auto ex = pool.executor(); // この記法はコンセプトによる変数の制約
+
+// 高レベルのライブラリによる処理がどこで実行されるかを制御するためにexecutorを使用する
+perform_business_logic(ex);
+
+// あるいは、P0443によるよりプリミティブなAPIを直接使用することもできる
+
+// スレッドプールに処理を投げ、すぐ実行する
+execute(ex, []{ std::cout << "Hello world from the thread pool!"; });
+
+// スレッドプールに処理を投げすぐ実行し、完了まで現在のスレッドをブロックする
+execute(std::require(ex, blocking.always), foo);
+
+// 依存性のある一連の処理を記述し、後で実行する
+sender auto begin    = schedule(ex);
+sender auto hi_again = then(begin, []{ std::cout << "Hi again! Have an int."; return 13; });
+sender auto work     = then(hi_again, [](int arg) { return arg + 42; });
+
+// 処理の最終結果を標準出力へ出力する
+receiver auto print_result = as_receiver([](int arg) { std::cout << "Received " << std::endl; });
+
+// 先ほど定義したworkによる処理をreceiverと組み合わせてスレッドプールで実行する
+submit(work, print_result);
+```
+
+ここで、`ex`という変数で示されているものがP0443のExecutorであり、それは`executor`コンセプトを満たす任意の型のオブジェクトです。`executor`コンセプトは単純には次のようなものです。
+
+```cpp
+template<typename E>
+concept executor =
+  requires(const E& e) {
+    {execution::execute(e, [] -> void {})} -> void;
+  };
+```
+
+`execution::execute`はCPOであり、`execution::execute(ex, f);`のようにして、Executor`ex`に任意の処理`f`（引数なし、戻り値なし）を投入します。他にも細かい指定があるのですが、一番重要な性質はこの`execute`CPOによって指定されるものです。
+
+`execute`CPOによる処理の投入は単純な処理の投入のみをサポートしており、その実行に際しては追加の引数を取らず戻り値を返しません。そのため`executor`は処理の戻り値の取得やエラーハンドル、処理のスケジューリングとそのキャンセルなどの方法を提供せず、その能力を持ちません。
+
+`executor`はこのようにインタフェースを制限することで、処理が実行されうる任意のハードウェア（CPU/GPU/SIMDユニット/スレッド...）を抽象化しており、それらのハードウェアリソース（まとめて実行コンテキストと呼ばれる）の軽量なハンドルとして統一的なアクセスを提供します。`executor`に実際に処理がどのように投入されるのか、実行がいつ行われるのか、どのように実行されるのか、は`executor`という抽象の中に覆われます。
+
+```cpp
+// 単純なexecutorの実装例
+
+struct inline_executor {
+  // define execute
+  template<class F>
+  void execute(F&& f) const noexcept {
+    // 現在のスレッドで即時実行
+    std::invoke(std::forward<F>(f));
+  }
+
+  // 実行コンテキストの比較
+  auto operator<=>(const inline_executor&) const = default;
+};
+
+struct thread_executor {
+
+  template<class F>
+  void execute(F&& f) const noexcept {
+    // 別のスレッドを起動してそこで実行
+    std::thread th{std::forward<F>(f)};
+    th.detach();
+  }
+
+  auto operator<=>(const thread_executor&) const = default;
+};
+```
+
+この2つの`executor`実装を眺めると、それぞれには異なる性質（プロパティ）がある事に気付きます。つまり、`execute(ex, f)`した時にブロッキングするかしないか、あるいは`execute(ex, f)`が戻った時に処理が完了しているかどうかです。このような`executor`のプロパティは他にもいくつも考えることができて、時にはそのプロパティを制御したくなるでしょう。このようなプロパティは`executor`の最小の契約の範囲外ですが、それを制御するために、`require/prefer`によるプロパティ指定が用意されます。
+
+```cpp
+// 何かしらのexecutorを取得する
+executor auto ex = ...;
+
+// 実行にはブロッキングが必要という要求（require
+executor auto blocking_ex = std::require(ex, execution::blocking.always);
+
+// 特定の優先度pで実行することが好ましい（prefer
+executor auto blocking_ex_with_priority = std::prefer(blocking_ex, execution::priority(p));
+
+// ブロッキングしながら実行、可能ならば指定の優先度で実行
+execution::execute(blocking_ex_with_priority, work);
+```
+
+`require`によるプロパティの指定は強い要求で、不可能な場合コンパイルエラーとなります。一方、`prefer`は弱い要求であり、不可能な場合でも無視されコンパイルエラーにはなりません。`require/prefer`によるプロパティの指定は、`executor`をそのプロパティを持つ`executor`に変換するものであり、プロパティ指定後得られたものもまた`executor`として扱うことができます。
+
+`executor`は処理を投入した後からその処理について何かをハンドルする能力を持ちません。これは基盤的な共通のAPIとしては良いものかもしれませんが、非同期処理グラフを構成し、その実行を制御するための基盤としては表現力が足りません。P0443のゴールはそのような非同期アルゴリズムAPIを整えることを目指しており、そのために`executor`よりも強い保証を持つものと、非同期処理及びそのコールバックに関する共通の基盤が必要となります。
+
+P0443ではそのために、Scheduler、Sender/Recieverという3つの抽象を定義します。
+
+Schedulerとは`executor`同様に`scheduler`コンセプトを満たす任意の型のことです。
+
+```cpp
+template<class S>
+concept scheduler =
+  requires(S&& s) {
+    {execution::schedule((S&&)s)} -> sender;
+  };
+```
+
+（これは簡略化したものですが）定義も`executor`同様に、`execution::schedule`CPOによってその実行コンテキストでスケジューリングされる`sender`オブジェクトを取得可能な任意の型を指定します。
+
+`sender`は任意の非同期処理を表現するもので、`sender`コンセプト（この定義はほぼ何も言わないので省略）によって指定されます。`schedule`CPOによって得られる`sender`というのは、その`scheduler`上で実行される何もしない処理を表現しており、それに対して非同期アルゴリズムを適用することで非同期処理グラフを構成していきます。
+
+```cpp
+// P0443の目指した世界の一例
+
+sender auto s = just(3) |                                  // 即座に`3`を生成
+                via(scheduler1) |                          // 実行コンテキストを遷移（変更）
+                then([](int a){return a+1;}) |             // 継続処理をチェーン
+                then([](int a){return a*2;}) |             // さらにもう一つ継続処理をチェーン
+                via(scheduler2) |                          // 実行コンテキストを遷移（変更）
+                handle_error([](auto e){return just(3);}); // エラーハンドル、デフォルト値を返すようにする
+
+int r = sync_wait(s);                                      // 一連の処理の結果を待機
+```
+
+P0443の言う非同期アルゴリズムとは単純には次のように、`sender`を受け取り`sender`を返すものです。
+
+```cpp
+template<typename A>
+concept async_algorithm = 
+  requires (A alg, sender s) {
+    alg(s) -> sender;
+  }
+```
+
+つまりは各非同期アルゴリズムは、`sender`という抽象に入出力を依存することで、前段及び後段の処理が何をするか、あるいは実行コンテキストがどこであるのか
 
 #### P2300
 
 #### Networking TS
 
 
-### P2300 vs Networking TS
+### P2300 vs Networking TS(Asio)
 
 ### 参考文献
 
