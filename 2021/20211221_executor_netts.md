@@ -426,10 +426,10 @@ template<typename A>
 concept async_algorithm = 
   requires (A alg, sender s) {
     alg(s) -> sender;
-  }
+  };
 ```
 
-つまりは各非同期アルゴリズムは、`sender`という抽象にのみ入出力を依存することで、前段及び後段の処理が何をするか、あるいは実行コンテキストがどこであるのかということを意識せずに実装できるようになっています。この性質から、非同期アルゴリズムはSenderアルゴリズムとも呼ばれます。
+パイプライン演算子（`|`）の場合、`s | alg -> sender`のようになります。つまりは各非同期アルゴリズムは、`sender`という抽象にのみ入出力を依存することで、前段及び後段の処理が何をするか、あるいは実行コンテキストがどこであるのかということを意識せずに実装できるようになっています。この性質から、非同期アルゴリズムはSenderアルゴリズムとも呼ばれます。
 
 `sender`コンセプトは構文的に何か特別なことを求めておらず、`sender`だけでは処理結果の取得すら行うことができません。`sender`の表現する処理から結果を取得（またはエラーハンドリング、キャンセル）するには、`receiver`を用います。
 
@@ -498,10 +498,55 @@ if (bool(rec)) {
 
 #### P2300
 
-#### Networking TS
+P2300はP0443にパッチを当てたものではなく、`sender/receiver`とSenderアルゴリズムを中心として、それが正しく働くようにP0443を進化・改善したものです。
+
+```cpp
+using namespace std::execution;
+
+scheduler auto sch = thread_pool.scheduler();                     // schedulerの取得
+
+sender auto begin = schedule(sch);                                // schの実行コンテキストで完了するsenderを取得
+sender auto hi = then(begin, []{                                  // thenアルゴリズムによる処理のチェーン
+    std::cout << "Hello world! Have an int.";
+    return 13;
+});
+sender auto add_42 = then(hi, [](int arg) { return arg + 42; });  // thenアルゴリズムによる処理のチェーン
+
+auto [i] = this_thread::sync_wait(add_42).value();                // 構成した処理を実行コンテキストに投入し、完了を待機する
+```
+
+一見すると先ほど見たP0443の`sender/receiver`から大きな変化はないように思えます。
+
+P2300のP0443との大きな違いは
+
+- `executor`コンセプトの削除
+    - `scheduler`と`sender`をベースとするように全体を書き換え
+- プロパティ指定の削除
+    - プロパティは`scheduler`が備えている性質であり、変更可能ではない
+    - 一部のプロパティについては問い合わせが可能
+    - 将来的に`require/prefer`ベースのプロパティ指定を導入することはできる（より便利になれば）
+- Senderアルゴリズムの取り込み
+- `sender`の保証の強化
+  - 特定の`sender`が特定の実行コンテキストで完了する保証を追加
+  - `sender`型の`connect()`オーバーロード（`connect`CPOの呼び出し先）を右辺値と左辺値で分けることで実行可能回数を表現する
+
+`executor`の担っていた役割は`scheduler`へ移管されると共に、`sender/receiver`がExecutorライブラリの中心に据えられた形です。とはいえ、`sender/receiver`とSenderアルゴリズムの雰囲気はP0443の頃から大きく変わってはいません。
+
+#### Asio(Networking TS)
+
+Networking TSはAsioをベースとしていますが、AsioはP0443を取り込む形で進化している一方でNetworking TSは2018年以降更新がないため、設計が少し変わっている部分があります。ここでは、現在のAsioを見てみます。
+
+Tail Callのカスタマイゼーションポイントとしてのexecutor
 
 
-### P2300 vs Networking TS(Asio)
+completion token
+
+#### Networking TS(Asio)にとって問題だったこと
+
+- Asioの要求するExecutorは*tail call*のカスタマイゼーションポイントであり、`scheduler`はそぐわない
+- AsioのExecutorに対する操作（`dispatch/post/defer/`）には少なくともExecutorのブロッキングプロパティを制御できる必要があるが、P2300で削除されている
+- Asioには10年以上の、P0443の部分も1年の実装経験があるが、P2300には実装経験がない
+    - 従って、P2300をベースとするようにAsio(Networking TS)を書き換える事は実装経験の不足から好ましくない
 
 ### 参考文献
 
