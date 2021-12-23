@@ -1,4 +1,4 @@
-# ［C++］`owning_view`によるパイプライン安全性の確保
+# ［C++］ ExecutorとNetworking TSで起きていたこと
 
 この記事は[C++ Advent Calendar 2021](https://qiita.com/advent-calendar/2021/cxx)の21日目の記事です。
 
@@ -344,7 +344,7 @@ concept executor =
 // 単純なexecutorの実装例
 
 struct inline_executor {
-  // define execute
+
   template<class F>
   void execute(F&& f) const noexcept {
     // 現在のスレッドで即時実行
@@ -388,7 +388,7 @@ execution::execute(blocking_ex_with_priority, work);
 
 `executor`は処理を投入した後からその処理について何かをハンドルする能力を持ちません。これは基盤的な共通のAPIとしては良いものかもしれませんが、非同期処理グラフを構成し、その実行を制御するための基盤としては表現力が足りません。P0443のゴールはそのような非同期アルゴリズムAPIを整えることを目指しており、そのために`executor`よりも強い保証を持つものと、非同期処理及びそのコールバックに関する共通の基盤が必要となります。
 
-P0443ではそのために、Scheduler、Sender/receiverという3つの抽象を定義します。
+P0443ではそのために、Scheduler、Sender/Receiverという3つの抽象を定義します。
 
 Schedulerとは`executor`同様に`scheduler`コンセプトを満たす任意の型のことです。
 
@@ -406,7 +406,6 @@ concept scheduler =
 
 ```cpp
 // P0443の目指した世界の一例
-
 sender auto s = just(3) |                                  // 即座に`3`を生成
                 via(scheduler1) |                          // 実行コンテキストを遷移（変更）
                 then([](int a){return a+1;}) |             // 継続処理をチェーン
@@ -414,7 +413,7 @@ sender auto s = just(3) |                                  // 即座に`3`を生
                 via(scheduler2) |                          // 実行コンテキストを遷移（変更）
                 handle_error([](auto e){return just(3);}); // エラーハンドル、デフォルト値を返すようにする
 
-int r = sync_wait(s);                                      // 一連の処理の結果を待機
+int r = sync_wait(s);                                      // 一連の処理を実行し、結果を待機
 ```
 
 ただし、これらの非同期アルゴリズムAPIはP0443の一部ではなく別の提案（[P1341R0](https://wg21.link/p1341r0)）で提案されているもので、P0443はExecuotrのコアな部分を整備しようとする提案です（した）。
@@ -517,9 +516,10 @@ auto [i] = this_thread::sync_wait(add_42).value();                // 構成し�
 
 一見すると先ほど見たP0443の`sender/receiver`から大きな変化はないように思えます。
 
-P2300のP0443との大きな違いは
+P2300のP0443との大きな違いは次のような点です
 
 - `executor`コンセプトの削除
+    - 処理を投入するだけでは表現力不足であり、`sender/receiver`と調和しない
     - `scheduler`と`sender`をベースとするように全体を書き換え
 - プロパティ指定の削除
     - プロパティは`scheduler`が備えている性質であり、変更可能ではない
@@ -528,9 +528,13 @@ P2300のP0443との大きな違いは
 - Senderアルゴリズムの取り込み
 - `sender`の保証の強化
   - 特定の`sender`が特定の実行コンテキストで完了する保証を追加
+    - 実行コンテキストに処理をどう投入するか？という部分の抽象化が`executor`から`sender`に移された
+    - `scheduler`は実行コンテキストのハンドルとしてその実行コンテキストのための`sender`を生成する、`sender`ファクトリの1つに過ぎない
   - `sender`型の`connect()`オーバーロード（`connect`CPOの呼び出し先）を右辺値と左辺値で分けることで実行可能回数を表現する
 
-`executor`の担っていた役割は`scheduler`へ移管されると共に、`sender/receiver`とSenderアルゴリズムがExecutorライブラリの中心に据えられた形です。とはいえ、`sender/receiver`とSenderアルゴリズムの雰囲気はP0443の頃から大きく変わってはいません。
+`executor`の担っていた役割は`scheduler`と`sender`へ移管されると共に、`sender/receiver`とSenderアルゴリズムがExecutorライブラリの中心に据えられた形です。とはいえ、`sender/receiver`とSenderアルゴリズムの雰囲気はP0443の頃から大きく変わってはいません。
+
+[P2300R3](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2300r3.html)には、さらに多くのサンプルコードが掲載されています。眺めると`sender/receiver`とSenderアルゴリズムの雰囲気をよりつかめるかもしれません。
 
 #### Asio(Networking TS)
 
@@ -538,12 +542,268 @@ Networking TSはAsioをベースとしていますが、AsioはP0443を取り込
 
 Tail Callのカスタマイゼーションポイントとしてのexecutor
 
+Asioにおける非同期処理は通常、I/O操作（主にネットワーク処理）の完了後にその結果を受けるコールバックとして起動されます。それらの機構をまとめて非同期操作（*Asynchronous operation*）と呼び、Asioにおける非同期操作は開始関数（*Initiating function*）と完了ハンドラ（*Completion handler*）からなります。非同期操作はAsioにおける非同期モデルの基本単位となります。
 
-completion token
+開始関数とは非同期I/O関数（`soket.async_read_some()`とか`asio::async_write()`など）のことで、完了ハンドラはそこに渡されるコールバック関数です。
+
+```cpp
+// 呼び出しはすぐにリターンする
+socket.async_read_some(buffer,
+  [](error_code e, size_t) {
+    // bufferにsocketからのデータを読み込んだ後、呼び出される
+    ...
+  }
+);
+```
+
+Asioの非同期操作は、このような開始関数の行うI/O処理と完了ハンドラの呼び出しが、同期的に（シングルスレッドで順番に）実行された場合と同じように呼び出されることを保証します。それによって、開始関数（非同期I/O）の実行とコールバックの実行ではリソースの使用がオーバーラップする事がありません。そのため、完了ハンドラではそれを開始した非同期I/Oそのものを再帰的に呼び出した時でも、解放されないリソースが蓄積してリソース使用量が増大する事はありません。
+
+```cpp
+// async_read_someの簡易実装例
+// async_read_someはこのような実装を別スレッドで呼び出してリターンする
+void sokcet::async_read_some_impl(Buffer buffer, CompletionHandler handler) {
+  // ソケットからのデータ読み出し処理
+  // ブロッキングと、リソースの確保など
+  error_code ec{};
+  std::size_t len = this->io_read(buffer, ec);  // 説明のための読み込み操作
+
+  // データの読み出しとbufferへの格納の完了後、完了ハンドラを呼び出す
+  async(std::move(handler), std::move(ec), len);
+}
+```
+
+すなわち、完了ハンドラは開始関数の末尾で（おそらく非同期的に）呼び出され、完了ハンドラの実行が始まった時には開始関数は完了しておりそこで確保されたリソースは解放されています。すなわち、完了ハンドラが呼び出された時には開始関数は終了していることが保証され、完了ハンドラはI/O操作の詳細とほぼ無関係に実行されます。
+
+完了ハンドラはさらに継続して別の非同期操作を実行することができます。それら非同期操作のチェーン全体およびそれらチェーンの進行を保証する仕組みのことを非同期エージェント（*Asynchronous agent*）と呼びます。非同期エージェントは概念的な存在というか、何か特定のライブラリ実体に結びつくものではなく、Asioの非同期モデルに組み込まれたある種のシステムです。
+
+```cpp
+socket.async_read_some(buffer,
+  [&socket, &buffer](error_code e, size_t) {
+    // ...
+    
+    socket.async_read_some(buffer, [&socket, &buffer](error_code e2, size_t) {
+      // ...
+
+      socket.async_read_some(buffer, [&socket, &buffer](error_code e2, size_t) {
+        // ここまで（およびこの先も）きちんと実行されることを保証する機構が実行エージェント
+
+        // ...
+      }
+    };
+  }
+);
+```
+
+実行エージェントは複数の非同期操作からなり、実行エージェントのそれぞれの非同期操作内においての各完了ハンドラは、スケジューリング可能な作業の最小単位を表します。
+
+非同期エージェントには、その一部となっている非同期操作がどのように動作するべきかを指定する次の3つの特性が関連づけられています
+
+- Allocator
+    - 非同期操作がどのようにメモリリソースを取得するかを指定する
+- Cancellation slot
+    - 非同期操作がどのようにキャンセル操作をサポートするかを指定する
+- Executor
+    - 各完了ハンドラがどこで、どのように実行されるかを指定する
+
+非同期エージェント内の各非同期操作が実行される時、その実装はこれらの関連づけられた特性を照会しそれらの指定する要件を満たすために使用します。非同期操作内では、完了ハンドラに*associator traits*を適用することでそのようなクエリを実行します。
+
+```cpp
+// async_read_someの簡易実装例
+// async_read_someはこのような実装を別スレッドで呼び出してリターンする
+void sokcet::async_read_some_impl(Buffer buffer, CompletionHandler handler) {
+  // 関連づけられたアロケータの取得
+  auto alloc = associated_allocator<CompletionHandler>::get(handler);
+  // 関連づけられたcancellation slotの取得
+  auto cancel = associated_cancellation_slot<CompletionHandler>::get(handler);
+
+  // ソケットからのデータ読み出し処理
+  error_code ec{};
+  std::size_t len = this->io_read(buffer, ec, alloc, cancel);
+
+  // 関連づけられたExecutorの取得
+  auto ex = associated_executor<CompletionHandler>::get(handler);
+  // exの場所でexによって指定された方法で完了ハンドラを実行
+  dispatch(ex, std::move(handler), std::move(ec), len);
+}
+```
+
+*associator traits*（`associated_xxx`）は完了ハンドラ型（`CompletionHandler`）について特殊化することでユーザーがカスタマイズすることができます。
+
+全ての非同期エージェントには関連づけられたExecutorがあり（カスタマイズしない場合でもデフォルトのものが関連づけられる）、非同期エージェントのExecutorは非同期エージェントの完了ハンドラがどのようにキューイングされ、どのように実行されるかを決定します。非同期エージェント内の非同期操作は、非同期エージェントに関連づけられたExecutorを使用して次のようなことを行います
+
+- 非同期操作の実行中、その非同期操作表す作業の存在を追跡する
+- 非同期操作の完了時、完了ハンドラを実行するためにキューイングする
+- 完了ハンドラがリエントラントに実行可能ではないことを保証する
+    - こうしない場合、完了ハンドラの2回以上の呼び出しによって意図しない再起やスタックオーバーフローに陥る可能性がある
+
+このように、非同期エージェントに関連づけられたExecutorは、その非同期エージェントがいつ、どこで、どのように実行されるべきかというポリシーを表し、それを非同期エージェント全体にわたって横断的に指定します。
+
+AsioにおけるExecutorの使用例としては
+
+- 共有データ構造上で実行される非同期エージェントのグループを調整し、各エージェントの完了ハンドラが同時に実行されないようにする
+- データまたはイベントソース（NICなど）に近い特定の実行リソース（CPU）上で非同期エージェントを実行する
+- 関連のある非同期エージェントのグループを示し、スレッドプールがよりスマートなスケジューリングを行えるようにする（実行リソース間でエージェントを移動するなど）
+- GUIアプリケーションのメインスレッドで実行される完了ハンドラを1つのキューに入れていくことで、UIを安全に更新する
+- ロギング、ユーザー認証、例外処理など、完了ハンドラの実行前後に何か処理を実行する
+- 非同期エージェントとその完了ハンドラの実行優先度を指定する
+- デフォルトのExecutorを使用することで、非同期操作完了のトリガーとなったイベントから最速のタイミングで完了ハンドラを起動する
+
+などがあります。ただし、AsioにおいてユーザーがExecutorをカスタムすることは稀であり、基本的にはExecutorの存在やそのカスタムを意識する必要はありません。
+
+AsioにおけるExecutorは開始関数（非同期I/O操作）の末尾で、完了ハンドラの実行をカスタマイズするポイントであることから、*tail call*のカスタマイゼーションポイントと呼ばれます。
+
+*tail call*の通り、完了ハンドラの実行時点で呼び出した開始関数は完了しているため、呼び出しに伴うエラーを処理したり完了ハンドラの結果を受けたりするのは後続の処理の責任となり、Executorを使用して呼び出した側（開始関数）はそれ以降の完了ハンドラで起こることに責任を持つ必要がなく、完了ハンドラを実行コンテキストへ送信する役割だけを負います。これは明らかにP0443の`executor`と親和性があり、実際追加のプロパティ指定を必要とするものの、Asioが元々持っていたExecutorはP0443の`executor`によって表現可能です。一方で、P2300の`scheduler`は`executor`の役割を`sender`と分割して請け負っているなど、AsioのExecutorと互換性がありません。
+
+ここまでのことは、Networking TSとAsioで大きく変わらない事です。  
+C++11の`std::future`やC++20のコルーチン、P0443のSenderアルゴリズムなど、C++の進化に伴ってAsioはコールバック以外の非同期の継続メカニズムに対応する必要が出てきました。既存のコードに対する互換性を維持しつつAsioの非同期モデルに種々の非同期継続メカニズムを親和させるための仕組みが完了トークン（*Completion token*）です。
+
+```cpp
+// コールバック
+socket.async_read_some(buffer, [](error_code e, size_t) {
+  // 継続作業...
+});
+
+// コルーチン
+awaitable<void> foo() {
+  size_t n = co_await socket.async_read_some(buffer, use_awaitable);
+  // 継続作業...
+}
+
+// future
+future<size_t> f = socket.async_read_some(buffer, use_future);
+// 継続作業...
+size_t n = f.get();
+
+// fiber
+void foo() {
+  size_t n = socket.async_read_some(buffer, fibers::yield);
+  // 継続作業...
+}
+```
+
+完了トークンは開始関数（`async_read_some`）の最後の引数で受け取っているもの（ラムダ、`use_awaitable`、`use_future`、`fibers::yield`）です。つまり、完了トークンとは完了ハンドラを一般化したものです。トークンの名の通り必ずしも呼び出し可能なものでなくてもよく、そのトークンに応じて継続作業（非同期操作の完了ハンドラ）の実行方法を柔軟にカスタマイズすることができます。このように書いた時でも、先ほどまで説明していた非同期モデルの一貫性は保たれていることがわかると思います。
+
+完了トークンを受け取る非同期操作では完了ハンドラの関数型（*completion signature*）を用意しておき、非同期操作の開始関数は*completion signature*、完了トークン、自信の内部実装を`async_result`型（traitクラス）に渡します。`async_result`はこれらの情報から具体的な完了ハンドラの作成と非同期操作の起動を行うカスタマイゼーションポイントです。
+
+```cpp
+// 完了トークンを用いるasync_read_some実装例
+template <class CompletionToken>
+auto async_read_some(tcp::socket& s, const mutable_buffer& b, CompletionToken&& token)
+{
+  // 非同期操作を開始するための関数オブジェクトの定義
+  auto init = [](auto completion_handler,   // async_resultから渡される完了ハンドラ
+                 tcp::socket* s,            // async_resultから渡される追加の引数
+                 const mutable_buffer& b)   // async_resultから渡される追加の引数
+  {
+    // 切り離されたスレッドで非同期操作を実行する
+    std::thread(
+      [](auto completion_handler,
+         tcp::socket* s,
+         const mutable_buffer& b)
+      {
+        error_code ec;
+        size_t n = s->read_some(b, ec);
+
+        std::move(completion_handler)(ec, n); // 完了ハンドラ呼び出し
+      },
+      std::move(completion_handler),
+      s,
+      b
+    ).detach();
+  };
+
+  // 非同期操作の起動と適切な戻り値の返却
+  return async_result<decay_t<CompletionToken>, // 完了トークンの型
+                      void(error_code, size_t)  // completion signature
+                     >::initiate(init,
+                                 std::forward<CompletionToken>(token),  // 完了トークンはasync_result内で適切な完了ハンドラに変換される
+                                 &s,  // 非同期操作に必要な追加の引数
+                                 b);  // 非同期操作に必要な追加の引数
+}
+```
+
+`async_result`はAsio内部に予め用意されているクラスです。完了トークンとしてラムダなど呼び出し可能なものが渡された場合、それが完了ハンドラとしての要件を満たしていればデフォルトの実装が使用され、それは従来（上で説明した）と同じ意味や保証を持つ非同期操作の実行と完了ハンドラの呼び出しを行います。
+
+```cpp
+// 完了ハンドラ用のデフォルト実装、引数を単純に転送するだけ
+template <class CompletionToken, completion_signature... Signatures>
+struct async_result {
+
+  template<class Initiation,
+           completion_handler_for<Signatures...> CompletionHandler,
+           class... Args>
+  static void initiate(Initiation&& initiation,
+                       CompletionHandler&& completion_handler,
+                       Args&&... args)
+  {
+    std::forward<Initiation>(initiation)(std::forward<CompletionHandler>(completion_handler),
+                                         std::forward<Args>(args)...);
+  }
+};
+```
+
+完了ハンドラは初期化関数の完了と共に即座に実行され、初期化関数そのものも即座に開始されるため、ここでは全ての引数のコピーが回避されます。しかし、遅延完了トークン（`use_awaitable`など）では初期化関数の遅延起動のために引数をキャプチャしておく必要があります。例えば、単純な`deferred`トークン（`deferred_t deferred{};`、操作をパッケージングするだけ）に対する`async_result`の特殊化は次のようになります。
+
+```cpp
+template <completion_signature... Signatures>
+struct async_result<deferred_t, Signatures...> {
+
+  // initiate()の戻り値=非同期操作の直接の戻り値は、完了トークン1つを受けて非同期操作を遅延実行する関数オブジェクト
+  template <class Initiation, class... Args>
+  static auto initiate(Initiation initiation, deferred_t, Args... args) {
+    return [initiation = std::move(initiation),             // 開始関数の実行詳細
+            arg_pack = std::make_tuple(std::move(args)...)  // 非同期操作の追加引数をtupleで固めてキャプチャ
+           ](auto&& token) mutable
+    {
+      return std::apply(
+        [&](auto&&... args) {
+          // 非同期操作を起動する
+          return async_result<decay_t<decltype(token)>, Signatures...>::initiate(
+            std::move(initiation),
+            std::forward<decltype(token)>(token),
+            std::forward<decltype(args)>(args)...
+          );
+        },
+        std::move(arg_pack)
+      );
+    };
+  }
+};
+
+// 例えば次のように使って
+auto def = socket.async_read_some(buffer, deferred);
+// 後から実行、その際にもう一度完了トークンを指定できる
+size_t n = co_await def(use_awaitable);
+```
+
+完了トークンは任意にユーザーが定義することができて、完了トークン型と期待する完了ハンドラのシグネチャで`async_result`を特殊化し、その`initiate()`内でそのトークンの振る舞いを記述することでAsioの非同期操作の実行と完了ハンドラの呼び出しを制御することができます。
+
+このような完了トークンはAsioに対してBoost1.54（2013年ごろ）で導入され、今の形になったのはBoost1.70（2019年5月）からのようです。
+
+完了トークンを用いるとSenderアルゴリズムlikeな非同期アルゴリズムを構成することができます。
+
+```cpp
+auto f = socket.async_read_some(buffer(data), use_then)
+  .then([&](error_code e, size_t n) {
+    return async_write(socket, buffer(data, n), use_then);
+  })
+  .then([&](error_code e, size_t n) {
+    return async_write(socket, buffer("\r\n", 2), use_then);
+  })
+  .then(use_future);
+```
+
+これは`use_then`トークンに対して`async_result`を特殊化するという同様の手順で実装できます（[P2463](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2463r0.pdf)の後ろの方に実装例があります）。しかも、完了トークンを用いることでコルーチンなど他の継続スタイルと自然に同居することができています。
+
+次の図はAsioの非同期モデルをまとめてその関係性を表したものです。
+
+![](https://raw.githubusercontent.com/onihusube/blog/master/2021/20211223_executor_netts/asio_async_model.png)
+
+現在のAsioはすでにこのような非同期モデルに基づいて構築されており、部分にもよりますが数年〜10年以上の実装経験を持っています。
 
 #### Networking TS(Asio)にとって問題だったこと
 
-- Asioの要求するExecutorは*tail call*のカスタマイゼーションポイントであり、`scheduler`はそぐわない
+- Asioの要求するExecutorは*tail call*のカスタマイゼーションポイントであり、`scheduler`と異なる
 - AsioのExecutorに対する操作（`dispatch/post/defer/`）には少なくともExecutorのブロッキングプロパティを制御できる必要があるが、P2300で削除されている
 - Asioには10年以上の、P0443の部分も1年の実装経験があるが、P2300には実装経験がない
     - 従って、P2300をベースとするようにAsio(Networking TS)を書き換える事は実装経験の不足から好ましくない
@@ -554,7 +814,7 @@ completion token
 
 一部は実際には正しくないものもありますが、実装経験とAsioのExecutorとP2300の`scheduler`のミスマッチはかなり大きな問題です。
 
-とはいえ、経緯のところで見たように、LEWGとしてはP2300をC++23に向けて詰めていく方向性は確定しており、これらの問題が考慮されることはあってもP2300が止まることはなさそうです。一方で、Netowrking TSはExecutorの部分についてP2300ベースとするか今のまま行くのか決定しなければならず、どちらにしても困難が待ち構えていそうです・・・
+とはいえ経緯のところで見たように、LEWGとしてはP2300をC++23に向けて詰めていく方向性は確定しており、これらの問題が考慮されることはあっても、これらの問題によってP2300が止まることはなさそうです（多分`executor`が復活することもないでしょう）。一方で、Netowrking TSはExecutorの部分についてP2300ベースとするか今のまま行くのか（あるいは別のアプローチを取るのか）決定しなければならず、どちらにしても困難が待ち構えていそうです・・・
 
 ### 参考文献
 
@@ -577,3 +837,4 @@ completion token
 - [P0958 Networking TS changes to support proposed Executors TS - cplusplus/papers](https://github.com/cplusplus/papers/issues/339)
 - [Networking TS の Boost.Asio からの変更点 - その 3: Executor - あめだまふぁくとりー](https://amedama1x1.hatenablog.com/entry/2016/08/20/222326)
 - [Networking TS の Boost.Asio からの変更点 - その 4: Associated Executor - あめだまふぁくとりー](https://amedama1x1.hatenablog.com/entry/2017/12/09/102405)
+- [P1943R0 Networking TS changes to improve completion token flexibility and performance](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1943r0.html)
