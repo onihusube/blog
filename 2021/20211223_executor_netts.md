@@ -10,7 +10,7 @@ Executorライブラリは、非同期並行処理の制御のための基盤と
 
 標準インターフェースを介して様々なハードウェアリソースへアクセスする方法と非同期処理のグラフを表現する方法を提供し、処理がいつどこで行われるのかをプログラマが制御可能とするためのライブラリです。
 
-- [P2300R2 `std::execution`](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2300r2.html)
+- [P2300R3 `std::execution`](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2300r3.html)
 - [P2470R0 Slides for presentation of P2300R2: `std::execution` (`sender/receiver`)](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2470r0.pdf)
 - [［翻訳］P0443R13 A Unified Executors Proposal for C++ - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2020/05/24/205222)
 
@@ -542,8 +542,6 @@ P2300のP0443との大きな違いは次のような点です
 
 Networking TSはAsioをベースとしていますが、AsioはP0443を取り込む形で進化している一方でNetworking TSは2018年以降更新がないため、設計が少し変わっている部分があります。ここでは、現在のAsioを見てみます。
 
-Tail Callのカスタマイゼーションポイントとしてのexecutor
-
 Asioにおける非同期処理は通常、I/O操作（主にネットワーク処理）の完了後にその結果を受けるコールバックとして起動されます。それらの機構をまとめて非同期操作（*Asynchronous operation*）と呼び、Asioにおける非同期操作は開始関数（*Initiating function*）と完了ハンドラ（*Completion handler*）からなります。非同期操作はAsioにおける非同期モデルの基本単位となります。
 
 開始関数とは非同期I/O関数（`soket.async_read_some()`とか`asio::async_write()`など）のことで、完了ハンドラはそこに渡されるコールバック関数です。
@@ -633,7 +631,7 @@ void sokcet::async_read_some_impl(Buffer buffer, CompletionHandler handler) {
 
 全ての非同期エージェントには関連づけられたExecutorがあり（カスタマイズしない場合でもデフォルトのものが関連づけられる）、非同期エージェントのExecutorは非同期エージェントの完了ハンドラがどのようにキューイングされ、どのように実行されるかを決定します。非同期エージェント内の非同期操作は、非同期エージェントに関連づけられたExecutorを使用して次のようなことを行います
 
-- 非同期操作の実行中、その非同期操作表す作業の存在を追跡する
+- 非同期操作の実行中、その非同期操作を表す作業の存在を追跡する
 - 非同期操作の完了時、完了ハンドラを実行するためにキューイングする
 - 完了ハンドラがリエントラントに実行可能ではないことを保証する
     - こうしない場合、完了ハンドラの2回以上の呼び出しによって意図しない再起やスタックオーバーフローに陥る可能性がある
@@ -656,7 +654,7 @@ AsioにおけるExecutorは開始関数（非同期I/O操作）の末尾で、�
 
 *tail call*の通り、完了ハンドラの実行時点で呼び出した開始関数は完了しているため、呼び出しに伴うエラーを処理したり完了ハンドラの結果を受けたりするのは後続の処理の責任となり、Executorを使用して呼び出した側（開始関数）はそれ以降の完了ハンドラで起こることに責任を持つ必要がなく、完了ハンドラを実行コンテキストへ送信する役割だけを負います。これは明らかにP0443の`executor`と親和性があり、実際追加のプロパティ指定を必要とするものの、Asioが元々持っていたExecutorはP0443の`executor`によって表現可能です。一方で、P2300の`scheduler`は`executor`の役割を`sender`と分割して請け負っているなど、AsioのExecutorと互換性がありません。
 
-*tail call*のカスタマイゼーションポイントはC#（.Net）では[`SynchronizationContext`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.synchronizationcontext?view=net-5.0)として知られており、細部は異なるものの他のところ（SwiftのExecutor](https://github.com/rjmccall/swift-evolution/blob/custom-executors/proposals/0000-custom-executors.md)、[Java Netty libraryの`EventExecutor`](https://netty.io/4.0/api/io/netty/util/concurrent/EventExecutor.html)）でも同様のものが見られます。
+*tail call*のカスタマイゼーションポイントはC#（.Net）では[`SynchronizationContext`](https://docs.microsoft.com/en-us/dotnet/api/system.threading.synchronizationcontext?view=net-5.0)として知られており、細部は異なるものの他のところ（[SwiftのExecutor](https://github.com/rjmccall/swift-evolution/blob/custom-executors/proposals/0000-custom-executors.md)、[Java Netty libraryの`EventExecutor`](https://netty.io/4.0/api/io/netty/util/concurrent/EventExecutor.html)）でも同様のものが見られます。このことは、AsioのExecutorモデルが決して的外れなものではないことを示しているといえます。
 
 ここまでのことは、Networking TSとAsioで大きく変わらない事です。  
 C++11の`std::future`やC++20のコルーチン、P0443のSenderアルゴリズムなど、C++の進化に伴ってAsioはコールバック以外の非同期の継続メカニズムに対応する必要が出てきました。既存のコードに対する互換性を維持しつつAsioの非同期モデルに種々の非同期継続メカニズムを親和させるための仕組みが完了トークン（*Completion token*）です。
@@ -685,7 +683,7 @@ void foo() {
 }
 ```
 
-完了トークンは開始関数（`async_read_some`）の最後の引数で受け取っているもの（ラムダ、`use_awaitable`、`use_future`、`fibers::yield`）です。つまり、完了トークンとは完了ハンドラを一般化したものです。トークンの名の通り必ずしも呼び出し可能なものでなくてもよく、そのトークンに応じて継続作業（非同期操作の完了ハンドラ）の実行方法を柔軟にカスタマイズすることができます。このように書いた時でも、先ほどまで説明していた非同期モデルの一貫性は保たれていることがわかると思います。
+完了トークンは開始関数（`async_read_some`）の最後の引数で受け取っているもの（ラムダ、`use_awaitable`、`use_future`、`fibers::yield`）です。つまり、完了トークンとは完了ハンドラを一般化したものです。トークンの名の通り必ずしも呼び出し可能なものでなくてもよく、そのトークンに応じて非同期操作（完了ハンドラを含む）の実行方法を柔軟にカスタマイズすることができます。
 
 完了トークンを受け取る非同期操作では完了ハンドラの関数型（*completion signature*）を用意しておき、非同期操作の開始関数は*completion signature*、完了トークン、自信の内部実装を`async_result`型（traitクラス）に渡します。`async_result`はこれらの情報から具体的な完了ハンドラの作成と非同期操作の起動を行うカスタマイゼーションポイントです。
 
@@ -726,7 +724,7 @@ auto async_read_some(tcp::socket& s, const mutable_buffer& b, CompletionToken&& 
 }
 ```
 
-`async_result`はAsio内部に予め用意されているクラスです。完了トークンとしてラムダなど呼び出し可能なものが渡された場合、それが完了ハンドラとしての要件を満たしていればデフォルトの実装が使用され、それは従来（上で説明した）と同じ意味や保証を持つ非同期操作の実行と完了ハンドラの呼び出しを行います。
+`async_result`はAsioに予め用意されているクラスです。完了トークンとしてラムダなど呼び出し可能なものが渡された場合、それが完了ハンドラとしての要件を満たしていればデフォルトの実装が使用され、それは従来（上で説明したこと）と同じ意味や保証を持つ非同期操作の実行と完了ハンドラの呼び出しを行います。
 
 ```cpp
 // 完了ハンドラ用のデフォルト実装、引数を単純に転送するだけ
@@ -755,7 +753,7 @@ struct async_result<deferred_t, Signatures...> {
   // initiate()の戻り値=非同期操作の直接の戻り値は、完了トークン1つを受けて非同期操作を遅延実行する関数オブジェクト
   template <class Initiation, class... Args>
   static auto initiate(Initiation initiation, deferred_t, Args... args) {
-    return [initiation = std::move(initiation),             // 開始関数の実行詳細
+    return [initiation = std::move(initiation),             // 開始関数の実装詳細
             arg_pack = std::make_tuple(std::move(args)...)  // 非同期操作の追加引数をtupleで固めてキャプチャ
            ](auto&& token) mutable
     {
@@ -824,7 +822,7 @@ auto f = socket.async_read_some(buffer(data), use_then)
 
 - [A Unified Executors Proposal for C++ | P0443R14](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0443r14.html)
 - [P2033R0 - History of Executor Properties](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2033r0.pdf)
-- [P2300R2 `std::execution`](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2300r2.html)
+- [P2300R3 `std::execution`](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2300r3.html)
 - [P2430R0 Slides: Partial success scenarios with P2300](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2430r0.pdf)
 - [P2431R0 Presentation: Plans for P2300 Revision 2](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2431r0.pdf)
 - [P2444R0 The Asio asynchronous model](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2444r0.pdf)
@@ -843,3 +841,6 @@ auto f = socket.async_read_some(buffer(data), use_then)
 - [Networking TS の Boost.Asio からの変更点 - その 4: Associated Executor - あめだまふぁくとりー](https://amedama1x1.hatenablog.com/entry/2017/12/09/102405)
 - [並列コンピューティング SynchronizationContext こそすべて - MSDNマガジン](https://docs.microsoft.com/ja-jp/archive/msdn-magazine/2011/february/msdn-magazine-parallel-computing-it-s-all-about-the-synchronizationcontext)
 - [P1943R0 Networking TS changes to improve completion token flexibility and performance](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1943r0.html)
+
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2021/20211223_executor_netts.md)
