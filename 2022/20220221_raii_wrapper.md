@@ -2,6 +2,7 @@
 
 C言語のライブラリにたまにある、最初にグローバル状態を`~init()`で確保して、それを最後に`~release()`で解放するというインターフェースについて、C++から使うときはRAIIで自動化したい衝動に駆られます。そのとき問題となるのは、プログラムの最初で初期化したらあとはプログラム終了時まで誰にも触ってほしくない、という気持ちをどうやって実現するのか、という事です。
 
+[:contents]
 
 ### グローバルRAIIラッパー
 
@@ -264,3 +265,5 @@ int main() {
 - [STL/optional - microsoft/STL](https://github.com/microsoft/STL/blob/20b8f611c8b9bf570632e80bae1e704991b9e11e/stl/inc/optional#L33-L37)
 - [llvm-project/optional - llvm/llvm-project](https://github.com/llvm/llvm-project/blob/main/libcxx/include/optional#L212-L216)
 - [［C++］集成体の要件とその変遷 - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2019/02/22/201044)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2022/20220221_raii_wrapper.md)
