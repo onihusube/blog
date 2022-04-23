@@ -2,6 +2,8 @@
 
 C++20の`<ranges>`のパイプ（`|`）に自作の`view`（Rangeアダプタ）を接続できるようにするにはどうすればいいのでしょうか？その方法は一見よくわからず、特に提供されてもいません。それでもできないことはないので、なんとかする話です。
 
+[:contents]
+
 ### パイプの実態
 
 rangesのパイプは言語組み込みの機能ではなく、ビット論理和演算子（`|`）をオーバーロードしたものです。そのため、単純には`|`のオーバーロードを自作の`view`に対して提供すれば良さそうに思えます。
@@ -128,7 +130,7 @@ int main() {
 }
 ```
 
-`drop, filter, transform, take``adoptor`は全てRangeアダプタオブジェクトであり、引数を与えて呼び出すことでRangeアダプタクロージャオブジェクトを生成しています。それらを`|`で接続して生成された`adopter`もまたRangeアダプタクロージャオブジェクトであり、まだ`range`は入力されていません。そして、`iota(1) | adoptor`は冒頭の全部まとめているコードと同じ振る舞いをします（ただし、ここではまだ処理を開始していないので何も始まっていません）。
+`drop, filter, transform, take, adoptor`は全てRangeアダプタオブジェクトであり、引数を与えて呼び出すことでRangeアダプタクロージャオブジェクトを生成しています。それらを`|`で接続して生成された`adopter`もまたRangeアダプタクロージャオブジェクトであり、まだ`range`は入力されていません。そして、`iota(1) | adoptor`は`view`を生成し、冒頭の全部まとめているコードと同じ振る舞いをします（ただし、ここではまだ処理を開始していないので何も始まっていません）。
 
 - [ここまでの例 - Compiler Explorer](https://godbolt.org/z/Y8ThbT4zP)
 
@@ -299,7 +301,7 @@ Rangeアダプタの性質を実装しているのは`operator()`内で、ここ
 
 `constexpr if`の`false`分岐では、`C(args...)(r)`を処理しています。この場合は引数列`__args`に入力`range`は含まれておらず、それは後から入力（`|`or`()`）されるので、渡された引数列を保存して後から入力`range`と共に`_Callable`の遅延呼び出しを行う呼び出し可能ラッパを返しています。それはラムダ式で実装されており、引数の保存はキャプチャによって行われています。この場合の戻り値はRangeアダプタクロージャオブジェクトであり、引数と`_Callable`を内包したラムダ式を`_RangeAdaptorClosure`に包んで返しています。
 
-どちらの場合でもメンバに保存した`_M_callable`を使用していませんが、この`#1, #2`のケースの場合はどちらも`_Callable`がデフォルト構築可能であることを仮定することができます。なぜなら、この二つの場合にわたってくる`_Callable`は状態を持たないラムダ式であり、C++20からそれはデフォルト構築可能であるためです。`_M_callable`を使用する必要があるのは実は`C(args...)`相当の部分適用をおこなった場合のみで、それはRangeアダプタクロージャオブジェクト（`_RangeAdaptorClosure`）において処理されます。
+どちらの場合でもメンバに保存した`_M_callable`を使用していませんが、この`#1, #2`のケースの場合はどちらも`_Callable`がデフォルト構築可能であることを仮定することができます。なぜなら、この二つの場合にわたってくる`_Callable`は状態を持たないラムダ式であり、C++20からそれはデフォルト構築可能であり、それはRangeアダプタオブジェクト定義時に渡されるものだからです。`_M_callable`を使用する必要があるのは実は`C(args...)`相当の部分適用をおこなった場合のみで、それはRangeアダプタクロージャオブジェクト（`_RangeAdaptorClosure`）において処理されます。
 
 次はそのRangeアダプタクロージャオブジェクトの実装を見てみましょう。
 
@@ -320,14 +322,14 @@ struct _RangeAdaptorClosure : public _RangeAdaptor<_Callable>
       return this->_M_callable(std::forward<_Range>(__r));
   }
 
-  // 1. range | RACO -> view  ※説明のため追記
+  // 1. range | RACO -> view
   template<viewable_range _Range>
     requires requires { declval<_Callable>()(declval<_Range>()); }
   friend constexpr auto
   operator|(_Range&& __r, const _RangeAdaptorClosure& __o)
   { return __o(std::forward<_Range>(__r)); }
 
-  // 2. RACO | RACO -> RACO ※説明のため追記
+  // 2. RACO | RACO -> RACO
   template<typename _Tp>
   friend constexpr auto
   operator|(const _RangeAdaptorClosure<_Tp>& __x,
@@ -375,9 +377,9 @@ template<typename _Callable>
 
 Rangeアダプタクロージャオブジェクトは1つの`range`を関数呼出によって入力することができ、それは`operator()`で実装されています。ここで、`_Callable`がデフォルト構築可能かによって`_RangeAdaptor::_M_callable`を使用するかの切り替えが初めて行われており、`_Callable`がデフォルト構築可能ではない場合というのは、Rangeアダプタに追加の引数を部分適用した結果生成されたRangeアダプタクロージャオブジェクトの場合のみで、それは`_RangeAdaptor::operator()`内`constexpr if`の`false`パートの結果として生成されます。
 
-1つ目の`operator|`オーバーロードは追記コメントにあるように、左辺に`range`を受けて結合する場合の`|`のオーバーロードです。この場合は先ほどの関数呼び出しと同じことになるので、`operator()`に委譲されています。わかりづらいですが、2つ目の引数の`__o`が`*this`に対応しています。
+1つ目の`operator|`オーバーロードは追記コメントにあるように、左辺に`range`を受けて結合する場合の`|`のオーバーロードです（`range | RACO -> view`）。この場合は先ほどの関数呼び出しと同じことになるので、`operator()`に委譲されています。わかりづらいですが、2つ目の引数の`__o`が`*this`に対応しています。
 
-2つ目の`operator|`オーバーロードは残った振る舞い、すなわちRangeアダプタクロージャオブジェクト同士の事前結合を担っています。なんか`if`で4分岐しているのは、引数の`_RangeAdaptorClosure`オブジェクトの`_Callable`がデフォルト構築可能か否かでメンバの`_M_callable`を参照するかが変化するためで、それが引数2つ分の2x2で4パターンの分岐になっています。実際の結合処理は1つ目の`|`に委譲していて、その処理はラムダ式で記述していて、そのラムダ式のオブジェクトを`_RangeAdaptorClosure`に包んで返しています。`if`の分岐の差異は必要な場合にのみ引数`__x, __y`を返すラムダにキャプチャしていることです。
+2つ目の`operator|`オーバーロードは残った振る舞い、すなわちRangeアダプタクロージャオブジェクト同士の事前結合を担っています。なんか`if`で4分岐しているのは、引数の`_RangeAdaptorClosure`オブジェクトの`_Callable`がデフォルト構築可能か否かでメンバの`_M_callable`を参照するかが変化するためで、それが引数2つ分の2x2で4パターンの分岐になっています。実際の結合処理は1つ目の`|`に委譲していて、その処理はラムダ式で記述して、そのラムダ式のオブジェクトを`_RangeAdaptorClosure`に包んで返すことで戻り値は再びRangeアダプタクロージャオブジェクトになります。`if`の分岐の差異は必要な場合にのみ引数`__x, __y`を返すラムダにキャプチャしていることです。
 
 GCC10の実装では、Rangeアダプタとしての動作はステートレスなラムダ式で与えられ、Rangeアダプタオブジェクトはそれを受けたこの2つの型のどちらかのオブジェクトとなり、ややこしい性質の実装はこの2つの型に集約され共通化されています。`<ranges>`のパイプライン演算子は`_RangeAdaptorClosure`に定義されたものが常に使用されています。
 
@@ -516,7 +518,7 @@ struct _RangeAdaptorClosure
 
 `_Partial`と`_Pipe`はどちらも部分特殊化を使用することで、渡された追加の引数/Rangeアダプタクロージャオブジェクトを効率的に保持しようとします。`_RangeAdaptor/_RangeAdaptorClosure`を継承するクラス型に`_S_has_simple_call_op`とか`_S_has_simple_extra_args`だとかの静的メンバが生えているのは、これを適切に制御するためでもあります。
 
-実装が細分化され分量が増えてはいますが、基本的にやっていることはGCC10の時と大きく変わってはいません。
+実装が細分化され分量が増えて利用方法も変化していますが、基本的にやっていることはGCC10の時と大きく変わってはいません。
 
 これらの変更はおそらく、[P2281](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2281r1.html)の採択と[P2287](https://wg21.link/p2387r3)を意識したものだと思われます（どちらもC++23では採択済）。
 
@@ -525,7 +527,7 @@ struct _RangeAdaptorClosure
 
 #### MSVC
 
-同じように、MSVCの実装も見てみます。`view`型とそのアダプタの関係性は変わらないので、ここではRangeアダプタだけに焦点を絞ります。
+同じように、MSVCの実装も見てみます。`view`型とそのアダプタの関係性は変わらないので、以降はRangeアダプタだけに焦点を絞ります。
 
 `views::filter`（Rangeアダプタオブジェクト）
 
@@ -1001,6 +1003,8 @@ namespace myrange {
 }
 ```
 
+- [`filter`と`common`を実装した例 - godbolt](https://godbolt.org/z/4oMv351rh)
+
 #### GCC11
 
 GCC11の場合も`_RangeAdaptorClosure/_RangeAdaptor`を使用するのですがラムダ式は使用できず、別にRangeアダプタ（クロージャ）型を定義してそこで継承して使用する必要があります。
@@ -1024,7 +1028,7 @@ namespace myrange {
         }
 
         // Rangeアダプタの部分適用共通処理を有効化
-        using _RangeAdaptor<_Filter>::operator();
+        using _RangeAdaptor<xxx_adoptor>::operator();
 
         // よくわからない場合は定義しない方がいいかもしれない
         static constexpr int _S_arity = 2;  // 入力rangeも含めた引数の数
@@ -1040,7 +1044,7 @@ namespace myrange {
 
     namespace detail {
         
-      struct xxx_adoptor_closure : __adaptor::_RangeAdaptorClosure  // これはCRTPではない
+      struct xxx_adoptor_closure : std::views::__adaptor::_RangeAdaptorClosure  // これはCRTPではない
       {
         template<std::ranges::viewable_range R>
         constexpr auto operator()(R&& r) const {
@@ -1059,6 +1063,8 @@ namespace myrange {
 ```
 
 GCC10と11の間で使用法が結構変わっているのが地味に厄介かもしれません。GCCの場合はどちらでもRangeアダプタの引数事前適用を実装する必要がありません。
+
+- [`filter`と`common`を実装した例 - godbolt](https://godbolt.org/z/hqYEjbcM1)
 
 #### MSVC
 
@@ -1083,10 +1089,10 @@ namespace myrange {
         }
 
         template <typename Arg>
-            requires constructible_from<decay_t<Arg>, Arg>
+            requires std::constructible_from<std::decay_t<Arg>, Arg>
         constexpr auto operator()(Arg&& arg) const {
           // Rangeアダプタの引数事前適用処理
-          return std::ranges::_Range_closure<xxx_adoptor, decay_t<Arg>>{std::forward<Arg>(arg)};
+          return std::ranges::_Range_closure<xxx_adoptor, std::decay_t<Arg>>{std::forward<Arg>(arg)};
         }
       };
     }
@@ -1138,7 +1144,7 @@ namespace myrange {
         }
 
         template <typename Arg>
-            requires constructible_from<decay_t<Arg>, Arg>
+            requires std::constructible_from<std::decay_t<Arg>, Arg>
         constexpr auto operator()(Arg&& arg) const {
           // Rangeアダプタの引数事前適用処理
           return std::__range_adaptor_closure_t(std::__bind_back(*this, std::forward<Arg>(arg)));
@@ -1169,6 +1175,8 @@ namespace myrange {
 ```
 
 clangもMSVCの場合同様に、Rangeアダプタの追加の引数を事前適用する処理を自分で記述する必要があります。とはいえ内部実装を流用すればほぼ定型文となり、Rangeアダプタクロージャオブジェクト型の場合も`__range_adaptor_closure`を継承するだけです。
+
+- [`filter`と`common`を実装した例 - godbolt](https://godbolt.org/z/Tor7xsT4E)
 
 ### C++23から
 
