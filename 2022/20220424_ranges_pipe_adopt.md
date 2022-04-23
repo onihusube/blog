@@ -1248,3 +1248,5 @@ namespace myrange {
 - [P2281R1 Clarifying range adaptor objects - WG21月次提案文書を眺める（2021年01月）](https://onihusube.hatenablog.com/entry/2021/02/11/153333#P2281R0-Clarifying-range-adaptor-objects)
 - [P2387R3 Pipe support for user-defined range adaptors](https://wg21.link/p2387r3)
 - [P2387R3 Pipe support for user-defined range adaptors - WG21月次提案文書を眺める（2021年12月）](https://onihusube.hatenablog.com/entry/2022/01/10/235544#P2387R3-Pipe-support-for-user-defined-range-adaptors)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2022/20220424_ranges_pipe_adopt.md)
