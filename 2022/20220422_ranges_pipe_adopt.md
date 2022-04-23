@@ -21,9 +21,9 @@ int main() {
 
 このチェーンの起点となっているのは`iota(1)`であり、これは入力となる`range`を生成しています。この`iota`は`iota_view`という`view`を返していて、このように引数から何か`view`を生成しているものをRangeファクトリと呼びます。Rangeファクトリはこの`iota`のようにパイプの最初で使用して入力となる`range`を生成するタイプのものです。今回どうにかしたいのはこれではありません。
 
-`iota(1)`の後ろで、`|`で接続されているの（`drop, filter`など）がRangeアダプタと呼ばれるもので、これは`view`を入力として何かしらの変換を適用した`view`を返すもので、これは必ず`|`の右辺に来ます。今回どうにかしたいのはこれです。
+`iota(1)`の後ろで、`|`で接続されているの（`drop, filter`など）がRangeアダプタと呼ばれるもので、これは`view`を入力として何かしらの変換を適用した`view`を返すもので、これは必ず`|`の右辺に来ます。今回どうにかしたいのはこれであり、これは`view`型とは別のもので、どうやら型ではなさそうです。
 
-ここで注意すべきなのは、Rangeファクトリの戻り値型は常に`view`であるのに対して、Rangeアダプタの戻り値型はそうではないことです。例えば`drop(5)`の戻り値型は引数に与えられた`5`を保持した何かを返しています。その後、`|`によって`range`を入力することでようやく`view`を生成します（`iota(1) | drop(5)`の結果は`dorp_view`になる）。
+ここで注意すべきなのは、Rangeファクトリの戻り値型は常に`view`であるのに対して、Rangeアダプタの戻り値型はそうではないことです。例えば`drop(5)`の戻り値型は引数に与えられた`5`を保持した何かを返しています。その後、`|`によって`range`を入力することでようやく`view`を生成します（例えば、`iota(1) | drop(5)`の結果は`dorp_view`になる）。
 
 Rangeファクトリを`RF`、Rangeアダプタを`RA`、与える0個以上の引数を`Args`として、コンセプトっぽい書き方で表すと次のようになっています
 
@@ -37,9 +37,9 @@ Rangeファクトリを`RF`、Rangeアダプタを`RA`、与える0個以上の�
 
 ### Rangeアダプタオブジェクト/Rangeアダプタクロージャオブジェクト
 
-Rangeアダプタは関数のように見えますがそうではなく、CPOと呼ばれる関数オブジェクトの一種です。そのため、Rangeアダプタの実体のことをRangeアダプタオブジェクトと呼びます。
+Rangeアダプタは関数のように見えますがそうではなく、カスタマイゼーションポイントオブジェクト（CPO）と呼ばれる関数オブジェクトの一種です。そのため、Rangeアダプタの実体のことをRangeアダプタオブジェクトと呼びます。
 
-Rangeアダプタオブジェクトとは、1つ目の引数に[`viewable_range`](https://cpprefjp.github.io/reference/ranges/viewable_range.html)を受けて呼出可能なカスタマイゼーションポイントオブジェクトであり、その戻り値型は`view`となります。中でも、1引数のRangeアダプタオブジェクトのことを特に、Rangeアダプタクロージャオブジェクトと呼びます。
+Rangeアダプタオブジェクトとは、1つ目の引数に[`viewable_range`](https://cpprefjp.github.io/reference/ranges/viewable_range.html)を受けて呼出可能なCPOでありその戻り値型は`view`となる、みたいに規定されています。その中でも、1引数のRangeアダプタオブジェクトのことを特に、Rangeアダプタクロージャオブジェクトと呼びます。
 
 このRangeアダプタクロージャオブジェクトには規格によって変な性質が付加されています。
 
@@ -73,13 +73,13 @@ view auto v3 = r | E ;
 view auto v4 = E(r) ;
 ```
 
-つまりは、Rangeアダプタクロージャオブジェクト同士もまた`|`で（事前に）接続可能であるということです。そしてその結果もRangeアダプタクロージャオブジェクトとなり、入力に対して順番に接続した時と同じ振る舞いをしなければなりません。ただし、Rangeアダプタクロージャオブジェクト同士の事前結合においては関数記法を使用できません。
+つまりは、Rangeアダプタクロージャオブジェクト同士もまた`|`で（事前に）接続可能であり、`|`は右結合となるということです。そしてその結果もRangeアダプタクロージャオブジェクトとなり、入力に対して順番に接続した時と同じ振る舞いをしなければなりません。ただし、Rangeアダプタクロージャオブジェクト同士の事前結合においては関数記法は求められていません。
 
 ```cpp
-auto E = D(C);  // これはできない
+auto E = D(C);  // これはできる必要はない（できない）
 ```
 
-Rangeアダプタクロージャオブジェクトは1引数ですが、Rangeアダプタオブジェクトの中には追加の引数を受け取る者もいます（というかそっちの方が多い）。その場合、引数を渡してから`range`を入力しても、`range`と一緒に引数を渡しても、等価な振る舞いをします。
+Rangeアダプタクロージャオブジェクトは1引数ですが、Rangeアダプタオブジェクトの中には追加の引数を受け取る者もいます（というかそっちの方が多い）。その場合、引数を渡してから`range`を入力しても、`range`と一緒に引数を渡しても、ほぼ同等な振る舞いをします。
 
 ```cpp
 view auto v1 = r | C(args...);
@@ -128,7 +128,7 @@ int main() {
 }
 ```
 
-ここで、`adoptor`はRangeアダプタクロージャオブジェクトであり、まだ`range`は入力されていません。そして、`iota(1) | adoptor`は冒頭の全部まとめているコードと同じ振る舞いをします（ただし、ここではまだ処理を開始していないので何も始まっていません）。
+`drop, filter, transform, take``adoptor`は全てRangeアダプタオブジェクトであり、引数を与えて呼び出すことでRangeアダプタクロージャオブジェクトを生成しています。それらを`|`で接続して生成された`adopter`もまたRangeアダプタクロージャオブジェクトであり、まだ`range`は入力されていません。そして、`iota(1) | adoptor`は冒頭の全部まとめているコードと同じ振る舞いをします（ただし、ここではまだ処理を開始していないので何も始まっていません）。
 
 - [ここまでの例 - Compiler Explorer](https://godbolt.org/z/Y8ThbT4zP)
 
@@ -148,7 +148,7 @@ namespace std::ranges {
   ...
 
   template<input_range _Vp,
-	         indirect_unary_predicate<iterator_t<_Vp>> _Pred>
+           indirect_unary_predicate<iterator_t<_Vp>> _Pred>
     requires view<_Vp> && is_object_v<_Pred>
   class filter_view : public view_interface<filter_view<_Vp, _Pred>>
   {
@@ -162,7 +162,7 @@ namespace std::ranges {
     inline constexpr __adaptor::_RangeAdaptor filter
       = [] <viewable_range _Range, typename _Pred> (_Range&& __r, _Pred&& __p)
       {
-	      return filter_view{std::forward<_Range>(__r), std::forward<_Pred>(__p)};
+        return filter_view{std::forward<_Range>(__r), std::forward<_Pred>(__p)};
       };
   } // namespace views
 
@@ -291,7 +291,7 @@ view auto v2 = C(r, args...);   // #2
 view auto v3 = C(args...)(r);   // #3
 ```
 
-このクラスは何か呼出可能と思われるもの（`_Callable`）を受け取って、それがデフォルト構築不可能な場合のみメンバ（`_M_callable`）に保存しています。最初に見た使われ方では、ラムダ式によって初期化されていて、そのラムダ式で対象の`view`に合わせたRangeアダプタの効果が実装されていました。
+このクラスは何か呼出可能と思われるもの（`_Callable`）を受け取って、それがデフォルト構築不可能な場合のみメンバ（`_M_callable`）に保存しています。最初に見た使われ方では、ラムダ式によって初期化されていて、そのラムダ式で対象の`view`に合わせたRangeアダプタの処理が実装されていました。
 
 Rangeアダプタの性質を実装しているのは`operator()`内で、ここでは上記`#2, #3`の2つのケースを処理していて、`#1`はRangeアダプタクロージャオブジェクト（`_RangeAdaptorClosure`）のパイプライン演算子に委ねています。
 
@@ -1232,6 +1232,9 @@ namespace myrange {
 - [GCC10 `<ranges>` - github](https://github.com/gcc-mirror/gcc/blob/releases/gcc-10.2.0/libstdc++-v3/include/std/ranges)
 - [GCC11 `<ranges>` - github](https://github.com/gcc-mirror/gcc/blob/releases/gcc-11.2.0/libstdc++-v3/include/std/ranges)
 - [MSVC `<ranges>` - github](https://github.com/microsoft/STL/blob/main/stl/inc/ranges)
+- [llvm-project/common_view.h - github](https://github.com/llvm/llvm-project/blob/main/libcxx/include/__ranges/common_view.h)
+- [llvm-project/filter_view.h - github](https://github.com/llvm/llvm-project/blob/main/libcxx/include/__ranges/filter_view.h)
+- [llvm-project/range_adaptor.h - github](https://github.com/llvm/llvm-project/blob/main/libcxx/include/__ranges/range_adaptor.h)
 - [C++20 状態を持たないラムダ式を、デフォルト構築可能、代入可能とする - cpprefjp](https://cpprefjp.github.io/lang/cpp20/default_constructible_and_assignable_stateless_lambdas.html)
 - [P2281R1 Clarifying range adaptor objects](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2281r1.html)
 - [P2281R1 Clarifying range adaptor objects - WG21月次提案文書を眺める（2021年01月）](https://onihusube.hatenablog.com/entry/2021/02/11/153333#P2281R0-Clarifying-range-adaptor-objects)
