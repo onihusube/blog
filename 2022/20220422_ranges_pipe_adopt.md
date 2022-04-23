@@ -525,6 +525,8 @@ struct _RangeAdaptorClosure
 
 #### MSVC
 
+同じように、MSVCの実装も見てみます。`view`型とそのアダプタの関係性は変わらないので、ここではRangeアダプタだけに焦点を絞ります。
+
 `views::filter`（Rangeアダプタオブジェクト）
 
 ```cpp
@@ -602,6 +604,8 @@ namespace views {
 
 Rangeアダプタクロージャオブジェクトでは、`_Pipe::_Base`といういかにもな名前の型を継承しています。どうやら、パイプライン演算子はそこで定義されているようです。
 
+まずはRangeアダプタの引数の部分適用時に返されるラッパ型`_Range_closure`を見てみます。
+
 ```cpp
 template <class _Fn, class... _Types>
 class _Range_closure : public _Pipe::_Base<_Range_closure<_Fn, _Types...>> {
@@ -612,7 +616,9 @@ public:
     // 2. _Fn must be default-constructible and stateless, so we can create instances "on-the-fly" and avoid
     //    storing a copy.
 
+    // Types（追加の引数）は参照やconstではないこと
     _STL_INTERNAL_STATIC_ASSERT((same_as<decay_t<_Types>, _Types> && ...));
+    // _Fn（Rangeアダプタ型 not クロージャ型）はステートレスクラスかつデフォルト構築可能であること
     _STL_INTERNAL_STATIC_ASSERT(is_empty_v<_Fn>&& is_default_constructible_v<_Fn>);
 
     // clang-format off
@@ -670,13 +676,256 @@ private:
 };
 ```
 
-#### Clang
+やたら複雑ですが、4つある`operator()`は値カテゴリの違いでムーブしたりしなかったりしているだけで、実質同じことをしています。テンプレートパラメータの`_Fn`は`views::filter`の実装で見たように、まだクロージャではないRangeアダプタ型です。追加の引数は`Types...`で、静的アサートにも表れているように参照や`const`を外すことでコピー/ムーブして（メンバの`tuple`オブジェクトに）保持されています。
 
-under implementing...
+このクラスはRangeアダプタオブジェクトとその追加の引数をラップしてRangeアダプタクロージャオブジェクトとなるものなので、`operator()`がやることは入力の`range`を受け取って、ラップしているRangeアダプタに同じくラップしている追加の引数とともに渡して`view`を生成することです。その実態は`_Call()`関数であり、`_Arg`（入力`range`オブジェクト）->`_Captures`（追加の引数列）をこの順番で`_Fn`（Rangeアダプタ型）の関数呼び出し演算子に渡しています。`_Fn`は常にデフォルト構築可能であること強制することで追加のストレージを節約しており、`_Fn`の関数呼び出し演算子は`_Arg`と共に呼び出すとそこで直接定義されている入力`range`を受け取る処理が実行されます。例えば`views::filter`の場合は1つ目の`operator()`がそれにあたり、`filter_view`の生成を行っています。
+
+`_Range_closure`もまた、`_Pipe::_Base`を継承することで`|`の実装を委譲しています。次はこれを見てみます。
+
+```cpp
+namespace _Pipe {
+  // clang-format off
+  // C | R = C(R)の呼び出しが可能かを調べるコンセプト
+  template <class _Left, class _Right>
+  concept _Can_pipe = requires(_Left&& __l, _Right&& __r) {
+      static_cast<_Right&&>(__r)(static_cast<_Left&&>(__l));
+  };
+
+  // Rangeアダプタクロージャオブジェクト同士の結合の要件をチェックするコンセプト
+  // 共に、コピーorムーブできること
+  template <class _Left, class _Right>
+  concept _Can_compose = constructible_from<remove_cvref_t<_Left>, _Left>
+      && constructible_from<remove_cvref_t<_Right>, _Right>;
+  // clang-format on
+
+  // 前方宣言
+  template <class, class>
+  struct _Pipeline;
+
+  // Rangeアダプタクロージャオブジェクト型にパイプラインを提供する共通クラス
+  template <class _Derived>
+  struct _Base {
+      template <class _Other>
+          requires _Can_compose<_Derived, _Other>
+      constexpr auto operator|(_Base<_Other>&& __r) && noexcept(
+          noexcept(_Pipeline{static_cast<_Derived&&>(*this), static_cast<_Other&&>(__r)})) {
+          // |両辺のCRTPチェック
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Derived, _Base<_Derived>>);
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Other, _Base<_Other>>);
+          return _Pipeline{static_cast<_Derived&&>(*this), static_cast<_Other&&>(__r)};
+      }
+
+      template <class _Other>
+          requires _Can_compose<_Derived, const _Other&>
+      constexpr auto operator|(const _Base<_Other>& __r) && noexcept(
+          noexcept(_Pipeline{static_cast<_Derived&&>(*this), static_cast<const _Other&>(__r)})) {
+          // |両辺のCRTPチェック
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Derived, _Base<_Derived>>);
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Other, _Base<_Other>>);
+          return _Pipeline{static_cast<_Derived&&>(*this), static_cast<const _Other&>(__r)};
+      }
+
+      template <class _Other>
+          requires _Can_compose<const _Derived&, _Other>
+      constexpr auto operator|(_Base<_Other>&& __r) const& noexcept(
+          noexcept(_Pipeline{static_cast<const _Derived&>(*this), static_cast<_Other&&>(__r)})) {
+          // |両辺のCRTPチェック
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Derived, _Base<_Derived>>);
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Other, _Base<_Other>>);
+          return _Pipeline{static_cast<const _Derived&>(*this), static_cast<_Other&&>(__r)};
+      }
+
+      template <class _Other>
+          requires _Can_compose<const _Derived&, const _Other&>
+      constexpr auto operator|(const _Base<_Other>& __r) const& noexcept(
+          noexcept(_Pipeline{static_cast<const _Derived&>(*this), static_cast<const _Other&>(__r)})) {
+          // |両辺のCRTPチェック
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Derived, _Base<_Derived>>);
+          _STL_INTERNAL_STATIC_ASSERT(derived_from<_Other, _Base<_Other>>);
+          return _Pipeline{static_cast<const _Derived&>(*this), static_cast<const _Other&>(__r)};
+      }
+
+      template <_Can_pipe<const _Derived&> _Left>
+      friend constexpr auto operator|(_Left&& __l, const _Base& __r)
+#ifdef __EDG__ // TRANSITION, VSO-1222776
+          noexcept(noexcept(_STD declval<const _Derived&>()(_STD forward<_Left>(__l))))
+#else // ^^^ workaround / no workaround vvv
+          noexcept(noexcept(static_cast<const _Derived&>(__r)(_STD forward<_Left>(__l))))
+#endif // TRANSITION, VSO-1222776
+      {
+          return static_cast<const _Derived&>(__r)(_STD forward<_Left>(__l));
+      }
+
+      template <_Can_pipe<_Derived> _Left>
+      friend constexpr auto operator|(_Left&& __l, _Base&& __r)
+#ifdef __EDG__ // TRANSITION, VSO-1222776
+          noexcept(noexcept(_STD declval<_Derived>()(_STD forward<_Left>(__l))))
+#else // ^^^ workaround / no workaround vvv
+          noexcept(noexcept(static_cast<_Derived&&>(__r)(_STD forward<_Left>(__l))))
+#endif // TRANSITION, VSO-1222776
+      {
+          return static_cast<_Derived&&>(__r)(_STD forward<_Left>(__l));
+      }
+  };
+
+
+  // Rangeアダプタクロージャオブジェクト同士の事前結合を担うラッパ型
+  template <class _Left, class _Right>
+  struct _Pipeline : _Base<_Pipeline<_Left, _Right>> {
+      /* [[no_unique_address]] */ _Left __l;
+      /* [[no_unique_address]] */ _Right __r;
+
+      template <class _Ty1, class _Ty2>
+      constexpr explicit _Pipeline(_Ty1&& _Val1, _Ty2&& _Val2) noexcept(
+          is_nothrow_convertible_v<_Ty1, _Left>&& is_nothrow_convertible_v<_Ty2, _Right>)
+          : __l(_STD forward<_Ty1>(_Val1)), __r(_STD forward<_Ty2>(_Val2)) {}
+
+      template <class _Ty>
+      _NODISCARD constexpr auto operator()(_Ty&& _Val) noexcept(
+          noexcept(__r(__l(_STD forward<_Ty>(_Val))))) requires requires {
+          __r(__l(static_cast<_Ty&&>(_Val)));
+      }
+      { return __r(__l(_STD forward<_Ty>(_Val))); }
+
+      template <class _Ty>
+      _NODISCARD constexpr auto operator()(_Ty&& _Val) const
+          noexcept(noexcept(__r(__l(_STD forward<_Ty>(_Val))))) requires requires {
+          __r(__l(static_cast<_Ty&&>(_Val)));
+      }
+      { return __r(__l(_STD forward<_Ty>(_Val))); }
+  };
+
+  template <class _Ty1, class _Ty2>
+  _Pipeline(_Ty1, _Ty2) -> _Pipeline<_Ty1, _Ty2>;
+} // namespace _Pipe
+```
+
+`_Pipe::_Base`には2種類6つの`operator|`が定義されています。`_Can_compose`コンセプトで制約されている最初の4つがRangeアダプタクロージャオブジェクト同士の事前結合を行うパイプ演算子で、4つあるのは値カテゴリの違いで`*this`を適応的にムーブするためです。このクラスはCRTPで利用され、`_Derived`型は常にRangeアダプタクロージャオブジェクト型です。`views::common`のように最初からRangeアダプタクロージャオブジェクトである場合は`_Derived`はステートレスですが、`views::filter`のように追加の引数を受け取る場合は`_Derived`は何かを保持しています。この結果は再びRangeアダプタクロージャオブジェクトとなるため、`_Pipeline`型がそのラッピングを担っています。`_Pipeline`も`_Pipe::_Base`を継承することで`|`の実装を省略しています。その関数呼び出し演算子では`range | __l | __r`の接続が`__r(__l(range))`となるように呼び出しを行っています。
+
+残った2つが`range | RACO -> view`の形の接続（`|`による`range`の入力）を行っているパイプ演算子で、この場合の`_Left`型の`__l`が入力の`range`オブジェクトです。`__r`は`*this`であり、パラメータを明示化していることで不要なキャストやチェックが省略できています（ここにはDeducing thisの有用性の一端を垣間見ることができます）。この場合は`__l | __r`の形の接続が`__r(__L)`の呼び出しと同等になる必要があり、そのような呼び出しを行っています。  
+なぜこっちだけHidden friendsになっているかというと、この場合は`this`パラメータが`|`の右辺に来るように定義する必要があるため非メンバで定義せざるを得ないからです（メンバ定義だと常に左辺に`this`パラメータが来てしまう）。
+
+GCCがRangeアダプタオブジェクトの`operator()`（引数を部分適用する方）の実装をも共通クラスに外出ししていたのに対して、MSVCはそうしていません。そのおかげだと思いますが、実装がだいぶシンプルに収まっています（値カテゴリの違いで必要になる4つのオーバーロードから目を逸らしつつ）。
+
+どうやらMSVCは早い段階からこのような実装となっていたようで、[P2281](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2281r1.html)と[P2287](https://wg21.link/p2387r3)の二つの変更はいずれもMSVCのこれらの実装をモデルケースとして標準に反映するものでした。
+
+#### clang
+
+`views::filter`
+
+```cpp
+namespace views {
+namespace __filter {
+  struct __fn {
+    template<class _Range, class _Pred>
+    [[nodiscard]] _LIBCPP_HIDE_FROM_ABI
+    constexpr auto operator()(_Range&& __range, _Pred&& __pred) const
+      noexcept(noexcept(filter_view(std::forward<_Range>(__range), std::forward<_Pred>(__pred))))
+      -> decltype(      filter_view(std::forward<_Range>(__range), std::forward<_Pred>(__pred)))
+      { return          filter_view(std::forward<_Range>(__range), std::forward<_Pred>(__pred)); }
+
+    template<class _Pred>
+      requires constructible_from<decay_t<_Pred>, _Pred>
+    [[nodiscard]] _LIBCPP_HIDE_FROM_ABI
+    constexpr auto operator()(_Pred&& __pred) const
+      noexcept(is_nothrow_constructible_v<decay_t<_Pred>, _Pred>)
+    { return __range_adaptor_closure_t(std::__bind_back(*this, std::forward<_Pred>(__pred))); }
+  };
+} // namespace __filter
+
+inline namespace __cpo {
+  inline constexpr auto filter = __filter::__fn{};
+} // namespace __cpo
+} // namespace views
+```
+
+`views::common`
+
+```cpp
+namespace views {
+namespace __common {
+  struct __fn : __range_adaptor_closure<__fn> {
+    template<class _Range>
+      requires common_range<_Range>
+    [[nodiscard]] _LIBCPP_HIDE_FROM_ABI
+    constexpr auto operator()(_Range&& __range) const
+      noexcept(noexcept(views::all(std::forward<_Range>(__range))))
+      -> decltype(      views::all(std::forward<_Range>(__range)))
+      { return          views::all(std::forward<_Range>(__range)); }
+
+    template<class _Range>
+    [[nodiscard]] _LIBCPP_HIDE_FROM_ABI
+    constexpr auto operator()(_Range&& __range) const
+      noexcept(noexcept(common_view{std::forward<_Range>(__range)}))
+      -> decltype(      common_view{std::forward<_Range>(__range)})
+      { return          common_view{std::forward<_Range>(__range)}; }
+  };
+} // namespace __common
+
+inline namespace __cpo {
+  inline constexpr auto common = __common::__fn{};
+} // namespace __cpo
+} // namespace views
+```
+
+clangの実装はMSVCのものにかなり近いことが分かるでしょう。Rangeアダプタの共通実装は提供しておらず、Rangeアダプタクロージャオブジェクトの共通実装は`__range_adaptor_closure_t`と`__range_adaptor_closure`というCRTP型を使用しています。
+
+[初期コミット時のメッセージ](https://github.com/llvm/llvm-project/commit/ee44dd8062a26541808fc0d3fd5c6703e19f6016)によれば、[P2287](https://wg21.link/p2387r3)をベースとした実装であり、P2287はMSVCの実装を参考にしていたので、結果として似た実装となっているようです。
+
+```cpp
+// CRTP base that one can derive from in order to be considered a range adaptor closure
+// by the library. When deriving from this class, a pipe operator will be provided to
+// make the following hold:
+// - `x | f` is equivalent to `f(x)`
+// - `f1 | f2` is an adaptor closure `g` such that `g(x)` is equivalent to `f2(f1(x))`
+template <class _Tp>
+struct __range_adaptor_closure;
+
+// Type that wraps an arbitrary function object and makes it into a range adaptor closure,
+// i.e. something that can be called via the `x | f` notation.
+template <class _Fn>
+struct __range_adaptor_closure_t : _Fn, __range_adaptor_closure<__range_adaptor_closure_t<_Fn>> {
+    constexpr explicit __range_adaptor_closure_t(_Fn&& __f) : _Fn(std::move(__f)) { }
+};
+
+template <class _Tp>
+concept _RangeAdaptorClosure = derived_from<remove_cvref_t<_Tp>, __range_adaptor_closure<remove_cvref_t<_Tp>>>;
+
+template <class _Tp>
+struct __range_adaptor_closure {
+    template <ranges::viewable_range _View, _RangeAdaptorClosure _Closure>
+        requires same_as<_Tp, remove_cvref_t<_Closure>> &&
+                 invocable<_Closure, _View>
+    [[nodiscard]] _LIBCPP_HIDE_FROM_ABI
+    friend constexpr decltype(auto) operator|(_View&& __view, _Closure&& __closure)
+        noexcept(is_nothrow_invocable_v<_Closure, _View>)
+    { return std::invoke(std::forward<_Closure>(__closure), std::forward<_View>(__view)); }
+
+    template <_RangeAdaptorClosure _Closure, _RangeAdaptorClosure _OtherClosure>
+        requires same_as<_Tp, remove_cvref_t<_Closure>> &&
+                 constructible_from<decay_t<_Closure>, _Closure> &&
+                 constructible_from<decay_t<_OtherClosure>, _OtherClosure>
+    [[nodiscard]] _LIBCPP_HIDE_FROM_ABI
+    friend constexpr auto operator|(_Closure&& __c1, _OtherClosure&& __c2)
+        noexcept(is_nothrow_constructible_v<decay_t<_Closure>, _Closure> &&
+                 is_nothrow_constructible_v<decay_t<_OtherClosure>, _OtherClosure>)
+    { return __range_adaptor_closure_t(std::__compose(std::forward<_OtherClosure>(__c2), std::forward<_Closure>(__c1))); }
+};
+```
+
+`__range_adaptor_closure_t`のテンプレートパラメータ`_Fn`はRangeアダプタ型で、`__range_adaptor_closure_t`は`_Fn`と`__range_adaptor_closure`を基底に持ち、`operator|`は`__range_adaptor_closure`で定義されています。
+
+`__range_adaptor_closure`もまたCRTPで、`operator|`は2つともHidden friendsであり、1つ目が`range`を入力する方、2つ目がRangeアダプタクロージャオブジェクト同士の接続をする方、に対応しています。どちらでも、`_Closure`型の方が`this`パラメータで`_Tp`と同じ型となることが制約されています。
+
+Rangeアダプタ型（の部分適用`operator()`）で使用される場合`_Tp`は一つ上の`__range_adaptor_closure_t`となり、Rangeアダプタクロージャオブジェクト型で（継承して）使用される場合は`_Tp`はそのRangeアダプタクロージャオブジェクト型となります。`__range_adaptor_closure::operator|`での`*this`とは使われ方に応じてそのどちらかの型であり、Rangeアダプタの処理は`_Fn`の関数呼び出し演算子に実装されていて（`__range_adaptor_closure_t<_Fn>`の場合は`_Fn`を継承することで実装していて）、`this`パラメータ`__closure`はそれらを呼び出すことができます。2つ目の`operator|`で使用されている`__compose(f, g)`は`f(g(arg))`となるように関数合成を行うラッパ型のようです。
+
+`filter`の実装で`__range_adaptor_closure_t`の初期化に使用されている`__bind_back()`は[`std::bind_front`](https://cpprefjp.github.io/reference/functional/bind_front.html)と同じことを逆順で行うもので、Rangeアダプタの実装簡略化のために[P2287](https://wg21.link/p2387r3)で提案されているものでもあります。
 
 ### 自作`view`のアダプト
 
-#### ユニバーサル実装（Rangeアダプタオブジェクトとか知らねえ！とりあえず`|`で繋げればいい！！っていう人向け）
+各実装をみて見ると、割とそこそこ異なっていることが分かります。従って、自作`view`をrangesの`|`にアダプトするには各実装に合わせたコードが必要になりそうです（共通化も可能だと思いますが、考えがまとまっていないので次回以降・・・）。
+
+#### Rangeアダプタオブジェクトとか知らねえ！とりあえず`|`で繋げればいい！！っていう人向け
 
 Rangeアダプタの性質を知り色々実装を見てみると、`|`につなぐだけなら簡単なことに気付けます。Rangeアダプタは必ず`|`の右辺に来て、左辺は`range`（`viewable_range`）オブジェクトとなります。複数チェーンしている時でも、1つの`range | RA`の結果は`view`になります。つまり、`range`を左辺に受ける`|`の実装においては左辺のオブジェクトは常に`viewable_range`となります。
 
@@ -718,20 +967,271 @@ namespace myrange {
 }
 ```
 
-他の部分を適切に整えさえすれば、この`operator|`定義は全ての実装でrangesのパイプラインチェーンにアダプトすることができます（多分）。
+省略した部分を適切に整えさえすれば、この`operator|`定義は全ての実装でrangesのパイプラインチェーンにアダプトすることができます（多分）。
 
 ただしこの`xxx_view_adoptor`はRangeアダプタとして必要なことを何もしていないので、それ以外の保証はありません。未定義動作にはならないと思いますが、標準のRangeアダプタ/Rangeアダプタクロージャオブジェクトと同等の振る舞いはできないので本当にとりあえずの実装です。
 
 #### GCC10
+
+GCC10の場合は、`_RangeAdaptorClosure/_RangeAdaptor`を適切にラムダ式などで初期化し、そのラムダ式内に`view`生成処理を記述します。
+
+```cpp
+namespace myrange {
+
+  template<std::ranges::view V>
+  class xxx_view;
+
+  namespace views {
+
+    // xxx_viewのRangeアダプタクロージャオブジェクト
+    inline constexpr std::views::__adaptor::_RangeAdaptorClosure xxx
+      = [] <viewable_range _Range> (_Range&& __r)
+      {
+        // xxx_viewの生成処理
+      };
+
+    
+    // xxx_viewのRangeアダプタオブジェクト
+    inline constexpr std::views::__adaptor::_RangeAdaptor xxx
+      = [] <viewable_range _Range, typename _Pred> (_Range&& __r, _Pred&& __p)
+      {
+	      // xxx_viewの生成処理
+      };
+  }
+}
+```
+
 #### GCC11
+
+GCC11の場合も`_RangeAdaptorClosure/_RangeAdaptor`を使用するのですがラムダ式は使用できず、別にRangeアダプタ（クロージャ）型を定義してそこで継承して使用する必要があります。
+
+```cpp
+namespace myrange {
+
+  template<std::ranges::view V>
+  class xxx_view;
+
+  // Rangeアダプタの場合
+  namespace views {
+
+    namespace detail {
+      
+      struct xxx_adoptor : std::views::__adaptor::_RangeAdaptor<xxx_adoptor>
+      {
+        template<std::ranges::viewable_range R, typename... Args>
+        constexpr auto operator()(R&& r, Args&&... args) const {
+          // xxx_viewの生成処理
+        }
+
+        // Rangeアダプタの部分適用共通処理を有効化
+        using _RangeAdaptor<_Filter>::operator();
+
+        // よくわからない場合は定義しない方がいいかもしれない
+        static constexpr int _S_arity = 2;  // 入力rangeも含めた引数の数
+        static constexpr bool _S_has_simple_extra_args = true;
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor xxx{};
+  }
+
+  // Rangeアダプタクロージャの場合
+  namespace views {
+
+    namespace detail {
+        
+      struct xxx_adoptor_closure : __adaptor::_RangeAdaptorClosure  // これはCRTPではない
+      {
+        template<std::ranges::viewable_range R>
+        constexpr auto operator()(R&& r) const {
+          // xxx_viewの生成処理
+        }
+
+        // _S_arityはクロージャオブジェクトの場合は不要らしい
+
+        static constexpr bool _S_has_simple_call_op = true;
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor_closure xxx{};
+  }
+}
+```
+
+GCC10と11の間で使用法が結構変わっているのが地味に厄介かもしれません。GCCの場合はどちらでもRangeアダプタの引数事前適用を実装する必要がありません。
+
 #### MSVC
-SBC PROFIVE® NUCE - V2516
+
+MSVCの場合は`_Pipe::_Base`を使用します。
+
+```cpp
+namespace myrange {
+
+  template<std::ranges::view V>
+  class xxx_view;
+
+  // Rangeアダプタの場合
+  namespace views {
+
+    namespace detail {
+      
+      struct xxx_adoptor {
+
+        template<std::ranges::viewable_range R, typename... Args>
+        constexpr auto operator()(R&& r, Args&&... args) const {
+          // xxx_viewの生成処理
+        }
+
+        template <typename Arg>
+            requires constructible_from<decay_t<Arg>, Arg>
+        constexpr auto operator()(Arg&& arg) const {
+          // Rangeアダプタの引数事前適用処理
+          return std::ranges::_Range_closure<xxx_adoptor, decay_t<Arg>>{std::forward<Arg>(arg)};
+        }
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor xxx{};
+  }
+
+  // Rangeアダプタクロージャの場合
+  namespace views {
+
+    namespace detail {
+        
+      struct xxx_adoptor_closure : public std::ranges::_Pipe::_Base<xxx_adoptor_closure>
+      {
+        template<std::ranges::viewable_range R>
+        constexpr auto operator()(R&& r) const {
+          // xxx_viewの生成処理
+        }
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor_closure xxx{};
+  }
+}
+```
+
+MSVCの場合、Rangeアダプタの追加の引数を事前適用する処理を自分で記述する必要があります。そこでは`_Range_closure`を使用することでほぼ省略可能です。Rangeアダプタ型の場合はこれだけでよく、Rangeアダプタクロージャオブジェクト型の場合は`_Pipe::_Base`を継承する必要があります。
+
+#### clang
+
+clangの場合、MSVCとほぼ同じ記述となり、使用するものが異なるだけです。
+
+```cpp
+namespace myrange {
+
+  template<std::ranges::view V>
+  class xxx_view;
+
+  // Rangeアダプタの場合
+  namespace views {
+
+    namespace detail {
+      
+      struct xxx_adoptor {
+
+        template<std::ranges::viewable_range R, typename... Args>
+        constexpr auto operator()(R&& r, Args&&... args) const {
+          // xxx_viewの生成処理
+        }
+
+        template <typename Arg>
+            requires constructible_from<decay_t<Arg>, Arg>
+        constexpr auto operator()(Arg&& arg) const {
+          // Rangeアダプタの引数事前適用処理
+          return std::__range_adaptor_closure_t(std::__bind_back(*this, std::forward<Arg>(arg)));
+        }
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor xxx{};
+  }
+
+  // Rangeアダプタクロージャの場合
+  namespace views {
+
+    namespace detail {
+        
+      struct xxx_adoptor_closure : public std::__range_adaptor_closure<xxx_adoptor_closure>
+      {
+        template<std::ranges::viewable_range R>
+        constexpr auto operator()(R&& r) const {
+          // xxx_viewの生成処理
+        }
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor_closure xxx{};
+  }
+}
+```
+
+clangもMSVCの場合同様に、Rangeアダプタの追加の引数を事前適用する処理を自分で記述する必要があります。とはいえ内部実装を流用すればほぼ定型文となり、Rangeアダプタクロージャオブジェクト型の場合も`__range_adaptor_closure`を継承するだけです。
+
 ### C++23から
+
+これら実装を見ると、自作の`view`型を標準のものと混ぜてパイプで使用することはあまり想定されていなかったっぽいことが察せられます。そもそも`view`を自作することってそんなにある？ということは置いておいて、この事態はあまり親切ではありません。
+
+これまでもちらちら出ていましたが、この状況は[P2287](https://wg21.link/p2387r3)の採択によってC++23で改善されています。それによって、MSVC/clangの実装とほぼ同等に使用可能なユーティリティ`std::ranges::range_adaptor_closure`と`std::bind_back`が用意されます。これを利用すると次のように書けるようになります。
+
+```cpp
+namespace myrange {
+
+  template<std::ranges::view V>
+  class xxx_view;
+
+  // Rangeアダプタの場合
+  namespace views {
+
+    namespace detail {
+      
+      struct xxx_adoptor {
+
+        template<std::ranges::viewable_range R, typename... Args>
+        constexpr auto operator()(R&& r, Args&&... args) const {
+          // xxx_viewの生成処理
+        }
+
+        template <typename Arg>
+            requires constructible_from<decay_t<Arg>, Arg>
+        constexpr auto operator()(Arg&& arg) const {
+          // Rangeアダプタの引数事前適用処理
+          return std::ranges::range_adaptor_closure(std::bind_back(*this, std::forward<Arg>(arg)));
+        }
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor xxx{};
+  }
+
+  // Rangeアダプタクロージャの場合
+  namespace views {
+
+    namespace detail {
+        
+      struct xxx_adoptor_closure : public std::ranges::range_adaptor_closure<xxx_adoptor_closure>
+      {
+        template<std::ranges::viewable_range R>
+        constexpr auto operator()(R&& r) const {
+          // xxx_viewの生成処理
+        }
+      };
+    }
+
+    inline constexpr detail::xxx_adoptor_closure xxx{};
+  }
+}
+```
+
+これはC++23以降の世界で完全にポータブルです。ただし、MSVC/clang同様に、Rangeアダプタの追加の引数を事前適用する処理を自分で記述する必要があります。とはいえそれはやはりほぼ定型文まで簡略化されます。
 
 ### 参考文献
 
 - [GCC10 `<ranges>` - github](https://github.com/gcc-mirror/gcc/blob/releases/gcc-10.2.0/libstdc++-v3/include/std/ranges)
 - [GCC11 `<ranges>` - github](https://github.com/gcc-mirror/gcc/blob/releases/gcc-11.2.0/libstdc++-v3/include/std/ranges)
+- [MSVC `<ranges>` - github](https://github.com/microsoft/STL/blob/main/stl/inc/ranges)
 - [C++20 状態を持たないラムダ式を、デフォルト構築可能、代入可能とする - cpprefjp](https://cpprefjp.github.io/lang/cpp20/default_constructible_and_assignable_stateless_lambdas.html)
 - [P2281R1 Clarifying range adaptor objects](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2281r1.html)
 - [P2281R1 Clarifying range adaptor objects - WG21月次提案文書を眺める（2021年01月）](https://onihusube.hatenablog.com/entry/2021/02/11/153333#P2281R0-Clarifying-range-adaptor-objects)
