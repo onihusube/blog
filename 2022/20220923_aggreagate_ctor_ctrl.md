@@ -190,6 +190,9 @@ static_assert(not std::movable<A>);
 
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/simJQwq1Nc5eZivH)
 
+
+この時、ムーブもコピーも不可能なのに`f()`から`A`の値を返せているのは、C++17から保証されるようになった[コピー省略](https://cpprefjp.github.io/lang/cpp17/guaranteed_copy_elision.html)の効果によります。
+
 3の場合（いつ？
 
 ```cpp
