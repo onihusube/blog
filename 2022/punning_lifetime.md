@@ -23,6 +23,8 @@ std::uint64_t punning(double v) {
 
 ### C++20以前の方法
 
+以下の3つの方法のうち、最初の2つは未定義動作となる危険な手法です。
+
 #### `reinterpret_cast`
 
 `reinterpret_cast`はこういう場合に誰もが簡単に思いつく方法だと思います。
@@ -36,7 +38,7 @@ std::uint64_t punning(double v) {
 }
 ```
 
-ポインタは単にメモリアドレスであってメモリのどこかを指しているのだから、これは動作しそうに思えます。不思議ですね。
+ポインタは単にメモリアドレスであってメモリのどこかを指していてそこから値を読み出すだけなので、これは動作しそうに思えます。不思議ですね。
 
 #### `union`
 
@@ -124,9 +126,81 @@ To bit_cast_by_memcpy(const From& from) {
 
 よく、`reinterpret_cast`や`union`による方法が未定義動作となるのはStrict Aliasing Ruleに抵触しているからだと言われます。たしかに`memcpy`の方法は抵触していませんが、`std::bit_cast`はどうなのでしょうか？`std::bit_cast`が合法なのはそういう関数だからでしょうか？それともコンパイラマジックで実装されるから？もちろん、そうではありません。
 
-その境界線上にあるのはオブジェクトの生存期間（*lifetime*）という概念です。すなわち、合法で行える方法は常に生存期間内にあるオブジェクトを参照してしかいません。
+その境界線を別つのは、オブジェクトの生存期間（*lifetime*）という概念です。合法で行える方法は常に生存期間内にあるオブジェクトを参照してしかいません。
+
+`union`による方法で見てみましょう
+
+```cpp
+#include <bit>
+
+std::uint64_t punning(double v) {
+  union U {
+    double d;
+    std::uint64_t n;
+  };
+
+  // doubleで初期化
+  U u{v}; // (1)
+
+  // uint64_tとして読み出し
+  return u.n; // (2)
+}
+```
+
+C++の共用体オブジェクトが生存期間内にある場合、そのメンバ変数はいずれか1つだけが生存期間内にあります。このメンバのことを特にアクティブメンバと呼びます。すなわち、(1)の部分で初期化されているのは`u.d`のみであり、以降この関数内で生存期間内にある`U`のメンバは`u.d`のみです。
+
+```cpp
+#include <bit>
+
+std::uint64_t punning(double v) {
+  union U {
+    double d;
+    std::uint64_t n;
+  };
+
+  U u{v}; // ok、u.dをアクティブメンバとして初期化、u.dの生存期間が開始
+
+  return u.n; // ub、u.nの生存期間は始まっていない（アクティブメンバはu.d）
+}
+```
+
+C++において、生存期間外にあるオブジェクトの操作（値の読み出しや非静的メンバ関数/変数の使用）は未定義動作です。したがって、`union`の方法が未定義となるのは`return`文で非アクティブなメンバの値を読み出そうとしているところです。
+
+共用体メンバの生存期間を切り替えるには明示的に非アクティブなメンバを初期化する必要がありますが、この関数ではそれは行われていません。
+
+```cpp
+U u{1.0}; // u.dがアクティブメンバ
+
+{
+  double d = u.d; // ok
+  int n = u.n;    // ub、u.nは生存期間外
+}
+
+u.n = 10; // ok、u.dの生存期間は終了しu.nの生存期間が開始される
+
+{
+  double d = u.d; // ub、u.dは生存期間外
+  int n = u.n;    // ok
+}
+```
+
+これを踏まえると、`reinterpret_cast`の方法もポインタの参照先で生存期間内にあるオブジェクトとは別のオブジェクトに対してアクセスしようとしているため、未定義動作を踏んでいることがわかるでしょう。
+
+```cpp
+#include <bit>
+
+std::uint64_t punning(double v) {
+  auto* p reinterpret_cast<const std::uint64_t*>(&v); // vには当然、double型のオブジェクトが生存期間内にある
+  return *p;  // ub、pの参照先ではuint64_tのオブジェクトが生存期間内にない
+}
+```
+
+これらが未定義となる理由がStrict Aliasing Ruleに抵触しているからという言説が間違っているとは言っていません。後述しますがおそらく、C++においてはそれも結局突き詰めるとこのオブジェクト生存期間の問題に帰結するためです。
 
 ### オブジェクト生存期間とC++のポインタ
+
+### Strict Aliasing Rule
+
 
 ### `std::launder`
 
@@ -134,9 +208,12 @@ To bit_cast_by_memcpy(const From& from) {
 
 ### Pointer lifetime-end zap
 
-### Strict Aliasing Rule
 
 ### pointer interconvertible
+
+### implicitly create objects
+
+### implicit-lifetime types
 
 ### 参考文献
 
@@ -144,3 +221,4 @@ To bit_cast_by_memcpy(const From& from) {
 - [`std::bit_cast` - cppreference](https://en.cppreference.com/w/cpp/numeric/bit_cast)
 - [bit_cast 実装イメージと未定義動作の話・ Issue #664 - cpprefjp/site](https://github.com/cpprefjp/site/issues/664)
 - [（翻訳）C/C++のStrict Aliasingを理解する または - どうして#$@##@^%コンパイラは僕がしたい事をさせてくれないの！ - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20120220/p1)
+- [Lifetime - cppreference](https://en.cppreference.com/w/cpp/language/lifetime)
