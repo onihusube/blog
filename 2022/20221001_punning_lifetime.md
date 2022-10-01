@@ -1,5 +1,7 @@
 # ［C++］type punningとオブジェクト生存期間
 
+この記事は規格書や提案文書から読み取れる暗黙の気持ちを前提にしている部分があり、必ずしも出典や根拠が明確でない場合があります。
+
 [:contents]
 
 ### `std::bit_cast`
@@ -234,7 +236,7 @@ std::uint64_t punning(double v) {
 >     // この時点で、*t1pのTrivially Copyableな型の全てのサブオブジェクトには、*t1pの対応するサブオブジェクトと同じ値が含まれる
 > ```
 
-ここに書かれているのは、まず、*Trivially Copyable*な任意の型`T`のオブジェクトについてバイト表現をバイト列（`char, std::byte`等の配列）としてコピーすることができて、別の場所にコピーしたものを後で書き戻した後で、そのオブジェクトはコピーした時点と同じ値を持つということです。そして、同じ*Trivially Copyable*な型`T`のオブジェクトの間でバイト表現をコピーすることもできて、その場合はコピー元とコピー先オブジェクトは同じ値を持つということです。
+ここに書かれているのは、まず、*Trivially Copyable*な任意の型`T`のオブジェクトについてバイト表現をバイト列（`char, std::byte`等の配列）としてコピーすることができて、別の場所にコピーしたものを後で書き戻した後で、そのオブジェクトはコピーした時点と同じ値を持つということです。そして、同じ*Trivially Copyable*な型`T`のオブジェクトの間でバイト表現を直接コピーすることもできて、その場合はコピー元とコピー先オブジェクトは同じ値を持つということです。
 
 これら2つの規定からまず読み取れることは、`memcpy`によるバイト表現の上書きコピーはオブジェクトの生存期間を終了させないということです。
 
@@ -242,7 +244,7 @@ std::uint64_t punning(double v) {
 
 ただし、[`std::bit_cast`の規定](http://eel.is/c++draft/bit.cast#2)にあるように、不定値やそれを含むオブジェクトからのコピーや、コピーしたバイト表現に対応する値をコピー先オブジェクトが持たない場合、結果は未規定ないし未定義動作になるでしょう。
 
-とはいえ、これらの推測は明確に書かれていることではないので間違っているかもしれません（詳しい方いましたら教えてください・・・）。しかし、`memcpy`によるtype punningが合法であるのは間違いないはずです。
+とはいえ、これらの推測は明確に書かれていることではないので間違っているかもしれません（ご指摘歓迎です）。しかし、`memcpy`によるtype punningが合法であるのは間違いないはずです。
 
 ### 制約について
 
@@ -264,3 +266,5 @@ std::uint64_t punning(double v) {
 - [bit_cast 実装イメージと未定義動作の話・ Issue #664 - cpprefjp/site](https://github.com/cpprefjp/site/issues/664)
 - [（翻訳）C/C++のStrict Aliasingを理解する または - どうして#$@##@^%コンパイラは僕がしたい事をさせてくれないの！ - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20120220/p1)
 - [What is the Strict Aliasing Rule and Why do we care? - Github](https://gist.github.com/shafik/848ae25ee209f698763cffee272a58f8)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2022/20221001_punning_lifetime.md)
