@@ -1,7 +1,5 @@
 # ［C++］type punningとオブジェクト生存期間
 
-この記事は規格書や提案書の様々な部分から感じ取れる規格文書の気持ちについての私の理解をまとめたものであり、必ずしも根拠や出典が明記されていない場合があり、内容も間違っている可能性があります。いわばポエムです。
-
 [:contents]
 
 ### `std::bit_cast`
@@ -213,19 +211,21 @@ std::uint64_t punning(double v) {
 
 近しい規定は[[basic.types.general]/2](http://eel.is/c++draft/basic.types.general#2)
 
-> *Trivially Copyable*な型`T`の任意のオブジェクト（*potentially-overlapping*サブオブジェクトを除く）は、そのオブジェクトが型`T`の有効な値を保持しているかどうかに関わらず、基礎となるバイトを`char, unsigned char, std::byte`の配列にコピーすることができる。
+> *Trivially Copyable*な型`T`の任意のオブジェクト（*potentially-overlapping*サブオブジェクトを除く）は、そのオブジェクトが型`T`の有効な値を保持しているかどうかに関わらず、基礎となるバイトを`char, unsigned char, std::byte`の配列にコピーすることができる。  
 > その配列の内容が元のオブジェクトにコピーし直された場合、オブジェクトはその後元の値を保持する。
+> 
 > ```cpp
 > constexpr std::size_t N = sizeof(T);
 > char buf[N];
 > T obj;                          // objは元の値で初期化されている
-> std::memcpy(buf, &obj, N);      // この2つのmemcpy呼び出しの間に、objは変更されうる
+> std::memcpy(buf, &obj, N);      // この2つのmemcpy呼び出しの間にobjが変更されたとしても
 > std::memcpy(&obj, buf, N);      // この時点で、objのスカラ型のサブオブジェクトは元の値を保持する
 > ```
 
 及び[[basic.types.general]/3](http://eel.is/c++draft/basic.types.general#3)に見つけることができます。
 
 > *Trivially Copyable*な型`T`の異なる2つのオブジェクト`obj1, obj2`（`obj1`と`obj2`は*potentially-overlapping*サブオブジェクトではない）は、`obj1`を構成する基礎となるバイトが`obj2`にコピーされると、その後`obj2`は`obj1`と同じ値を保持する。
+> 
 > ```cpp
 > T* t1p;
 > T* t2p;
@@ -250,112 +250,17 @@ std::uint64_t punning(double v) {
 
 前項の`memcpy`の規定に関しても、型が*Trivially Copyable*である場合にのみ保証されています。
 
-# オブジェクト生存期間とC++のポインタ意味論
+### おわり
 
-### `reinterpret_cast`によるpunning
+ここまで読むと、type punningの合法性についてStrict Aliasing Ruleに抵触しているからという理由は間違っているのか？と思うかもしれませんが、そうではありません。この記事の最終的な主張はここで述べていることとStrict Aliasing Ruleによることは同じ事について別の側面から見たものにすぎず、同じことを言っているという事です。
 
-`reinterpret_cast`によるtype punningが未定義となる次のコードをもう一度見てみます。
-
-```cpp
-#include <bit>
-
-std::uint64_t punning(double v) {
-  auto* p reinterpret_cast<const std::uint64_t*>(&v); // vには当然、double型のオブジェクトが生存期間内にある
-  return *p;  // ub、pの参照先ではuint64_tのオブジェクトが生存期間内にない
-}
-```
-
-このコードから読み取れる事は、ポインタが我々（誰？）の思っているような物ではないのではないか？という事です。
-
-ポインタとはアドレスでありアドレスはメモリ空間のどこか一点を指している整数値、というのがよくあるポインタの認識かと思います。そのようなメンタルモデルに従えば、このコードから問題を見出す事はできないし、生存期間がーと言われても釈然としないものがあります。さらにいえば、`union`による方法が動作するはずという考えはそのようなメンタルモデルの延長線上にあります。
-
-### ポインタはオブジェクトのエイリアスです！
-
-現代（少なくともC++20時点）のC++において、ポインタとはオブジェクトのエイリアス（別名）です。メモリのアドレスを示す整数値ではありません。
-
-
-#### エイリアス？
-
-例えば、ローカルスコープのオブジェクトは初期化されその生存期間が開始する時に、同時に名前が付けられます。
-
-```cpp
-int main() {
-  int a = 0;  // int型のオブジェクトを0で初期化し作成、aという名前をつける
-
-  // aという名前を介してオブジェクトにアクセスできる
-  a = 10;
-  int a2 = a; // a2とaは別のオブジェクト
-}
-```
-
-この名前は一度つけると変更できず、通常名前の有効期間はオブジェクトの生存期間と一致するため、オブジェクトとこの名前は同一視することができます。
-
-一度名付けられたオブジェクトは名前と一対一対応しておりそれを切り離す事はできませんが、オブジェクトには別の名前をつけて扱うことができます。このオブジェクトの別名のことをエイリアスと呼びます。
-
-```cpp
-int main() {
-  int a = 0;  // int型のオブジェクトを0で初期化し作成、aという名前をつける
-
-  // オブジェクトaのエイリアス（別名）
-  int& b = a;
-  int* c = &q;
-
-  // エイリアスを介してもオブジェクトにアクセスできる
-  b = 10;
-  *c = 20;
-
-  int a2 = b;
-  int a3 = *c;
-}
-```
-
-C++における最も基本的なエイリアスは参照であり、ポインタもまたエイリアスの一種です。
-
-なお、ヒープ領域に構築されたオブジェクトには名前をつけることができないため、エイリアスを介してしかアクセスできません。
-
-#### ポインタの実装
-
-ポインタとはオブジェクトのエイリアスである、というのはC++の意味論においての話でその実装は多くの場合メモリアドレスによって行われます。その場合でも、C++の意味論におけるポインタはオブジェクトのエイリアスでしかなく、単なるメモリアドレス値だと思って行うことのできる多くの操作には保証がありません。
-
-ただし、先に生まれたのはメモリアドレスとしてのポインタであり、現代の実行環境はほぼその時の実体と互換性があるので、多くの技法は実際には意図通りに動作するでしょう。これがまた、話をややこしくしている原因の一つでもあります・・・
-
-### ポインタのもう一つの役割:ストレージインスタンス
-
-
-### 配列のポインタ？
-
-よく知られているように、配列オブジェクト（の名前及びエイリアス）はかなりの場所で配列の先頭オブジェクトへのポインタに変換されます。また、そのように取得したポインタは整数値との演算によって配列内の別の要素のポインタとして扱うことができ、さらには、配列の最後の要素の1つ後ろのポインタ（オブジェクトが存在しない場所）は特別に存在が許されています。そして、ポインタは順序付け比較が可能だと思われています。これらの性質はポインタがメモリアドレスであることを前提としており、それを雄弁に物語っているように見えるかもしれません。
-
-ポインタのこれらの性質は、生配列に対するイテレータの役割をポインタに担わせてしまった結果の産物であり、歴史的経緯によるものに過ぎません。配列型から取得したポインタはイテレータであり、それはポインタとは異なるものと思うのが良いでしょう。また、ポインタの順序付け比較は通常同じ配列内や同じクラス内のサブオブジェクト間でのみ定義されており、任意のポインタの間で可能ではありません。これもまた、配列のインデックス順序によってイテレータ順序を定義しようとした際にそれをアドレスとしてのポインタ値をベースとして規定しまった結果です。
-
-配列に対する配列ポインタの誕生は、人類がイテレータ概念を獲得した瞬間でもありますが、ポインタとイテレータを同一視してしまったのは後に禍根を残す永遠の失敗です。実装がポインタだったとしても、意味論としてポインタとは区別するべきでした。
-
-もちろん歴史的にはイテレータは配列ポインタを抽象化することで得られたものです。しかしそれは歴史でしかなく、現代のポインタ意味論からすると黒歴史です。
-
-### Strict Aliasing Rule
-
-
-### `std::launder`
-
-### `reinterpret_cast`
-
-### Pointer lifetime-end zap
-
-### Pointerのprovenance
-
-### pointer interconvertible
-
-### implicitly create objects
-
-### implicit-lifetime types
+実のところ、これはそのような主張のポエムの序文です。次回は、ここでの`reinterpret_cast`によるtype punningのコードから出発して、オブジェクト生存期間とポインタについての独自研究が展開される予定です。
 
 ### 参考文献
 
 - [`std::bit_cast` - cpprefjp](https://cpprefjp.github.io/reference/bit/bit_cast.html)
 - [`std::bit_cast` - cppreference](https://en.cppreference.com/w/cpp/numeric/bit_cast)
+- [Lifetime - cppreference](https://en.cppreference.com/w/cpp/language/lifetime)
 - [bit_cast 実装イメージと未定義動作の話・ Issue #664 - cpprefjp/site](https://github.com/cpprefjp/site/issues/664)
 - [（翻訳）C/C++のStrict Aliasingを理解する または - どうして#$@##@^%コンパイラは僕がしたい事をさせてくれないの！ - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20120220/p1)
-- [Lifetime - cppreference](https://en.cppreference.com/w/cpp/language/lifetime)
-- [P0593R6 Implicit creation of objects for low-level object manipulation](https://wg21.link/p0593r6)
 - [What is the Strict Aliasing Rule and Why do we care? - Github](https://gist.github.com/shafik/848ae25ee209f698763cffee272a58f8)
-- [旧石器時代のポインタをご利用の皆様へ ～provenance入門～ - Qiita](https://qiita.com/__pandaman64__/items/1788a90ae5be79cc908b)
