@@ -116,14 +116,14 @@ int main() {
   {
     // 範囲forの外で受けておく
     auto tmp = f();
-    for (auto&& c : tmp) {  // ✅ ok
+    for (auto&& c : tmp.at(0)) {  // ✅ ok
       ...
     }
   }
 
   {
     // 初期化式を利用する
-    for (auto tmp = f(); auto&& c : tmp) {  // ✅ ok
+    for (auto tmp = f(); auto&& c : tmp.at(0)) {  // ✅ ok
       ...
     }
   }
