@@ -317,3 +317,5 @@ P2644によれば、P2012が合意を得られなかったのは本質的な一�
 - [P2644 Get Fix of Broken Range-based for Loop Finally Done - cplusplus/papers](https://github.com/cplusplus/papers/issues/1316)
 - [P2012R0 Fix the range-based for loop, Rev0ix the range-based for loop - WG21月次提案文書を眺める（2020年11月）](https://onihusube.hatenablog.com/entry/2020/12/06/015108#P2012R0-Fix-the-range-based-for-loop-Rev0ix-the-range-based-for-loop)
 - [P2644R0 Get Fix of Broken Range-based for Loop Finally Done - WG21月次提案文書を眺める（2022年10月）](https://onihusube.hatenablog.com/entry/2022/11/13/233529#P2644R0-Get-Fix-of-Broken-Range-based-for-Loop-Finally-Done)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2022/20221204_range_for_fix_cpp23.md)
