@@ -1,4 +1,4 @@
-# ［C++］暗黙ムーブの副作用
+# ［C++］暗黙ムーブの副作用による安全性
 
 C++23から、参照を返す関数においてローカル変数を直接返すケースがコンパイルエラーとなるようになります。
 
@@ -14,15 +14,266 @@ int main() {
 }
 ```
 
-これは意図された振る舞いであるとはいえ個別の提案によって導入されたものではなく、一見関係なさそうな別の提案の副作用として導入されました。それは、[P2266R3 Simpler implicit move](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2266r3.html)という提案で、これは`return`文における暗黙ムーブの機会を拡大しようとするものです。
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/cUUo3iMkQubfv6kz)
+
+これは意図された振る舞いであるとはいえ個別の提案によって導入されたものではなく、一見関係なさそうな別の提案の副作用として導入されました。それは[P2266R3 Simpler implicit move](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2266r3.html)という提案で、これは`return`文における暗黙ムーブの機会を拡大しようとするものです。
+
+[:contents]
 
 ### 暗黙ムーブ
 
-暗黙ムーブとはC++11で許可された戻り値最適化（*Return value optimization*）の一種で、ローカル変数が`return`文でコピーされた返される場合に暗黙的にムーブを行うことでコピーを回避する最適化のことです。
+暗黙ムーブとはC++11で許可された戻り値最適化（*Return value optimization*）の一種で、ローカル変数が`return`文でコピーされて返される場合に暗黙的にムーブを行うことでコピーを回避する最適化のことです。
 
-### P2266の概要
+```cpp
+struct Widget {
+  Widget(Widget&&);
+};
+
+Widget one(Widget w) {
+  return w;  // ローカル変数の暗黙ムーブ、C++11から
+}
+
+struct RRefTaker {
+  RRefTaker(Widget&&);
+};
+
+RRefTaker two(Widget w) {
+  return w;  // ローカル変数の暗黙ムーブ、C++11(CWG1579)
+}
+```
+
+C++11では関数のローカル変数のみが暗黙ムーブの対象でしたが、C++20（[P1825R0 Merged wording for P0527R1 and P1155R3](https://wg21.link/P1825R0)）では関数ローカルの右辺値参照も暗黙ムーブ対象になったほか、`return`文だけではなく`throw`式でも起こるようになり、型変換演算子等の変換を考慮するようになりました。
+
+```cpp
+RRefTaker three(Widget&& w) {
+  return w;  // ローカル右辺値参照の暗黙ムーブ、C++20(P0527)
+}
+
+[[noreturn]]
+void four(Widget w) {
+  throw w;  // throw式での暗黙ムーブ、C++20(P1155)
+}
+
+struct From {
+  From(Widget const &);
+  From(Widget&&);
+};
+
+struct To {
+  operator Widget() const &;
+  operator Widget() &&;
+};
+
+From five() {
+  Widget w;
+  return w;  // 暗黙ムーブ（コンストラクタによる変換）、C++11
+}
+
+Widget six() {
+  To t;
+  return t;  // 暗黙ムーブ（変換演算子による変換）、C++20(P1155)
+}
+
+struct Fowl {
+  Fowl(Widget); // 値で受け取るコンストラクタ
+};
+
+Fowl seven() {
+  Widget w;
+  return w;  // 暗黙ムーブ、C++20(P1155)
+}
+
+// DerivedはBaseを公開継承しているとき
+Base eight() {
+  Derived result;
+  return result;  // 暗黙ムーブ（基底クラスへの変換）、C++20(P1155)
+}
+```
+
+### C++20時点の暗黙ムーブ仕様の概要
+
+まず、暗黙ムーブ可能なもの（*implicitly movable entity*）とは次のどちらかです
+
+- 自動記憶域期間の非`volatile`オブジェクト
+- 自動記憶域期間の非`volatile`型の右辺値参照
+
+そして、次のどちらかのコンテキストでコピーによる初期化が行われる場合、コピーの代わりにムーブを使用して初期化することが許可されています（必須ではありません）
+
+- `return`/`co_return`文
+    - オペランドはid式（変数名を指定する式）であり
+    - id式は、その文を囲む最も内側の関数（ラムダ式）の本体内もしくは関数引数宣言内の、暗黙ムーブ可能なものを指定している
+- `throw`式
+    - オペランドはid式であり
+    - そのid式のスコープは、囲む最も内側の`try`ブロックのスコープよりも長くなく
+    - id式は暗黙ムーブ可能なものを指定している
+
+これらの細かい条件は、暗黙ムーブが起きた後でアクセスされる可能性のある変数を除くための条件です。
+
+これらのコンテキストにおいて、`throw`するオブジェクトを生成するためのコピーコンストラクタもしくは戻り値を生成するためのコンストラクタを選択するためのオーバーロード解決は次の順序で実行されます
+
+1. オペランドのid式を*rvalue*とみなしてオーバーロード解決を実行する
+2. 1が失敗した（もしくは行われなかった）場合、オペランドのid式を*lvalue*としてオーバーロード解決を実行する
+
+暗黙ムーブはこの最後の手順における1において起こっており、その対象は*implicitly movable entity*として指定されます。対象外のコンテキストや暗黙ムーブが行われない場合は2の手順だけが実行されます。
+
+### C++23 P2266の概要
+
+C++20の仕様では、暗黙ムーブが起こるのは関数の戻り値型がオブジェクト型である場合のみであり、参照型の場合は暗黙ムーブ可能なものを`return`していても暗黙ムーブは起こりません。
+
+```cpp
+int&& four(int&& w) {
+  return w;  // Error
+}
+```
+
+なぜなら、暗黙ムーブが起こるコンテキストとはコピーによる初期化が行われる場合なので、参照戻り値型の関数の`return`文はそもそも対象外のコンテキストとなるためです。
+
+また、C++20の暗黙ムーブの仕様は2段階のオーバーロード解決を含む複雑な処理になっており、実装が困難なことから実装による挙動の差異を生んでいました。
+
+P2266R3ではこれらの問題の解決のために、`return`文におけるムーブする資格のあるid式（*move-eligible id-expression*）は*xvalue*である、と規定することによって暗黙ムーブ仕様を簡素化します。
+
+これによって、暗黙ムーブ可能なもの（*implicitly movable entity*）は次のコンテキスト
+
+- `return`/`co_return`文
+    - オペランドはid式（変数名を指定する式）であり
+    - id式は、その文を囲む最も内側の関数（ラムダ式）の本体内もしくは関数引数宣言内の、暗黙ムーブ可能なものを指定している
+- `throw`式
+    - （略）
+
+（ここは変更なし）
+
+でid式によって指名される場合、そのid式はムーブする資格がある（*move-eligible*）となります。そして、ムーブする資格のあるid式の値カテゴリは`xvalue`であると規定されます。
+
+`return`文でコピーによる初期化が行われるかどうかに関係なく、ムーブする資格のある変数名を指定した`return`文はそれを`xvalue`として扱う（すなわち`std::move()`したかのように扱う）ことで暗黙ムーブが行われます。また、`return`文に指定された式の値カテゴリを指定した後の仮定は通常の`return`文の仕様に従うため、2段階のオーバーロード解決をする必要もなくなっています。
+
+先程の例をもう一度見てみると
+
+```cpp
+int&& four(int&& w) {
+  return w;  // 暗黙ムーブ、C++23
+  //return std::move(w); のような扱いになっている
+}
+```
+
+`w`は暗黙ムーブ可能なもの（右辺値参照`int&&`）であり、`return`文ではid式`w`でそれを指定しています。`w`はこの関数の引数で宣言されているため（この関数スコープよりも寿命が長くはないため）このid式`w`はムーブする資格のあるid式であり、値カテゴリは*xvalue*（すなわち、`int&&`）となり、戻り値型と合うため特に変換されずに`return`されます。
+
+また、このような仕様の単純化によって、暗黙ムーブはされる可能性があるから必須になっています（必須になったのはこの提案より前かもしれません）。
 
 ### ダングリング参照生成の抑止
+
+P2266R3の変更によって、`return`文における暗黙ムーブは（非`volatile`）ローカル変数を*xvalue*として扱うだけのものになり、それは常に行われます。これは関数の戻り値型に関わらずいつも行われます。
+
+```cpp
+int& f() {
+  int n = 10;
+
+  return n; // ng、暗黙ムーブが起こることで、型が一致しなくなる
+}
+```
+
+すると、左辺値参照を返す関数内の`return`文でローカル変数を直接指定すると、それは常に*xvalue*として（ムーブされたかのように）扱われることとなり、`T&&`を`T&`で返そうとすることになった結果コンパイルエラーを起こすようになります。
+
+これは同じメカニズムで`std:reference_wrapper`でも有効です
+
+```cpp
+std::reference_wrapper<int> f() {
+  int w;
+  
+  return w;  // ng、C++23から
+}
+```
+
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/xyJeDTziulEMaj18)
+
+
+これは`return`文で`int&& -> std::reference_wrapper<int>`の変換が起こりますが、このような変換は[`std::reference_wrapper`のコンストラクタ](https://cpprefjp.github.io/reference/functional/reference_wrapper/op_constructor.html)で禁止されているためです（禁止の方法はかなり複雑ですが・・・）。
+
+ただし、間接化が1段階増えると、つまりローカル変数を参照している参照を返そうとすると、防ぐことができなくなります。
+
+```cpp
+int& f() {
+  int n = 10;
+  int& r = n;
+
+  return r; // UB
+}
+
+std::reference_wrapper<int> g() {
+  int w;
+  int& r = w;
+  
+  return r;  // UB
+}
+```
+
+- [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/zohVb6aE9ETd14qe)
+
+なぜかというと、どちらの場合も`return`文で指定されている`r`はローカルの左辺値参照であり、暗黙ムーブ可能なもの（*implicitly movable entity*）ではないためムーブする資格（*move-eligible*）はなく、`return`文での変換はその値カテゴリのまま行われ、`int&`を返そうとするためどちらの場合も問題なくコンパイルが通ってしまいます。
+
+あくまで、左辺値参照を返す関数から**直接**ローカル変数を返そうとする場合にのみ保護が働きます。
+
+提案より、その他サンプルコード
+
+```cpp
+struct Weird {
+  Weird();
+  Weird(Weird&);
+};
+
+Weird g(bool b) {
+  static Weird w1;
+  Weird w2;
+
+  if (b) {
+    return w1;  // OK: Weird(Weird&)
+  } else {
+    return w2;  // error: w2はこのコンテキストでxvalue
+  }
+}
+```
+
+```cpp
+// 戻り値型推論の差異
+auto f(int x) -> decltype((x)) { return (x); }   // 戻り値型は"int&"
+auto g(int x) -> decltype(auto) { return (x); }  // 戻り値型は"int&&"
+```
+
+```cpp
+int& h(bool b, int i) {
+  static int s;
+  if (b) {
+    return s;  // OK
+  } else {
+    return i;  // error: iはxvalue
+  }
+}
+
+decltype(auto) h2(Thing t) {
+  return t;  // OK: tはxvalue、戻り値型はThing
+}
+
+decltype(auto) h3(Thing t) {
+  return (t);  // OK: (t)はxvalue、戻り値型はThing&&
+}
+```
+
+```cpp
+// Annex CセクションのC++20との非互換性レポート
+decltype(auto) f(int&& x) { return (x); }  // int&&を返す。以前は int&を返していた
+int& g(int&& x) { return x; }  // ill-formed; 以前は well-formed
+```
+
+### この変更の意味するところ
+
+P2266R3の変更が実装された（執筆時点でもclang 13/gcc 13で実装済）場合、C++規格は、コンパイラが関数内でローカル変数とそうでないものを区別できること（あるいはその能力）を仮定するようになります。これはよく考えると当たり前のことかもしれません（自動変数というカテゴリが存在しているため）が、今までこの能力が明示的に仮定されて利用されてはいなかったと思います。
+
+この能力を利用すると、さらなるダングリング参照の抑止方法を考えることができ、既にそのような提案が提出されています。
+
+- [P2740R0 Simpler implicit dangling resolution](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2740r0.html)
+- [P2742R0 indirect dangling identification](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2742r0.html)
+- [P2750R0 C Dangling Reduction](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2750r0.html)
+
+P2266R3やこれらの提案が導入されてもC++が完全に安全な言語になるわけではありませんが、その安全性はわずかでも確実に向上します。
 
 ### 参考文献
 
