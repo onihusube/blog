@@ -31,7 +31,7 @@ concept constant-iterator =
   same_as<iter_const_reference_t<It>, iter_reference_t<It>>;
 ```
 
-`constant-iterator`コンセプトの主要な部分は2つ目の制約式で、この制約式は入力のイテレータ型`It`二対して、その`iter_const_reference_t`と`iter_reference_t`が一致することを求めています。[`iter_reference_t`](https://cpprefjp.github.io/reference/iterator/iter_reference_t.html)はイテレータの間接参照（`*`）の直接の結果型のことで、どうやらそれが`const`になっていればこの制約式を満たせるように見えます。
+`constant-iterator`コンセプトの主要な部分は2つ目の制約式で、この制約式は入力のイテレータ型`It`に対して、その`iter_const_reference_t`と`iter_reference_t`が一致することを求めています。[`iter_reference_t`](https://cpprefjp.github.io/reference/iterator/iter_reference_t.html)はイテレータの間接参照（`*`）の直接の結果型のことで、どうやらそれが`const`になっていればこの制約式を満たせるように見えます。
 
 この`iter_const_reference_t`は`views::as_const`と共にC++23で追加されたエイリアステンプレートで、次のように定義されています
 
@@ -49,12 +49,10 @@ using iter_const_reference_t =
 
 `views::as_const`の入力範囲が`constant_range`ではない場合、`views::as_const`は次にその型を何とかこねくり回して要素の`const`化が達成できないかを試行します。それが叶わない場合、入力範囲を`as_const_view`に渡して返すことで要素型の`const`変換を行います。
 
-`views::as_const`が`as_const_view`を使用する場合、そのイテレータは`std::ranges::cbegin()`から取得されます。`ranges::cbegin()`はC++23で確実に要素が`const`になっているイテレータを返すように改修されており、型`T`の式`E`とそれの評価結果の左辺値を`t`として`ranges::cbegin(E)`のように呼ばれた時
+`views::as_const`が`as_const_view`を使用する場合、そのイテレータは`std::ranges::cbegin()`から取得されます。`ranges::cbegin()`はC++23で確実に要素が`const`になっているイテレータを返すように改修されており、型`T`の式`E`とそれの評価結果の左辺値を`t`として`ranges::cbegin(E)`のように呼ばれた時次のようなことを行います
 
 - `enable_borrowed_range<remove_cv_t<T>> == false`ならば、ill-formed
 - そうではない場合、式`U`を`ranges​::​begin(possibly-const-range(t))`として、`const_iterator<decltype(U)>(U)`を返す
-
-のように定義されています。
 
 `possibly-const-range`は説明専用の関数であり、次のように定義されています
 
@@ -166,7 +164,7 @@ int main() {
 - [[Wandbox]三へ( へ՞ਊ ՞)へ ﾊｯﾊｯ](https://wandbox.org/permlink/zlMRT9ZphxjcPziL)
 - [godbolt](https://godbolt.org/z/6q61deaWs)
 
-イテレータ型`I`の参照型（`iter_reference_t<I>`）を`T`とし、型`T`に対して特に`basic_common_reference`特殊化が行われていないとして、これによると`T`によって`std::iter_const_reference_t<I>`は次のようになります
+イテレータ型`I`の参照型（`iter_reference_t<I>`）を`T`（+修飾）とし、型`T`に対して特に`basic_common_reference`特殊化が行われていないとして、これによると`T`によって`std::iter_const_reference_t<I>`は次のようになります
 
 |`iter_reference_t<I>`|`iter_const_reference_t<I>`|
 |---|---|
@@ -206,10 +204,14 @@ int main() {
 
 `range_const_reference_t`は`iter_const_reference_t`の`range`版で、`iter_const_reference_t<iterator_t<R>>`として定義されています。
 
-`zip`と`enumrate`の結果をみると想像がつくかもしれませんが、`std::tuple<Ts...>`と`std::tuple<Us...>`の`common_reference`とは、`std::tuple<std::common_reference_t<Ts, Us>...>`のように、`tuple`要素型の対応する型同士の`common_reference`を求める形になります。なので、`std::tuple`の他のケースはその要素型について先程の一般の型に対する結果を参照すると簡単に求められます。また、その場合は`tuple`自信の`const`/参照修飾は無視されます。
+`zip`と`enumrate`の結果をみると想像がつくかもしれませんが、`std::tuple<Ts...>`と`std::tuple<Us...>`の`common_reference`とは、`std::tuple<std::common_reference_t<Ts, Us>...>`のように、`tuple`要素型の対応する型同士の`common_reference`を求める形になります。なので、`std::tuple`の他のケースはその要素型について先程の一般の型に対する結果を参照すると簡単に求められます。また、その場合は`tuple`自身の`const`/参照修飾は無視されます。
+
+`iter_const_reference_t`はこのように、とても巧妙に入力イテレータ型の要素型をそれに応じて適切に`const`化します。しかも、*prvalue*の場合は余計なことをしないなど、本当によくできすぎていることが分かります。
 
 ### 参考文献
 
 - [P2278R4 `cbegin` should always return a constant iterator](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2278r4.html)
 - [P2321R2 `zip`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2321r2.html)
 - [`std::common_reference` - cpprefjp](https://cpprefjp.github.io/reference/type_traits/common_reference.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2023/20230430_iter_const_reference.md)
