@@ -58,3 +58,5 @@ cppreferenceの値カテゴリのページにも次のようにあり
 - [N4861 3.28 static type [defns.static.type]](https://timsong-cpp.github.io/cppwp/n4861/intro.defs#defns.static.type)
 - [N4861 7.2.2 Type [expr.type]](https://timsong-cpp.github.io/cppwp/n4861/expr#type-1)
 - [Value categories - cppreference](https://en.cppreference.com/w/cpp/language/value_category)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2023/20230523_static_type.md)
