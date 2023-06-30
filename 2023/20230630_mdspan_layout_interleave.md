@@ -2,11 +2,35 @@
 
 `mdspan`お勉強のメモです。ここでのサンプルコードは全て[kokkos/mdspan](https://github.com/kokkos/mdspan)を用いています。
 
+`std::mdspan`そのものについてはあまり解説しないので、`std::mdspan`の使い方などに関しては例えばこれらの記事などをご参照ください
+
+- [`std::mdspan` - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20230303/p1)
+- [`std::mdspan` - cppreference.com](https://en.cppreference.com/w/cpp/container/mdspan)
+
 [:contents]
 
-### 配列のインターリーブレイアウト
+### インターリーブレイアウト
 
-ここでは、インターリーブはいつも行優先であるものとし列優先のレイアウトは扱いません。列優先でも考え方はそんなに変わらないはずですが。
+行列（配列）のインターリーブとは、同じサイズの複数の行列を1つの行列に詰め込むようなメモリレイアウトで、その際に同じ添字を持つ要素を連続的に配置するものです。
+
+インターリーブレイアウトへの変換イメージ
+
+![](https://jp.mathworks.com/matlabcentral/mlc-downloads/downloads/submissions/65036/versions/3/screenshot.png)  
+([Interleave - File Exchange - MATLAB Central](https://jp.mathworks.com/matlabcentral/fileexchange/65036-b-interleave-dim-a1-a2-a3-an)より引用)
+
+1次元（配列）の場合は、AoSに対してSoAと呼ばれるレイアウトのことです。
+
+このようなレイアウトを取ることによる利点は、対応する添字要素をメモリ上で隣接させて配置することで局所性を高めメモリアクセスを効率化できる点です。
+
+例えば、複数の行列を使用するある処理がそれら行列の対応する要素ごとに処理を行なっていくような場合、通常のレイアウトだと複数の行列間で対応する（同じ添字を持つ）要素はメモリ上で少なくとも行列サイズ分離れた位置に配置されています。それを読み込もうとすると全部の要素を読み込むのに異なる位置へのメモリアクセスが何度も発生し、1要素読み込むごとにキャッシュが無効化されるなど非効率となります。インターリーブレイアウトをとることで、1度のメモリアクセスで使いたい要素を一括でロードし、なおかつキャッシュにも乗りやすくなるなど効率化を図れます。
+
+インターリーブレイアウトを用いる場合、行列のメモリ配置が複雑になり1つの行列にアクセスする際に工夫しなければなりません。
+
+C++23からは多次元配列ビューである`std::mdspan`が追加されました。`std::mdspan`のデフォルトはC++の配列レイアウトを元にした行優先の多次元配列を扱いますが、`std::mdspan`はレイアウトをカスタムできるようになっており、それを利用するとインターリーブレイアウトを取り扱うことができるようになります。
+
+この記事では、`std::mdspan`のレイアウトカスタマイズ機能を利用してインターリーブレイアウトをハンドルできるようにしながら、複雑に見えがちな`std::mdspan`の内部構造に触れていきます。
+
+なお、上記イメージのようにインターリーブレイアウトには行優先と列優先の2種類がありますが、ここではインターリーブはいつも行優先であるものとし列優先のレイアウトは扱いません。列優先でも考え方はそんなに変わらないはずですが。
 
 ### レイアウトマッピングクラスの要件
 
@@ -28,7 +52,7 @@ struct LP {
 
 この`Extents`は`std::mdspan`から供給されるもので、`std::extents`の特殊化となります。レイアウトマッピングクラス内からは、この`Extents`とそのオブジェクトを介して現在の`std::mdspan`がハンドルしている配列のサイズ（次元と次元ごとの要素数）を取得することができます。
 
-今回はインターリーブされたレイアウトをハンドルするので`LP`の名前は`layout_right_interleaved`にすることにして、レイアウト計算のために必要となるパラメータとしてインターリーブされている配列数`D`を受け取っておきます。
+今回は行優先でインターリーブされたレイアウトをハンドルするので`LP`の名前は`layout_right_interleaved`にすることにして、レイアウト計算のために必要となるパラメータとしてインターリーブされている配列数`D`を受け取っておきます。
 
 ```cpp
 // レイアウトポリシークラス
@@ -42,6 +66,8 @@ struct layout_right_interleaved {
   };
 };
 ```
+
+そして、レイアウトマッピングクラスには満たすべき性質や定義すべき関数などの要件がいくつもあります。
 
 #### 型に対する要件
 
@@ -61,7 +87,7 @@ struct layout_right_interleaved {
   class mapping {
   public:
   
-    mapping(const mapping &) & = default;
+    mapping(const mapping &) = default;
     mapping &operator=(const mapping &) & = default;
 
     friend bool operator==(mapping, mapping) = default;
@@ -77,8 +103,7 @@ struct layout_right_interleaved {
     - `std::mdspan`のデフォルトコンストラクタを有効にするために必須
 - `Extents`を受け取るコンストラクタ
     - 動的`Extents`をサポートする場合に必要
-    - `std::mdspan`のレイアウトマッピングクラスを受け取らないコンストラクタを有効にするために必須
-        - デフォルトコンストラクタは除く
+    - デフォルトコンストラクタは除いて、`std::mdspan`のレイアウトマッピングクラスを受け取らないコンストラクタを有効にするために必須
 - 他のレイアウトマッピングクラスからの変換コンストラクタ
     - `std::mdspan`の変換コンストラクタを有効にするために必須
 
@@ -109,7 +134,7 @@ struct layout_right_interleaved {
 };
 ```
 
-エクステントを受け取るコンストラクタには`const Extents&`が渡されるので、このように`const`参照か値で受ける必要があります。
+エクステントを受け取るコンストラクタには`const Extents&`が渡されるので、`const`参照か値で受ける必要があります。
 
 これ以外のコンストラクタは必要なら定義することができ、これらのものと曖昧にならなければそれは自由です。
 
@@ -147,12 +172,12 @@ struct layout_right_interleaved {
 
 #### レイアウトの特性を表す関数
 
-レイアウトがどういう性質を持つかに関する性質を取得する関数が3種類要求されます
+レイアウトがどういう性質を持つかについてを取得する関数が3種類要求されます。これらはすべて引数を取らず`bool`を返す関数です。
 
-レイアウトマッピングクラスのオブジェクトを`m`としておきます
+説明のために、レイアウトマッピングクラスのオブジェクトを`m`としておきます
 
 - `is_unique()`
-    - 配列の1つの要素に1つのインデックスだけが対応する
+    - 配列の1つの要素に1つのインデックスだけが対応する場合に`true`
     - 対称行列における重複要素を節約するようなレイアウトだと1つの要素に複数のインデックスが対応するため満たさない
       - 2次元の場合`m(i, j) == m(j, i)`となるためユニークではない
 - `is_exhaustive()`
@@ -222,6 +247,7 @@ struct layout_right_interleaved {
     - 現在のエクステントを返す
 - `operator(...)`
     - 多次元インデックスをメモリ上の一点のインデックスに変換する
+    - インデックス計算の実装はここで行う
 - `required_span_size()`
     - 現在のレイアウトがアクセスするメモリ範囲の最大値を返す
       - `extents()`のサイズが0なら0
@@ -256,6 +282,8 @@ struct layout_right_interleaved {
   };
 };
 ```
+
+エクステント型の静的メンバ関数`extents_type::rank()`はそのエクステントのランク（次元数）を取得するもので、これは必ずコンパイル時の定数となります。静的`constexpr`メンバ関数であるため、型の文脈でも使用することができます。
 
 ### インターリーブレイアウトにおけるインデックス計算
 
@@ -308,7 +336,13 @@ $$
 
 2次元方向（列方向）を見てみると、ある`n`番目の行列の上下で隣り合う要素（例えば$a_{n00}$と$a_{n10}$）の間には、含まれる行列全ての列要素の個数分の要素、つまり`D * I`（行列数 × 列幅）個の要素があります。そのため、ある1つの行列の列間のオフセットは`m * D * I`で求められます。
 
-したがって、ある1つの行列の先頭要素から見た時、その行列の`y`列`x`行の要素へのインデックス`idx`は、`idx = y * D * I + x * D`で求められます。
+したがって、ある1つの行列の先頭要素から見た時、その行列の`y`列`x`行の要素へのインデックス`idx`は
+
+$$
+idx = y \times D \times I + x \times D
+$$
+
+で求められます。
 
 #### 多次元行列への一般化
 
@@ -318,24 +352,30 @@ $$
 
 その上でインターリーブされている場合のインデックスを考えると、インターリーブされているある3次元行列の3次元軸方向に隣り合う要素（例えば$a_{n000}$と$a_{n100}$）の間には、インターリーブされている行列の個数分の2次元行列が間に挟まっています。
 
-インターリーブされている行列数を`D`、3次元行列の各次元の要素数を1次元目から`I, J, K`とすると、ある1つの行列の先頭要素から見た時、その行列の`(x, y, z)`（左側が低位次元）要素へのインターリーブされた空間上でのインデックス`idx`は、`idx = z * D * I * J + y * D * I + x * D`で求められます。
+インターリーブされている行列数を`D`、3次元行列の各次元の要素数を1次元目から`I, J, K`とすると、ある1つの行列の先頭要素から見た時、その行列の`(x, y, z)`（左側が低位次元）要素へのインターリーブされた空間上でのインデックス`idx`は
+
+$$
+idx = z \times D \times I \times J + y \times D \times I + x \times D
+$$
+
+で求められます。
 
 同様に一般化すると、インターリーブされている行列数を`D`、N次元行列の各次元のサイズ（要素数）を`In`（`0 <= n < N`）とすると、ある1つの行列の先頭要素から見た時、その行列の`(i0, ..., in)`要素へのインターリーブされた空間上でのインデックス`idx`は、
 
 $$
-idx = D \times (i_n \times (I_{N - 1} \times ... \times I_0) + ... + i_2 \times I_1 \times I_0 + i_1 \times I_0  + i_0) 
+idx = D \times (i_n \times (I_{n - 1} \times ... \times I_0) + ... + i_2 \times I_1 \times I_0 + i_1 \times I_0  + i_0) 
 $$
 
 のようになります（多分）。
 
-今回は2次元行列のインターリーブだけを確認することにして、高次元はとりあえずこれに則って実装はしますが特にチェックしないことにします。
+今回は2次元行列のインターリーブだけを確認することにして、高次元はとりあえずこれに則って実装はしますが特にチェックしないことにします（間違ってたら教えてください）。
 
 ### 実装
 
 後は上式をコードに直すだけです。色々な方法が考えられますが、ここでは上式をホーナー法によって変換して、それをそれを実装する事にします。
 
 $$
-idx = D \times (I_0 \times ( I_1 \times ...(I_{N - 2} \times (I_{N - 1} \times i_n + i_{n-1}) + i_{n-2})... + i_1) + i_0)
+idx = D \times (I_0 \times ( I_1 \times ...(I_{n - 2} \times (I_{n - 1} \times i_n + i_{n-1}) + i_{n-2})... + i_1) + i_0)
 $$
 
 ここでのインターリーブされている行列数`D`はテンプレートパラメータ`N`から、行列の次元数`N`はエクステント型の`extents_type::rank()`から、各次元の要素数`I_i`はエクステントオブジェクトのメンバ関数`m_extent.extent(i)`から、多次元インデックス`i_n`はレイアウトマッピング型の`operator()`の引数から取得できます。
@@ -375,7 +415,7 @@ struct layout_right_interleaved {
                (std::is_nothrow_convertible_v<Indices, index_type> && ...)
     constexpr auto operator()(Indices... indices) const -> index_type {
       // 行列次元数
-      // extent()が0indexなので最大値は-1
+      // extent()が0indexなので最大値は-1する
       constexpr std::unsigned_integral auto N = extents_type::rank() - 1;
       static_assert(0u < N);
 
@@ -397,7 +437,7 @@ struct layout_right_interleaved {
 };
 ```
 
-計算してる部分（`operator()`）では、先ほどのホーナー法の式の内側から計算しています。このレイアウトマッピングクラスの`operator()`にわたってくるインデックスは、`mdspan`の`operator[]`に渡されるものがそのまま渡され、先頭が最大次元で末尾が1次元のインデックスとなるような順番です。
+計算してる部分（`operator()`）では、先ほどのホーナー法による式の内側から計算しています。このレイアウトマッピングクラスの`operator()`の引数の多次元インデックスは、`mdspan`の`operator[]`に渡されるものがそのまま渡され、先頭が最大次元で末尾が1次元のインデックスとなるような順番で渡ってきます。
 
 `std::array`に格納しているのはパラメータパックのままだと取り扱いが面倒だったためで、パック展開を駆使すればもっといい感じにできる可能性があります。
 
@@ -536,6 +576,7 @@ int main() {
   // 要素型はextentsの要素型に変換できればなんでもいい
   constexpr std::array<std::size_t, 2> stride = {9, 3};
 
+  // CTADによりテンプレートパラメータを推論している
   stride_interleaved_mat33 A{storage,     mapping{{}, stride}};
   stride_interleaved_mat33 B{storage + 1, mapping{{}, stride}};
   stride_interleaved_mat33 C{storage + 2, mapping{{}, stride}};
@@ -554,8 +595,8 @@ int main() {
     - ストライドを手動で渡す必要がない
 - ストライドの定数化が可能
     - エクステントが全て定数なら、後述
-- ストライドを保持する必要がない
-    - 保持した方が効率的になる可能性もある
+- オブジェクトごとにストライドを保持する必要がない
+    - オブジェクトサイズの削減
 
 などでしょうか。このメリットにこの手間が釣り合うと考える場合は自作する価値があるかもしれません（今回はお勉強のためなのでメリットとか無視してます）。
 
@@ -567,7 +608,7 @@ int main() {
 
 ひとまず完成した`layout_right_interleaved`の実装は、`extents_type`（`std::extents`）の各次元の要素数が動的な場合でも対応可能な実装になっています。動作例がそうであるように、全ての次元の要素数がコンパイル時に既知であれば、計算の一部をコンパイル時に終わらせておくことができます。
 
-エクステントが完全に静的であるか（動的エクステントが含まれていないかどうか）は、`std::extents`の静的メンバ関数である`rank_dynamic()`が`0`を返すかどうかで判定できます。これは`constexpr`関数なのでコンパイル時に呼び出すことができ、コンセプトなどの制約にも用いることができます。
+エクステントが完全に静的であるか（動的エクステントが含まれていないかどうか）は、`std::extents`の静的メンバ関数である`rank_dynamic()`が`0`を返すかどうかで判定できます。これは静的`constexpr`関数なのでコンパイル時に呼び出すことができ、コンセプトなどの制約にも用いることができます。
 
 まず、エクステントが静的である場合に、各次元のストライドをコンパイル時に求めておきます。
 
@@ -613,7 +654,7 @@ struct layout_right_interleaved {
 };
 ```
 
-静的メンバ関数として保存しておくことでコンパイル時に使用でき、オブジェクトのサイズを消費しないようにします。
+静的メンバ変数として保存しておくことでコンパイル時に使用でき、オブジェクトのサイズを消費しないようにします。
 
 次に、これを用いてインデックス計算周りを書き換えます。
 
@@ -695,13 +736,17 @@ struct layout_right_interleaved {
 
 Compiler Explorerのアセンブリ出力対応の色付けを見ると、静的と動的の両方の処理がきちんと使われており、出力も正しいことがわかります。
 
-あらかじめストライドが求めてある場合、各次元のインデックスに対応するストライドをかけて足すだけなので処理はだいぶ簡単になります。ここではやっていませんが、それによって畳み込み式で簡単に書けるようになると思われます。ただし、コンパイル時にストライドを求めるようにする場合でも、実行時の処理と掛け算と足し算の回数が変わらないのであまり効率的にはならないかもしれません。
+あらかじめストライドが求めてある場合、各次元のインデックスに対応するストライドをかけて足すだけなので処理はだいぶ簡単になります。ここではやっていませんが、それによって畳み込み式で簡単に書けるようになると思われます。ただし、コンパイル時にストライドを求めるようにする場合でも、実行時の処理と掛け算と足し算の回数がほぼ変わらないのであまり効率的にはならないかもしれません。
 
-また、`std::extents`はエクステントが全て静的である場合にサイズが1になるので、これによってエクステントが静的なら`layout_right_interleaved`のサイズも1になります（EBOが働く場合）。これは`mdspan`をコピーするときのコストを低下させることにつながります。
+また、`std::extents`はエクステントが全て静的である場合にサイズが1になるので、これによってエクステントが静的なら`layout_right_interleaved`は空のクラスとなりそのサイズも1になります（EBOが働く場合）。これは`mdspan`をコピーするときのコストを低下させることにつながります。
+
+### ソースコード全体
+
+- [mdspan_interleave_test.cpp](https://gist.github.com/onihusube/c57b4f8d3d60274578930300cf3d9a38)
 
 ### 参考文献
 
-- [Reference implementation of mdspan targeting C++23](https://github.com/kokkos/mdspan)
+- [kokkos/mdspan : Reference implementation of mdspan targeting C++23](https://github.com/kokkos/mdspan)
 - [`std::mdspan`×空間充填曲線 - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20230315/p1)
 - [`std::mdspan` - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20230303/p1)
 - [P0009R18 MDSPAN](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0009r18.html)
@@ -709,3 +754,5 @@ Compiler Explorerのアセンブリ出力対応の色付けを見ると、静的
 - [インターリーブ配列 VBO](https://wgld.org/d/webgl/w088.html)
 - [Introducing interleave-batched linear algebra functions in Arm PL - Arm Community blogs](https://community.arm.com/arm-community-blogs/b/tools-software-ides-blog/posts/new-interleave-batched-linear-algebra-functions-in-arm-pl)
 - [Interleave - File Exchange - MATLAB Central](https://jp.mathworks.com/matlabcentral/fileexchange/65036-b-interleave-dim-a1-a2-a3-an)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2023/20230630_mdspan_layout_interleave.md)
