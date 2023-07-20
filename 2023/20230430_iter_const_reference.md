@@ -170,7 +170,7 @@ int main() {
 |---|---|
 |`T&`|`const T&`|
 |`T&&`|`const T&&`|
-|`const T&`|`const T&&`|
+|`const T&`|`const T&`|
 |`const T&&`|`const T&&`|
 |`T`|`T`|
 |`const T`|`T`|
@@ -199,7 +199,7 @@ int main() {
 |---|---|---|---|
 |`std::vector<bool>`|`bool`|`std::vector<bool>::reference`|`bool`|
 |`const std::vector<bool>`|`bool`|`bool`|`bool`|
-|`views::zip`|`std::tuple<T, U>`|`std::tuple<T&, U&>`|`std::tuple<const int&, const double&>`|
+|`views::zip`|`std::tuple<T, U>`|`std::tuple<T&, U&>`|`std::tuple<const T&, const D&>`|
 |`views::enumrate`|`std::tuple<D, T>`|`std::tuple<D, T&>`|`std::tuple<D, const T&>`|
 
 `range_const_reference_t`は`iter_const_reference_t`の`range`版で、`iter_const_reference_t<iterator_t<R>>`として定義されています。
