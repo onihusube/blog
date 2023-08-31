@@ -83,7 +83,7 @@ namespace std::ranges {
 }
 ```
 
-この型は実質的に、先程の`const_iterator_t`で得られる定数イテレータの間接参照結果の型となります。
+この型は、先程の`const_iterator_t`で得られる定数イテレータの間接参照結果の型となります。
 
 ```cpp
 #include <ranges>
@@ -110,8 +110,35 @@ namespace std::ranges {
 }
 ```
 
+定義は`input_range`かつそのイテレータが`constant-iterator`であることを要求し、[`constant-iterator`](https://cpprefjp.github.io/reference/iterator/constant-iterator.html)はイテレータが定数イテレータであることを表す説明専用のコンセプトです。
 
-手持ちの範囲を手軽に`costant_range`化するには、`views::as_const`を使用すると便利です。
+このコンセプトは主に、`range`を受ける場所で受け取った`range`の要素を変更しない場合に使用すると良いでしょう。
+
+```cpp
+#include <ranges>
+using namespace std::ranges;
+
+// constant_rangeコンセプトで制約することで、受け取ったrangeの要素を変更しないことを表明
+void f(constant_range auto&& rng) {
+  // constant_rangeを満たしているため、内部では要素を変更しようとしてもできない
+  auto it = begin(vi);
+  *it = ...; // ngもしくは無意味
+
+  ...
+}
+
+int main() {
+  std::vector<int> vec = {1, 2, 3, 4, 5};
+  const auto& rv = vec;
+
+  f(vec); // ng
+  f(rv);  // ok
+}
+```
+
+`costant_range`コンセプトは構文的にイテレータを介して要素が変更不可能であることを要求しているため、関数の実装側も`costant_range`として受け取った範囲の要素を変更しようとしても変更できません。
+
+手持ちの範囲を手軽に`costant_range`化するには、`views::as_const`を使用します。
 
 ```cpp
 #include <ranges>
@@ -129,6 +156,8 @@ int main() {
 }
 ```
 
+`views::as_const`は、入力`range`を単に`const`化したり、そのイテレータを`std::basic_const_iterator`でラップするなどして、入力`range`を`constant_range`へ変換します。
+
 ### `range_adaptor_closure`
 
 ### 参考文献
@@ -136,4 +165,9 @@ int main() {
 - [P2278R4 `cbegin` should always return a constant iterator](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2278r4.html)
 - [`const_iterator_t` - cpprefjp](https://cpprefjp.github.io/reference/ranges/const_iterator_t.html)
 - [`const_sentinel_t` - cpprefjp](https://cpprefjp.github.io/reference/ranges/const_sentinel_t.html)
+- [`std::ranges::range_const_reference_t` - cpprefjp](https://cpprefjp.github.io/reference/ranges/range_const_reference_t.html)
+- [`std::ranges::constant_range` - cpprefjp](https://cpprefjp.github.io/reference/ranges/constant_range.html)
+- [`std::basic_const_iterator` - cpprefjp](https://cpprefjp.github.io/reference/iterator/basic_const_iterator.html)
+- [［C++］`iter_const_reference_t`の型の決定について - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2023/04/30/181514)
+- [C++23 <ranges>のviewを見る3 - As const view](https://zenn.dev/onihusube/articles/04120c20e1339b)
 - [［C++］ rangesのパイプにアダプトするには - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2022/04/24/010041)
