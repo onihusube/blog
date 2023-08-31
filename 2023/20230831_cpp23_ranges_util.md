@@ -160,6 +160,148 @@ int main() {
 
 ### `range_adaptor_closure`
 
+`range_adaptor_closure`は、レンジアダプタを自作する際に標準のアダプタと`|`で接続できるようにするためのクラス型です。CRTPによって継承して利用します。
+
+まず、これを使用せず何も考えずに自作のレンジアダプタを作成すると、標準のアダプタなら可能なパイプライン演算子（`|`）を使用した入力や合成ができません。
+
+```cpp
+#include <ranges>
+using namespace std::ranges;
+
+// 自作のレンジアダプタ型
+// 特にパイプのための実装をしていないとする
+class my_original_adaptor {
+  ...
+};
+
+inline constexpr my_original_adaptor my_adaptor{};
+
+int main() {
+  std::vector vec = {...};
+
+  // パイプでviewを入力できない
+  view auto v1 = vec | my_adaptor; // ng
+  view auto v2 = vec | views::take(2) | my_adaptor;  // ng
+
+  // レンジアダプタの合成もできない
+  auto raco1 = views::take(2) | my_adaptor;  // ng
+  auto raco2 = my_adaptor | views::take(2);  // ng
+}
+```
+
+これを可能とするには標準ライブラリ実装が用いているのと同様の方法によってパイプライン演算子を有効化しなければなりませんが、それは実装詳細であり公開されているものではありません。そこで、`range_adaptor_closure`を使用すると統一的かつ実装詳細を気にしない方法でパイプライン演算子を有効化することができます。
+
+```cpp
+#include <ranges>
+using namespace std::ranges;
+
+// 自作のレンジアダプタ型
+// CRTPによってrange_adaptor_closureを継承する
+class my_original_adaptor : range_adaptor_closure<my_original_adaptor> {
+  ...
+};
+
+inline constexpr my_original_adaptor my_adaptor{};
+
+int main() {
+  std::vector vec = {...};
+
+  // パイプでviewを入力できるようになる
+  view auto v1 = vec | my_adaptor; // ok
+  view auto v2 = vec | views::take(2) | my_adaptor;  // ok
+
+  // レンジアダプタの合成も有効化される
+  auto raco1 = views::take(2) | my_adaptor;  // ok
+  auto raco2 = my_adaptor | views::take(2);  // ok
+}
+```
+
+ここでは自作のレンジアダプタ`my_original_adaptor`の実装詳細を省略していますが、当然それはパイプライン演算子対応以外の部分はきちんとレンジアダプタとして実装されている必要があります。
+
+`range_adaptor_closure`はこのように、本来とても複雑なパイプライン演算子対応を自動化してくれるものです。レンジアダプタを自作することは稀だと思われるためあまり使用機会はないかもしれませんが、レンジアダプタを自作する場合は非常に有用なものとなるでしょう。
+
+ただ、`range_adaptor_closure`はその名の通りレンジアダプタクロージャオブジェクト型に対してパイプライン演算子を有効化することしかしません。追加の引数が必要なレンジアダプタオブジェクト型において、入力`range`以外の引数を予め受けておいてレンジアダプタクロージャオブジェクトを生成する部分については`range_adaptor_closure`はもちろん、特にサポートがありません。
+
+```cpp
+#include <ranges>
+using namespace std::ranges;
+
+int main() {
+  std::vector vec = {...};
+  
+  // views::commonはレンジアダプタクロージャオブジェクト
+  view auto v1 = vec | views::common;
+
+  // 追加の引数が必要なものはレンジアダプタオブジェクト
+  view auto v2 = vec | views::take(5);
+  view auto v3 = vec | views::filter([](auto v) { ... });
+  view auto v4 = vec | views::transform([](auto v) { ... });
+
+  // レンジアダプタオブジェクトに追加の引数を予め充填したものはレンジアダプタクロージャオブジェクト
+  auto raco1 = views::take(5);
+  auto raco2 = views::filter([](auto v) { ... });
+  auto raco3 = views::transform([](auto v) { ... });
+
+  // パイプライン演算子はレンジアダプタクロージャオブジェクトに対して作用する
+  view auto v5 = vec | raco1; // v2と同じ意味
+  view auto v6 = vec | raco2; // v3と同じ意味
+  view auto v7 = vec | raco3; // v4と同じ意味
+  auto raco4 = raco1 | raco2 | raco3;
+}
+```
+
+レンジアダプタを自作する場合、必ずしもレンジアダプタクロージャとして実装できない場合が容易に考えられ、その場合は追加の引数を保存してレンジアダプタクロージャオブジェクトを生成するという部分を実装しなければなりません。
+
+幸いなことに、C++23から追加された`std::bind_back()`（`std::bind_front()`の逆順版）を使用すると、追加の引数の順番を保った保存の部分を委任することができます。
+
+```cpp
+#include <ranges>
+using namespace std::ranges;
+
+// 自作のレンジアダプタクロージャ型
+template<typename F>
+struct my_closure_adaptor : range_adaptor_closure<my_original_adaptor> {
+  F f;
+
+  view auto operator()(viewable_range auto&& input) const {
+    return f(input);  // bind_back()でラッピングされたcallbleに引数のrangeを入力しレンジアダプタを実行する
+  }
+};
+
+// 自作のレンジアダプタ型（not クロージャ）
+class my_original_adaptor :  {
+
+  ...
+  
+  // 追加の引数を受けてレンジアダプタクロージャオブジェクトを返す
+  template<typename... Args>
+  auto operator()(Args&&... args) const {
+    // bind_back()で自身と追加の引数をラッピングし、レンジアダプタクロージャオブジェクトを作成
+    return my_closure_adaptor{ .f = std::bind_back(*this, std::forward<Args>(args)...)};
+  }
+};
+
+inline constexpr my_original_adaptor my_adaptor{};
+
+int main() {
+  std::vector vec = {...};
+
+  // my_original_adaptorが追加の引数として整数を1つ受け取るとすると
+  view auto v1 = vec | my_adaptor(1); // ok
+  view auto v2 = vec | views::take(2) | my_adaptor(2);  // ok
+  auto raco = my_adaptor(1);  // ok
+  view auto v3 = vec | raco;  // ok、v1と同じ意味
+}
+```
+
+`my_original_adaptor`はここでも実装を省略していますが、そこについては適切に実装されている必要があります（何かいい例があればいいのですが・・・）。
+
+おそらく、この`my_closure_adaptor`（汎用的なレンジアダプタクロージャオブジェクト型）のようなものは自作のレンジアダプタとは別で作成できて、かつこの例のような典型的な実装になるはずです。そのため、自作のレンジアダプタ毎にこのようなものを作る必要は無いでしょう。この部分がC++23で追加されなかったのは、この部分の最適な実装
+
+宣伝ですが、これらレンジアダプタ（クロージャ）オブジェクトを簡易に作成できるC++20/C++23のライブラリを作っていました。`range_adaptor_closure`や`std::bind_back`相当のものをC++20で使用できるほか、`my_closure_adaptor`相当のものも用意しており、より簡易にレンジアダプタを作成できるようになります。
+
+- [onihusube/rivet - github](https://github.com/onihusube/rivet)
+
 ### 参考文献
 
 - [P2278R4 `cbegin` should always return a constant iterator](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2278r4.html)
