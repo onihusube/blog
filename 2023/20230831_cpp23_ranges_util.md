@@ -6,7 +6,7 @@ C++23で追加された`<ranges>`関連の小さめのユーティリティを�
 
 ### `const_iterator_t`/`const_sentinel_t`
 
-`const_iterator_t`は`range`型からその定数イテレータ（*const iterator*）の型を取得するエイリアステンプレートです。`const_sentinel_t`はそれに対応する番兵型を取得するもので、どちらも`std::ranges`名前空間にあります。これらは、`iterator_t`/`sentinel_t`の亜種です。
+`const_iterator_t`は`range`型からその定数イテレータ（*const iterator*）の型を取得するエイリアステンプレートです。`const_sentinel_t`はそれに対応する番兵型を取得するものです。これらは、`iterator_t`/`sentinel_t`の亜種です。
 
 ```cpp
 namespace std::ranges {
@@ -48,9 +48,9 @@ void f(iota_view<int> vi) {
   const_iterator_t<iota_view<int>> cit = cbegin(vi);
   const_sentinel_t<iota_view<int>> cse = cend(vi);
 
-  *cit = 10;  // 要素型が組み込み型の場合はng、クラス型の場合は通る可能性がある
-
   static_assert(std::same_as<decltype(*cit), int>); // パスする
+
+  *cit = 10;  // 要素型が組み込み型の場合ng、クラス型の場合はエラーにならない場合がある
 }
 
 // 間接参照結果がstringのprvalueの場合
@@ -64,13 +64,13 @@ void g(R& rng) {
 }
 ```
 
-他の特殊な場合として、`views::zip`のような特殊なイテレータ型（値型と参照型の関係が複雑なイテレータ型）の場合は、`const_iterator`/`const_iterator_t`を通した後の間接参照結果型は単純に`const`を付加しただけでも*prvalue*のままにもなりません（参照型`std::tuple<T1&, T2&, ...>`に対して、`std::tuple<const T1&, const T2&, ...>`のようになる）。
+他の特殊な場合として、`views::zip`のような特殊なイテレータ型（値型と参照型の関係が複雑なイテレータ型）の場合は、`const_iterator`/`const_iterator_t`を通した後の間接参照結果型は少し複雑な変換を受けます（参照型`std::tuple<T1&, T2&, ...>`に対して、`std::tuple<const T1&, const T2&, ...>`のようになる）。
 
-これらのエイリアステンプレートによる定数イテレータの参照型の決定は最終的に`std::iter_const_reference_t`によって行われます。これについては以前の記事を参照ください
+とはいえそのような特殊なイテレータ型の場合は`common_reference`のカスタマイズなどを通して適切に`const`対応が取られているはずなので、結果的には、`const_iterator`/`const_iterator_t`を通したイテレータ型では常にその要素は変更されない（できない）とみなすことができます。よって、これと一致する`std::ranges::cbegin`/`std::ranges::cend`で得られるイテレータも常に定数イテレータになるようになります（C++20時点では、必ずしも定数イテレータを得られない場合がありました）。
+
+なお、これらのエイリアステンプレートによる定数イテレータの参照型の決定は最終的に[`std::iter_const_reference_t`](https://cpprefjp.github.io/reference/iterator/iter_const_reference_t.html)によって行われます。これについては以前の記事を参照ください
 
 - [［C++］`iter_const_reference_t`の型の決定について - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2023/04/30/181514)
-
-とはいえそのような特殊なイテレータ型の場合は`common_reference`のカスタマイズなどを通して適切に`const`対応が取られているはずなので、結果的には、`const_iterator`/`const_iterator_t`を通したイテレータ型では常にその要素は変更されない（できない）と見なすことができます。よって、これと一致する`std::ranges::cbegin`/`std::ranges::cend`で得られるイテレータも常に定数イテレータになるようになります（C++20時点では、必ずしも定数イテレータを得られない場合がありました）。
 
 ### `range_const_reference_t`
 
@@ -121,7 +121,7 @@ using namespace std::ranges;
 // constant_rangeコンセプトで制約することで、受け取ったrangeの要素を変更しないことを表明
 void f(constant_range auto&& rng) {
   // constant_rangeを満たしているため、内部では要素を変更しようとしてもできない
-  auto it = begin(vi);
+  auto it = begin(rng);
   *it = ...; // ngもしくは無意味
 
   ...
@@ -129,16 +129,16 @@ void f(constant_range auto&& rng) {
 
 int main() {
   std::vector<int> vec = {1, 2, 3, 4, 5};
-  const auto& rv = vec;
+  const auto& crv = vec;
 
   f(vec); // ng
-  f(rv);  // ok
+  f(crv);  // ok
 }
 ```
 
 `costant_range`コンセプトは構文的にイテレータを介して要素が変更不可能であることを要求しているため、関数の実装側も`costant_range`として受け取った範囲の要素を変更しようとしても変更できません。
 
-手持ちの範囲を手軽に`costant_range`化するには、`views::as_const`を使用します。
+`costant_range`で制約されているところに渡すために範囲を手軽に`costant_range`化するには、`views::as_const`を使用します。
 
 ```cpp
 #include <ranges>
@@ -160,7 +160,17 @@ int main() {
 
 ### `range_adaptor_closure`
 
+ここまでのものは全て定数イテレータに関連するものでしたが、これは上のものとは無関係なものです。
+
 `range_adaptor_closure`は、レンジアダプタを自作する際に標準のアダプタと`|`で接続できるようにするためのクラス型です。CRTPによって継承して利用します。
+
+```cpp
+namespace std::ranges {
+  template<class D>
+    requires is_class_v<D> && same_as<D, remove_cv_t<D>>
+  class range_adaptor_closure { }; 
+}
+```
 
 まず、これを使用せず何も考えずに自作のレンジアダプタを作成すると、標準のアダプタなら可能なパイプライン演算子（`|`）を使用した入力や合成ができません。
 
@@ -302,7 +312,7 @@ int main() {
 
 `my_original_adaptor`はここでも実装を省略していますが、そこについては適切に実装されている必要があります（何かいい例があればいいのですが・・・）。ただ、おそらくはほとんどの場合は、この例のように必要なものをすべて受けてレンジアダプタとしての処理を実行する関数呼び出し演算子と、追加の引数だけを受けて対応するレンジアダプタクロージャオブジェクトを作成する関数呼び出し演算子の2つを記述することになると思われます。
 
-おそらく、この`my_closure_adaptor`（汎用的なレンジアダプタクロージャオブジェクト型）のようなものは自作のレンジアダプタとは別で作成できて、かつこの例のような典型的な実装になるはずです。そのため、自作のレンジアダプタ毎にこのようなものを作る必要は無いでしょう。この部分がC++23で追加されなかったのは、この部分の最適な実装
+おそらく、この`my_closure_adaptor`（汎用的なレンジアダプタクロージャオブジェクト型）のようなものは自作のレンジアダプタとは別で作成できて、かつこの例のような典型的な実装になるはずです。そのため、自作のレンジアダプタ毎にこのようなものを作る必要は無いでしょう。この部分がC++23で追加されなかったのは、この部分の最適な実装がまだ確立されていないためだったようです。
 
 宣伝ですが、これらレンジアダプタ（クロージャ）オブジェクトを簡易に作成できるC++20/C++23のライブラリを作っていました。`range_adaptor_closure`や`std::bind_back`相当のものをC++20で使用できるほか、`my_closure_adaptor`相当のものも用意しており、より簡易にレンジアダプタを作成できるようになります。
 
@@ -318,4 +328,7 @@ int main() {
 - [`std::basic_const_iterator` - cpprefjp](https://cpprefjp.github.io/reference/iterator/basic_const_iterator.html)
 - [［C++］`iter_const_reference_t`の型の決定について - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2023/04/30/181514)
 - [C++23 <ranges>のviewを見る3 - As const view](https://zenn.dev/onihusube/articles/04120c20e1339b)
+- [P2387R3 Pipe support for user-defined range adaptors](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2387r3.html)
 - [［C++］ rangesのパイプにアダプトするには - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2022/04/24/010041)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2023/20230831_cpp23_ranges_util.md)
