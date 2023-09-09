@@ -270,7 +270,7 @@ using namespace std::ranges;
 
 // 自作のレンジアダプタクロージャ型
 template<typename F>
-struct my_closure_adaptor : range_adaptor_closure<my_original_adaptor> {
+struct my_closure_adaptor : range_adaptor_closure<my_closure_adaptor<F>> {
   F f;
 
   view auto operator()(viewable_range auto&& input) const {
@@ -279,7 +279,7 @@ struct my_closure_adaptor : range_adaptor_closure<my_original_adaptor> {
 };
 
 // 自作のレンジアダプタ型（not クロージャ）
-class my_original_adaptor :  {
+class my_original_adaptor {
 
   ...
   
