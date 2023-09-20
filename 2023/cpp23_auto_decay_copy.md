@@ -133,11 +133,134 @@ int main() {
 
 `auto(x)`の`x`が右辺値の場合はコピーではなくムーブされて結果が生成されます。さらに、`x`が*prvalue*の場合はコピー省略によって`auto(x)`ではコピーもムーブも発生しません（受けている変数が非参照ならば、そこに直接構築される）。
 
-### decay-copy
+### 利点や用途
 
-### プライベートへのアクセス
+前述のように、`auto(x)`は`x`の素の型`T`に対して`T(x)`と同じ意味になります。さらに、`auto(x)`によるコピーは`auto var = x;`のような変数宣言でも同じことを達成できます。
 
-### 例
+```cpp
+template<std::copy_constructible T>
+void f(T x) {
+  // この4つは実は同じ意味
+  auto(x);
+  T(x);
+  auto{x};
+  T{x};
+
+  // 次の3つの宣言は同じことを行う
+  auto v1 = auto(x);
+  auto v2 = x;
+  T v3 = x;
+}
+```
+
+とすると、`auto(x)`のキャストは冗長で無価値なものにしか見えなくなります。
+
+`auto`キャストが有用なのは、上記のように`T`が素直に得られず、一時変数を作る必要がない場合においてです。
+
+例えばコンテナをテンプレートで受け取って、その先頭要素と同じ値をコンテナから削除したい場合を考えます。
+
+```cpp
+// front()が呼べるコンテナコンセプト
+template<typename C>
+concept container = 
+  std::ranges::range<C> and
+  requires(C& c) {
+    {c.front()} -> std::same_as<std::ranges::range_reference_t<C>>;
+  };
+
+// コンテナから先頭要素と同じ要素を削除する
+void pop_front_alike(container auto& x) {
+
+  // 先頭要素が削除された後、3番目の引数はダングリング参照となる
+  std::erase(x.begin(), x.end(), x.front());
+
+  // 予め先頭要素をコピーしておいて、それを使う
+  auto tmp = x.front();
+  std::erase(x.begin(), x.end(), tmp);
+
+  // 1行で書こうとすると面倒・・・
+  using T = std::decay_t<decltype(x.front())>;
+  std::erase(x.begin(), x.end(), T(x.front()));
+}
+```
+
+`.front()`は要素への参照を返し、`std::erase()`の第3引数は要素型の`const`参照を受け取ります。そのため、`std::erase()`の第3引数に`x.front()`を直接渡すと先頭要素が削除された後（つまり処理が開始されてすぐ）にその参照はダングリング参照となり、UBです。それを回避するためには、先頭要素を予めコピーしてから`std::erase()`に渡すことが必要となります。
+
+ここでは、コピーしてる変数(`tmp`)はその後使うことはないため一時変数は導入しない方が望ましく、要素型`T`は直接的に見えていないため取得が面倒になります。
+
+そこで、`auto(x)`を使用すると、それらの懸念を解消しつつ同じことをよりシンプルに記述できます。
+
+```cpp
+// コンテナから先頭要素と同じ要素を削除する
+void pop_front_alike(container auto& x) {
+  // auto(x)を使う
+  std::erase(x.begin(), x.end(), auto(x.front()));
+}
+```
+
+`auto(x.front())`で渡したオブジェクトは`std::erase()`の呼び出しが終わるまで有効であり、この場合に生存期間の問題は発生しません。
+
+また、`T`の名前が5文字以上の場合（おそらく多くの場合はそうなるでしょう）なら文字数のアドバンテージを得ることができます。さらに言えば、目が慣れれば`T(x)`よりも`auto(x)`の方が一貫性が高くその意図が明確になるでしょう。
+
+```cpp
+class very_long_name_my_class {
+  ...
+};
+
+auto f(const auto&) {
+  ...
+}
+
+int main() {
+  very_long_name_my_class v{};
+  int n = 10;
+  long double l = 1.0;
+
+  // vをコピーしてfに渡したい場合
+  f(very_long_name_my_class(v));
+  f(int(n));
+  f(long double(l));  // ng
+
+  f(auto(v));
+  f(auto(n));
+  f(auto(l)); // ok
+}
+```
+
+```cpp
+struct my_class {
+  my_class(const my_class&) noexcept(...) {
+    ...
+  }
+
+  my_class& operator=(my_class&&) noexcept {
+    ...
+  }
+
+  my_class& operator=(const my_class& other) noexcept(std::is_nothrow_copy_constructible_v<my_class>) {
+    if (this == &other) {
+      return *this;
+    }
+
+    // コピーしてムーブ代入することで実装する
+    auto copy = other;
+    *this = std::move(copy);
+
+    // あるいは
+    *this = my_class(other);
+
+    // auto(x)
+    *this = auto(other);
+
+    
+    return *this;
+  }
+}
+```
+
+### decay-copyとの違い
+
+### コンセプト定義における利用例
 
 ### 参考文献
 
