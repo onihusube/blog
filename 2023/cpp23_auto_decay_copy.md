@@ -260,6 +260,88 @@ struct my_class {
 
 ### decay-copyとの違い
 
+`auto(x)`の行うようなコピーは規格書中では`decay-copy`という用語でよく知られており、対応する説明専用のライブラリ関数も用意されています。
+
+```cpp
+// 実際の名前はdecay-copy
+template<class T>
+constexpr decay_t<T> decay_copy(T&& v) noexcept(is_nothrow_convertible_v<T, decay_t<T>>)
+{
+  return std::forward<T>(v);
+}
+```
+
+```cpp
+template<std::copy_constructible T>
+void f(T x) {
+  auto v1 = auto(x);
+  auto v2 = decay_copy(x);  // これではダメなの？
+}
+```
+
+`auto(x)`のような構文を新たに導入せずとも、この関数を標準化すれば同じことは達成できるように思えます。そうしないのは、`auto(x)`と`decay_copy(x)`では前者がキャスト式となり後者は関数呼び出し式となることから、その振る舞いに違いがあるためです。
+
+まず1つ目の違いは、`decay_copy(x)`は`x`が*prvalue*である場合にその引数で*prvalue*が実体化されてしまいコピー省略を妨げる点です。`auto(x)`の場合はこれ自体が*prvalue*の式であるため`x`が*prvalue*である場合はコピー省略によって一切のコンストラクタ呼び出しを伴いません（というか何もしません）。
+
+```cpp
+auto f() -> std::string;
+
+int main() {
+  std::string s1 = auto(f());       // コピー省略によって、s1はf()のreturn文の式から直接構築される
+  std::string s2 = decay_copy(f()); // s2はstd::stringのムーブコンストラクタによって構築される
+}
+```
+
+2つ目の違いは、クラス型のプライベートへのアクセスが可能なコンテキストで`decay_copy()`はそのコンテキストを引き継げない点です。
+
+```cpp
+class A {
+  int x;
+
+public:
+  A();
+
+  auto run() {
+    f(A(*this));           // ok
+    f(auto(*this));        // ok
+    f(decay_copy(*this));  // ng
+  }
+
+protected:
+  A(const A&);
+};
+```
+
+この場合の`decay_copy(*this)`で実際に`A`のコピーコンストラクタが呼ばれるのは、`decay_copy()`の定義内の`return`文においてであり、`decay_copy()`は`A`の`friend`ではないためそこからは`protected`である`A`のコピーコンストラクタにアクセスできません。
+
+`auto(*this)`は単なる式であるため、コピーが発生するのはその直接のコンテキストである`A::run()`の定義内であり、そこからは問題なく`A`のコピーコンストラクタにアクセスできます。
+
+この例は直接的ですが、`friend`を介すると別のクラスのコンテキストにおいても同様の違いが観測されます。
+
+```cpp
+class S;
+
+class A {
+public:
+  A() = default;
+
+private:
+  A(const A&);
+
+  friend S;
+};
+
+class S {
+public:
+  S() = default;
+
+  void f(A& a) {
+    auto ca1 = auto(a);       // ok
+    auto ca2 = decay_copy(a); // ng
+  }
+};
+```
+
 ### コンセプト定義における利用例
 
 ### 参考文献
