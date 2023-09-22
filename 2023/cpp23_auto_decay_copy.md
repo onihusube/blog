@@ -163,7 +163,7 @@ void f(T x) {
 // front()が呼べるコンテナコンセプト
 template<typename C>
 concept container = 
-  std::ranges::range<C> and
+  std::ranges::forward_range<C> and
   requires(C& c) {
     {c.front()} -> std::same_as<std::ranges::range_reference_t<C>>;
   };
@@ -288,7 +288,7 @@ auto f() -> std::string;
 
 int main() {
   std::string s1 = auto(f());       // コピー省略によって、s1はf()のreturn文の式から直接構築される
-  std::string s2 = decay_copy(f()); // s2はstd::stringのムーブコンストラクタによって構築される
+  std::string s2 = decay_copy(f()); // s2はf()の戻り値からムーブコンストラクタによって構築される
 }
 ```
 
@@ -342,10 +342,83 @@ public:
 };
 ```
 
+### 規格書における置き換え
+
+前述のように、規格書においては以前から`auto(x)`とほぼ同等の意味合いで`decay-copy`という用語が使用され、また説明専用の関数が使用されていました。この機能のもう一つの目的としてはそれらを置き換えることで規格書の記述をシンプルにすることも含まれています。
+
+ただし、単に`decay-copy`と書かれていもその意図が微妙に異なっているらしく、`auto(x)`とは異なり`x`が*prvalue*の場合でもコピーを行うこと（*prvalue*を実体化させること）を意図した場合があるようです。そのため、機械的な置き換えではなく、その微妙な意図を汲み取った上で`auto(x)`と同じ意味で`decay-copy`が使用されている場所についてのみ置き換えを行なっています。次の表はその大まかな分類と方針をまとめたものです
+
+|規格表現|C++20の例|C++23からの例|
+|---|---|---|
+|特定の式を指定した`decay-copy`|`decay-copy(begin(t))`|`auto(begin(t))`|
+|特定の式を指定しない`decay-copy`|`decay-copy(E)`|変更なし|
+|`decay-copy`の評価結果についての説明|`decay-copy`の呼び出しはコンストラクタを呼び出したスレッドで評価される|`auto`によって生成された値はコンストラクタを呼び出したスレッドで実体化される|
+
+表中の規格文章は一例で、それぞれ`ranges::begin`、`std::thread`のコンストラクタにおけるものです。
+
+正直こんなニュアンスわかるはずもありませんが、今後は`auto(x)`が使用されている場所は*prvalue*の実体化を意味しないコピーであり、引き続き`decay-copy`が使用されている場所はそうではない、と思うことができます。
+
 ### コンセプト定義における利用例
+
+少し変わった使用法になりますが、この機能はコンセプトの戻り値型制約において役立つ場合があります。
+
+例えば、コンセプトにおいて何か呼び出し可能な型をチェックする際に、その戻り値型を特定の1つの型に指定したい場合を考えます。
+
+```cpp
+// Fは引数なしで呼び出し可能であり、bool型を返してほしい
+template<typename F>
+concept returning_bool = 
+  std::invocable<F> and
+  requires(F& f) {
+    {f()} -> std::convertible_to<bool>; // bool型を返すという意味になっていない
+  };
+```
+
+この場合に要求したいことが、「`f()`の戻り値型が`bool`型そのものであってほしいが別に修飾（`&`や`&&`）はついていても構わない。ただし`bool`以外の型は遠慮してほしい」だった場合、`std::convertible_to<bool>`ではその要求を表現できていません。なぜなら、`std::convertible_to<bool>`だと`bool`に変換可能な型であればOKという意味になってしまっているからです。例えば、ポインタ型を返す引数なしの関数は全てこの制約をパスしますが、それは明らかに意図するところではないでしょう・・・
+
+`std::same_as`を使うとちょうど`bool`型のみという制約になりますが、これだと今度は少し厳しくなります。
+
+```cpp
+template<typename F>
+concept returning_bool = 
+  std::invocable<F> and
+  requires(F& f) {
+    {f()} -> std::same_as<bool>; // bool&などが弾かれる
+  };
+```
+
+この戻り値型制約（および他のところでコンセプトの第一引数の自動補完が働く場所）においては、コンセプトの第一引数には`decltype((expr))`が充てられます。例えば上記の場合、`std::convertible_to<decltype((f())), bool>`という制約がチェックされますが、`decltype((expr))`で取得していることによって`expr`の値カテゴリの情報が含まれることになります。
+
+この場合にその修飾情報を無視した素の型をチェックするのは意外に難しく（`decay`したり`remove_cvref_t`したりする必要がある）、戻り値型制約の利用は諦めざるを得なくなります
+
+```cpp
+template<typename F>
+concept returning_bool = 
+  std::invocable<F> and
+  std::same_as<std::remove_cvref_t<std::invoke_result_t<F>>, bool>; // ようやくほぼ意図通りになる
+```
+
+これは目を凝らさないと何してるのかわからないものがあり、戻り値型制約と比べると可読性に劣ります。
+
+このような場合に`auto(x)`を使用すると、型の`decay`（`std::remove_cvref_t`）を式としてスマートに記述することができます。
+
+```cpp
+template<typename F>
+concept returning_bool = 
+  std::invocable<F> and
+  requires(F& f) {
+    {auto(f())} -> std::same_as<bool>; // 修飾を無視して戻り値型がboolであること！
+  };
+```
+
+もちろん、`auto(x)`によって戻り値のコピーが入るので若干制約の意味は異なることになりますのでその点に注意が必要ではありますが、`invoke_result_t`を`remove_cvref_t`してのような謎の呪文を書かなくても、同じことを戻り値型制約の構文の範囲内で表現可能になります。
+
+このことは、上記`f()`のような関数呼び出し式だけでなく任意の式においても有用となるでしょう。個人的には、本来の用途よりもこちらの用法の方がよく使いそうな気がしています。
 
 ### 参考文献
 
 - [P0849R8 `auto(x)`: decay-copy in the language](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0849r8.html)
 - [`std::decay` - cpprefjp](https://cpprefjp.github.io/reference/type_traits/decay.html)
 - [`decay-copy` - cpprefjp](https://cpprefjp.github.io/reference/exposition-only/decay-copy.html)
+- [C++20 コンセプトで、特定の戻り値の型を持つメンバ関数を持つことを要求するにはどのようにすべきですか？ - スタック・オーバーフロー](https://ja.stackoverflow.com/questions/74200/c20-コンセプトで-特定の戻り値の型を持つメンバ関数を持つことを要求するにはどのようにすべきですか)
+- [複合要件とsame_as/convertible_toコンセプト - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20200825/p1)
