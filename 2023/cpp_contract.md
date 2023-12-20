@@ -174,7 +174,35 @@ int select(int i, int j)   // 定義
 
 ### C++26に向けたロードマップ
 
+MVPに対する改善や設計検討はC++23サイクル中も行われていましたが、あまり活発ではありませんでした。そのためC++ ContractsはC++23には間に合いませんでした。
+
+2022年11月、SG21よりC++26に向けたContracts MVP仕様の標準への導入のロードマップが示されました。
+
+- [P2695R1 A proposed plan for contracts in C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2695r1.pdf)
+
+これによると、次のようなスケジュールになっていました
+
+|タイムライン|マイルストーン|やるべきこと|
+|---|---|---|
+|2022年11月（Kona）||契約注釈の副作用に関する議論|
+|2023年2月（Issaquah）|C++26サイクルの開始|契約注釈の副作用に関する設計の決定|
+|2023年6月（Varna）||違反ハンドラに関する設計の決定|
+|2023年11月（Kona）||契約構文に関する設計の決定|
+|2024年3月（Tokyo）||残った問題への対処。MVPを完成させEWGおよびLEWGへ転送する|
+|2024年6月（St. Louis）||EWGにおけるMVPのレビュー|
+|2024年11月?|C++26のための最後のEWGレビュー|MVPをEWGでの合意の下でCWGへ転送する|
+|2025年2月?|C++26のための最後のCWGレビュー|CWGにおけるレビューを完了し、C++26WPヘマージ|
+|2025年6月?|C++26 CD完了|未解決の設計/文言の問題解決|
+|2025年11月?||NBコメントへの対応|
+|2026年2月?|C++26 DIS完了|NBコメントへの対応|
+
+このロードマップはSG21で合意され（僅かながら反対票がありましたが）、SG21はこのロードマップに沿ってC++26 Contractsの作業を進めていくことになりました。
+
+そして、これを受けて2023年は非常に活発にContractsに関する議論が行われており、2023年中の関連提案がリビジョン改訂含めて74本も提出されています。これはC++20サイクルの終盤で議論が紛糾していた時よりもさらに多いです。
+
 ### MVPの改善
+
+#### 非`const`引数の事後条件からの参照
 
 ### CCAのセマンティクス
 
@@ -207,4 +235,5 @@ int select(int i, int j)   // 定義
 - [P2932R0 A Principled Approach to Open Design Questions for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2932r0.pdf)
 - [P2961R0 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r0.pdf)
 - [P1995R0 Contracts — Use Cases](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1995r0.html)
+- [P2695R1 A proposed plan for contracts in C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2695r1.pdf)
 - [標準化会議 - C++ の歩き方 | cppmap](https://cppmap.github.io/standardization/meetings/)
