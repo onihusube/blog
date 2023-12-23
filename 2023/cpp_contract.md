@@ -15,16 +15,18 @@ C++ Contractsとは、契約プログラミングという考え方に基づい�
 C++ Contractsは単に契約プログラミングの実現のためだけのものという訳ではなく、それを含めてさまざまなものが想定されています。例えば
 
 - 契約プログラミング（契約による設計）を言語機能によって実現する
-- 現在ドキュメントに記載されている関数に対する契約（事前条件・事後条件）をコードで記述する
-    - そして、デバッグ時にそれを検査することができる
+- 現在ドキュメントあるいはコメントに記載するしかない関数に対する契約の一部（事前条件・事後条件）をコードで記述する
+    - そして、実行時にそれを検査することができる
 - より高機能な実行時検査のための言語機能
     - 特に、関数呼び出しの境界においての実行時検査方法の提供
     - デバッグ時はもちろんとして、リリースバイナリにおいても有用な実行時検査方法の提供
 - 実行時検査の違反時のより効果的なハンドリング
-    - より高度なログ出力や安全なシャットダウンなどを可能にする
+    - 実行時のプログラム状態チェックが失敗した場合に、より高度なログ出力や安全なシャットダウンなどを可能にする
 - ユニットテストのための基盤機能としての利用
-- ツールが契約アノテーションを読み取ることで、静的解析に役立てる
-    - 静的解析ツールの能力向上
+- ツールに対するプログラマの知識の伝達手段
+    - IDE（入力支援など）が契約注釈に基づいたコード補完やサジェストを行う
+    - 静的解析ツールが契約注釈を読み取り解析に役立てる
+    - サニタイザーが契約注釈を読み取り実行時検査に使用する
     - 形式検証を可能にするようなアノテーション拡張（将来？）
 
 などです。もちろん、ここに記載されていないものや、実際に利用可能になってから開けるユースケースもあるでしょう。いずれにせよ、C++ ContractsはC++コードをさらに安全に記述する事に確実に貢献する機能です。
@@ -39,8 +41,8 @@ C++ ContractsはC++20に対してP0542で提案され、2018年6月に一旦C++2
 
 この提案自体もどうやら2013年頃から継続された議論の一つの集大成であったようです。あまり踏み込まないので詳しくは当時書かれた別の記事をご覧ください
 
-- [契約に基づくプログラミング - cpprefjp](https://cpprefjp.github.io/lang/future/contract-based_programming.html)
 - [C++20 Contract #C++ - Qiita](https://qiita.com/niina/items/440a44cd74ec4588cd15)
+- [契約に基づくプログラミング - cpprefjp](https://cpprefjp.github.io/lang/future/contract-based_programming.html)
 
 cpprefjpのサンプルコードを拝借すると、構文的には次のようなものでした
 
@@ -76,7 +78,7 @@ int main()
 
 基本的な機能は抑えておりこれでも実際に使用できるようになれば有用だったのでしょうが、色々議論が紛糾した結果、2019年7月の全体会議においてC++20から削除することが決定され削除されてしまいました。
 
-### 問題点とMVP
+### 問題点とMVP(Minimum Viable Product)
 
 C++20 Contractsは一旦はドラフト入りしたものの、1年後の2019年7月に削除することが合意されC++20から削除されてしまいました。
 
@@ -133,9 +135,9 @@ SG21では上記のP2076も含めてC++ Contractsの機能や設計について�
 
 ただ、P2182R1の部分でさえもSG21での合意に至ることはできなかったようで、さらに機能を絞り込んだものが最初のMVPとして確立されました。
 
-- [P2388R4 Abort-only contract support](https://wg21.link/p2388r4)
+- [P2388R4 Minimum Contract Support: either No_eval or Eval_and_abort](https://wg21.link/p2388r4)
 
-P2388の最初のMVPは主に次のようなものです
+P2388による最初のMVPは主に次のようなものです
 
 1. 事前条件 : `[[pre: condition]]`
 2. 事後条件 : `[[post: condition]]`
@@ -143,7 +145,6 @@ P2388の最初のMVPは主に次のようなものです
 4. 2つのビルドモード
    - *No_eval* : コンパイラは契約の式の有効性だけを検証し、実行時に影響を与えない
    - *Eval_and_abort* : 全ての契約を実行時にチェックする。違反した場合契約違反ハンドラが呼び出され、その後`std::abort()`する
-   - これらを翻訳単位ごとに切り替える実装が許可される
 5. カスタマイズ不可能で`std::abort()`を呼ぶだけの違反ハンドラ
 
 提案文書より、サンプルコード。
@@ -200,9 +201,143 @@ MVPに対する改善や設計検討はC++23サイクル中も行われていま
 
 そして、これを受けて2023年は非常に活発にContractsに関する議論が行われており、2023年中の関連提案がリビジョン改訂含めて74本も提出されています。これはC++20サイクルの終盤で議論が紛糾していた時よりもさらに多いです。
 
-### MVPの改善
+### 最初のMVP仕様
+
+P2388がMVPとしての地位を確立した後、P2521で改めてMVPの仕様がまとめられました。
+
+- [P2521R3 Contract support -- Record of SG21 consensus](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2521r3.html)
+
+このMVPの仕様においては契約注釈の構文は未決定なためプレースホルダの構文を使用しています。ただし、この記事では以降属性構文を基本として使用することにします。
+
+このMVP仕様に対しては、ロードマップ策定の前後までの間にいくつかの未解決の問題の解決が図られています。その中でも大き目なものをいくつかピックアップします。
+
+#### 関数の再宣言と契約注釈
+
+C++における関数宣言は定義が一つだけである必要があるものの、単なる宣言は何度でも行うことができます。その際問題となるのは、宣言ごとに契約注釈が異なっている場合にどの契約注釈が最終的なその関数に対する契約注釈となるのか？という事です。
+
+```cpp
+/// header.hpp
+
+int select(int i, int j)  // 最初の宣言
+  [[pre: i >= 0]];
+
+/// implemetation.cpp
+
+int select(int i, int j)  // 再宣言であり定義
+  [[pre: j >= 0]]
+  [[post r: r >= 0]]; 
+```
+
+変な例を考えれば、いくつも再宣言を行いそれぞれに異なる契約注釈を与えるような例なども容易に想像ができます。
+
+MVP仕様においては、契約注釈は関数の最初の宣言にのみ行うことができ、再宣言に対してなされている場合はill-formed（コンパイルエラー）とされています。
+
+```cpp
+/// header.hpp
+
+int select(int i, int j)    // ok、最初の宣言
+  [[pre: i >= 0]];
+
+
+int select2(int i, int j);  // ok、最初の宣言
+
+/// implemetation.cpp
+
+int select(int i, int j)  // ng、再宣言に契約注釈を行えない
+  [[pre: j >= 0]]
+  [[post r: r >= 0]];
+
+int select2(int i, int j)   // ng、再宣言に契約注釈を行えない
+  [[pre: i >= 0]]
+  [[pre: j >= 0]]
+  [[post r: r >= 0]];
+```
+
+正しい記述は次のようになります
+
+```cpp
+/// header.hpp
+
+int select(int i, int j)  // ok、最初の宣言
+  [[pre: i >= 0]]
+  [[pre: j >= 0]]
+  [[post r: r >= 0]];
+
+/// implemetation.cpp
+
+int select(int i, int j); // ok、再宣言であり定義
+```
+
+これは、ヘッダファイルに関数の宣言だけを記述し別のソースファイルでその定義を提供するプログラムやライブラリでの使用時に最も自然な形になります。すなわち、関数契約をコード化した契約注釈は常に利用者側に公開されなければならないということを反映しています。
 
 #### 非`const`引数の事後条件からの参照
+
+事後条件においては関数の戻り値だけではなく関数引数を参照することができます。その際、関数引数のどの時点の状態を取得するかによって条件の意味が変わってしまう場合があります。
+
+```cpp
+// ユーザーが見る宣言
+int generate(int lo, int hi)
+  [[pre lo <= hi]]
+  [[post r: lo <= r && r <= hi]];
+
+// 開発者が見る定義
+int generate(int lo, int hi) {
+  int result = lo;
+  while (++lo <= hi) // loが更新される
+  {
+    if (further())
+      ++result;      // loよりもゆっくりとインクリメントされる
+  }
+  return result;
+}
+```
+
+この`generate()`関数では、事後条件として`lo <= r`（`r`は戻り値）であることが表示されています。しかしその定義を見てみると、`lo`は関数中でその値が変更されています。このため、確かに`generate()`の戻り値の値は`generate()`を呼び出した時点の`lo`以上になるのですが、一方で関数終了時点の`lo`よりは小さくなります。
+
+このように、関数引数がその実装内部で変更できることによってユーザーが見る条件と実装者が見る条件の解釈が異なる場合がいあり得てしまいます。
+
+また、暗黙ムーブによって事後条件がムーブ後オブジェクトを参照する可能性もあります。
+
+```cpp
+// ユーザーが見る宣言
+string forward(string str)
+  [[post r: r == str]];
+
+// 開発者が見る定義
+string forward(string str) {
+  // ...
+  return str; // 暗黙ムーブが行われる
+}             // UB、事後条件はムーブ後オブジェクトを読み取る
+```
+
+契約注釈は実装者からユーザーに向けての関数契約をコードであらわしたものであり、それを読み取るのはユーザーです。ユーザーは関数宣言の契約注釈を見た場合、そこで使用されている仮引数名の値は自分が渡した値に一致すると思って見るのが一般的な見方だと思われます。そしておそらく、契約注釈を読み取るツールも同様の見方をするでしょう。そのため契約注釈の条件の意味はユーザー目線で自然であることがあるべき姿です。
+
+また、これらの問題は関数の引数が非参照（参照型変数は変更されうることが明確かつ暗黙ムーブ対象外）かつ非`const`（`const`引数であれば変更されないことが明確）の場合にのみ問題となります。そのため、MVPでは事後条件で関数引数を使用する場合、その引数が参照型であるか`const`でなければならず、そうでない場合はill-formed（コンパイルエラー）としています。
+
+```cpp
+// これはダメ
+int generate(int lo, int hi)
+  [[pre lo <= hi]]
+  [[post r: lo <= r && r <= hi]]; // ng、loもhiもconstでも参照でもない
+
+// こう書く
+int generate(const int lo, const int hi)
+  [[pre lo <= hi]]
+  [[post r: lo <= r && r <= hi]]; // ok、loもhiもconst
+```
+
+#### 契約条件式の副作用
+
+C++のほとんどの式はあらゆる副作用を含む可能性があり、それは契約注釈の条件式も例外ではありません。また、関数が副作用を含んでいるかどうかを判定することは困難であるため、副作用を含む関数の排除を徹底することもできません。
+
+C++ Contractsは安全なコードの記述を促進するための機能であるため、契約条件式からの副作用というものは望ましいものではありません。そのため、当初の論調では契約注釈内の副作用は禁止する雰囲気でしたが、それは困難なため何とか制限しようとする試みられていました。
+
+- [P2388R4 Minimum Contract Support: either No_eval or Eval_and_abort](https://wg21.link/p2388r4)
+    - 契約条件式の副作用を部分的に削除することを許可 
+- [P2680R1 Contracts for C++: Prioritizing Safety](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2680r1.pdf)
+    - 定数式における`constexpr`関数のように。その評価の内側に収まる限り副作用を許可する
+
+MVP仕様では、契約条件式の副作用を禁止していません。ただし、契約条件式はビルドモード等によって0回以上評価される可能性がある（評価回数が不定）とすることで、プログラマが契約条件式の副作用に依存することを回避しようとしています。
 
 ### CCAのセマンティクス
 
@@ -225,6 +360,8 @@ MVPに対する改善や設計検討はC++23サイクル中も行われていま
 
 ### 参考文献
 
+- [P1995R0 Contracts — Use Cases](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1995r0.html)
+- [P2466R0 The notes on contract annotations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2466r0.html)
 - [C++20 Contract - Qiita](https://qiita.com/niina/items/440a44cd74ec4588cd15)
 - [契約に基づくプログラミング - cpprefjp](https://cpprefjp.github.io/lang/future/contract-based_programming.html)
 - [C++20 Contract #C++ - Qiita](https://qiita.com/niina/items/440a44cd74ec4588cd15)
@@ -234,6 +371,5 @@ MVPに対する改善や設計検討はC++23サイクル中も行われていま
 - [P2755R0 A Bold Plan for a Complete Contracts Facility](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2755r0.pdf)
 - [P2932R0 A Principled Approach to Open Design Questions for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2932r0.pdf)
 - [P2961R0 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r0.pdf)
-- [P1995R0 Contracts — Use Cases](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1995r0.html)
 - [P2695R1 A proposed plan for contracts in C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2695r1.pdf)
 - [標準化会議 - C++ の歩き方 | cppmap](https://cppmap.github.io/standardization/meetings/)
