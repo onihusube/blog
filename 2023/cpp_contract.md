@@ -330,29 +330,127 @@ int generate(const int lo, const int hi)
 
 C++のほとんどの式はあらゆる副作用を含む可能性があり、それは契約注釈の条件式も例外ではありません。また、関数が副作用を含んでいるかどうかを判定することは困難であるため、副作用を含む関数の排除を徹底することもできません。
 
-C++ Contractsは安全なコードの記述を促進するための機能であるため、契約条件式からの副作用というものは望ましいものではありません。そのため、当初の論調では契約注釈内の副作用は禁止する雰囲気でしたが、それは困難なため何とか制限しようとする試みられていました。
+C++ Contractsは安全なコードの記述を促進するための機能であるため、契約条件式からの副作用というものは望ましいものではありません。そのため、当初の論調では契約注釈内の副作用は禁止する雰囲気でしたが、それは困難なため何とか制限しようと試みられていました。
 
 - [P2388R4 Minimum Contract Support: either No_eval or Eval_and_abort](https://wg21.link/p2388r4)
     - 契約条件式の副作用を部分的に削除することを許可 
+- [P2570R0 On side effects in contract annotations](https://onihusube.hatenablog.com/entry/2022/07/09/160343#P2570R0-On-side-effects-in-contract-annotations)
+    - 副作用が無いことが分かる関数のみ使用可能とする
+    - ビルドモードによって副作用の評価が異なるモデルを採用する
+    - 条件式を複数回評価する
 - [P2680R1 Contracts for C++: Prioritizing Safety](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2680r1.pdf)
     - 定数式における`constexpr`関数のように。その評価の内側に収まる限り副作用を許可する
+- [P2712R0 Classification of Contract-Checking Predicates](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2712r0.pdf)
+    - 契約条件式内専用の言語サブセットを作成しないことを推奨
+    - 副作用は許容するがそのような条件式を書かないように教育する
+- [P2756R0 Proposal of Simple Contract Side Effect Semantics](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2756r0.pdf)
+    - 契約条件式の扱いを他のC++コードと全く同じにする
 
 MVP仕様では、契約条件式の副作用を禁止していません。ただし、契約条件式はビルドモード等によって0回以上評価される可能性がある（評価回数が不定）とすることで、プログラマが契約条件式の副作用に依存することを回避しようとしています。
 
-### CCAのセマンティクス
+### 契約注釈のセマンティクス
 
-- [P2570R0 On side effects in contract annotations](https://onihusube.hatenablog.com/entry/2022/07/09/160343)
+契約注釈のセマンティクスとは契約注釈のC++コード上で持つ意味のことで、特に契約条件がどう評価されるのか、評価された時何が起こるのかなどを指定するものです（条件式の副作用の扱いもセマンティクスの一部です）。MVPにおける契約注釈のセマンティクスのほとんどの部分はビルドモードによって一律的に制御されていました。
+
+とはいえ細かいところまですべてが決まっていたわけではなく、例えば契約条件の評価に伴って例外がスローされたときにどうなるのか、あるいは未定義動作が発生したらどうなるのか、などが未決定でした。
+
+特に契約注釈からの例外送出に関してはセマンティクス全般にかかわる問題があり、契約違反発生時に例外を送出するモードの必要性が望まれたことでその議論が本格化しました。
+
+- [P2698R0 Unconditional termination is a serious problem](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2698r0.pdf)
+    - 契約違反時に例外を投げる*Eval and throw*ビルドモードの提案
+- [P2780R0 Caller-side precondition checking, and Eval_and_throw](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2780r0.html)
+    - 契約条件（事前条件）のチェックが関数内部ではなく関数呼び出し側で行われるという動作モデルの提案
+- [P2858R0 Noexcept vs contract violations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2858r0.html)
+    - *Eval and throw*モードの必要性に疑義を投げかける提案
+
+問題というのはまず、`noexcept(true)`指定がなされている関数に対して契約注釈を行われているとき、その関数の`noexcept`性がどうなるのかについてです。
+
+```cpp
+// noexceptだが、事前条件違反が起こる
+void fun() noexcept [[pre: false]];
+
+constexpr bool mystery = noexcept(fun());  // この値は何になる？
+
+using nothrow_callback_t = void(*)() noexcept;
+nothrow_callback_t p = fun;                // コンパイルが通る？
+
+void overload(void(*)());                  // #1
+void overload(void(*)() noexcept);         // #2
+
+overload(&fun);                            // どちらのオーバーロードが呼ばれる？
+```
+
+*Eval and throw*モードでは契約違反に伴って例外が送出されるため、その関数の呼び出し時のプログラム状態次第で`noexcept`関数から例外が送出されることになります。とすると、ビルドモードが*Eval and throw*の場合は契約注釈が行われている関数は全て例外が送出されうるため。そのような関数の`noexcept`演算子の結果は`false`となるべきでしょうか？
+
+*Eval and throw*モードでなくとも、契約条件式にはC++の任意の式が指定可能であるため任意の例外が送出される可能性があります。それを考慮すると、契約注釈が行われている全ての関数について契約条件がチェックされる場合に同様の問題があります。
+
+```cpp
+void my_func(int i) [[pre: i >= 0]];
+void your_func(int i) noexcept [[pre: i >= 0]];
+
+int x; // Value is not used.
+static_assert( false == noexcept(my_func(x)) );   // 常に成り立つ
+static_assert( true == noexcept(your_func(x)) );  // 常に成り立つ？
+```
+
+この例の`your_func()`は、呼び出し側から見ると契約条件が評価される場合は常に例外を投げる可能性があります。従って、`noexcept`演算子は契約条件が評価されるビルドモードにおいて契約注釈が行われている関数に対して常に`false`を返さなければなりません。
+
+```cpp
+static_assert( true == noexcept(your_func(x)) );  // 契約条件をチェックしないビルドモードでは成り立つ
+static_assert( false == noexcept(your_func(x)) ); // 契約条件をチェックするビルドモードでは成り立つ
+```
+
+`noexcept`演算子の振る舞いは契約のビルドモードによって変化してしまうわけです。しかし、これは現在`noexcept`演算子によってその動作を切り替えているコード（`std::vector`のムーブコンストラクタのようなコード）の動作をそのビルドモードに応じて静かに変更させることになりますが、それはおそらくバグというべき振る舞いでしょう。
+
+これらの問題について、その解決や整理を試みる提案がいくつか提出されました
+
+- [P2751R1 Evaluation of Checked Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2751r1.pdf)
 - [P2834R1 Semantic Stability Across Contract-Checking Build Modes](https://wg21.link/P2834R1)
+- [P2861R0 The Lakos Rule: Narrow Contracts And `noexcept` Are Inherently Incompatible](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2861r0.pdf)
 - [P2877R0 Contract Build Modes and Semantics](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2877r0.pdf)
-- [P2877R0 Contract Build Modes, Semantics, and Implementation Strategies](https://wg21.link/P2877R0)
+
+結局、C++26 Contractsに向けてはP2834およびP2877で提案されたセマンティクスが採用されました。その骨子は大きく分けて次の2つです
+
+1. 契約注釈が評価される場合、その評価は*ignore*、*observe*、*enforce*のいずれかのセマンティクスを持つ
+    - *ignore* : 契約注釈は各契約条件を評価しないため、契約違反を起こさない
+    - *observe* : 契約注釈は各契約条件を評価し、そのいずれかが`true`を返さない場合は契約違反処理プロセスが発生する
+    - *enforce* : 契約注釈は各契約条件を評価し、そのいずれかが`true`を返さない場合は契約違反処理プロセスが発生する。契約違反処理プロセスの終了後、プログラムは実装定義の方法で終了する
+2. 契約注釈の個々の評価において、それがどのようなセマンティクスを持つかは実装定義とする
+    - プログラム内の全ての注釈が同じセマンティクスを持つように強制される場合がある
+      - MVPの2つのビルドモードに対応する
+    - 異なる評価で異なるセマンティクスを持つことにより、同じ関数の異なるインライン版で異なるセマンティクスをコンパイル時に選択することができ、それはODR違反ではなくなる
+    - 実装は、その選択をどのように行うかを指定する仕組みがユーザーに公開されていれば、契約注釈のセマンティクスをコンパイル時・リンク時・実行時のいずれかのタイミングで選択できる
+
+P2877では、ビルドモードが元々備えていたセマンティクスに*observe*を1つ追加するとともに、契約注釈の評価のセマンティクスを契約注釈全体からその個々のプロパティとすることで、契約注釈を持つ関数のコンパイル時プロパティが契約注釈のセマンティクスに依存しない（できない）ようにするものです。
+
+これによって、契約注釈がビルドモードに関わらず他の言語機能に影響を与えないようになり、翻訳単位間で契約注釈のセマンティクスが混合していることも許可されます。すなわち、関数の`noexcept`指定は契約注釈とは無関係に今まで通りの振る舞いとなり、契約注釈のセマンティクスは翻訳単位で異なっていることも、翻訳単位内の関数呼び出しごとに異なっていることも許可されます。
+
+P2877単体では、実装はMVPの2つのビルドモードだけをサポートすることを選択でき、また、コンパイラはリンク時やコンパイル時、実行時で契約注釈のセマンティクスを選択できるようなビルドオプションを提供することもできるようにすることを意図していましたが、これに関しては違反ハンドラの役割の変更に伴ってさらに更新されます。
+
+このセマンティクスの下では、`noexcept`指定されている関数の呼び出し時に、*Eval and throw*モードにおいて契約が破られるか単に契約条件から例外がスローされた場合の振る舞いは、従来の`noexcept`指定された関数から例外が送出された場合と同じになり、`std::terminate()`によってプログラムが終了されます。これは仕様の矛盾ではなく、Lakos Ruleに背いて契約がなされてしまっていることにより発生する結果です。
+
+- [P2861R0 The Lakos Rule](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2861r0.pdf)
+- [広い契約(Wide Contracts)とnoexcept指定 - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20180127/p1)
+
+Lakos Ruleに基づけば
+
+- `noexcept`指定された関数の例外仕様と狭い契約は、本質的に互換性がなく、矛盾している
+- つまり、何かしらの契約がなされている関数は狭い契約を持つ（引数等プログラム状態に関して事前条件を持つ）ため、`noexcept`指定されるべきではない
+
+となり、`noexcept`指定された関数の契約注釈からの例外送出を特別扱いする必要は無いことが分かります。ただし、これを言語機能として強制すること（`noexcept`指定された関数の契約注釈はコンパイルエラーとすること）は、有効なユースケース（ネガティブテストやプログラマの仮定に基づく`noexcept`指定など）があるため回避されています。
+
+すなわち、`noexcept`指定されている関数に契約を付与することができ、`noexcept`関数ではその契約は評価及び破られた時にも例外を投げないとみなされます。もしその仮定が裏切られ、その契約が評価中に例外を投げるか、契約が満たされなかった時に例外を投げた場合、現在の`noexcept`関数から例外を投げた時と同様に`std::terminate()`を呼び出してプログラムを終了させます。
 
 ### 違反ハンドラ
 
+- [P2784R0 Not halting the program after detected contract violation](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2784r0.html)
 - [P2811R7 Contract-Violation Handlers](https://wg21.link/P2811R7)
+- [P2838R0 Unconditional contract violation handling of any kind is a serious problem](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2838r0.html)
 
 ### 構文
 
 - [P2961R0 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r0.pdf)
+- [P2885R3 Requirements for a Contracts syntax](https://wg21.link/p2885r3)
 
 ### C++26に向けて、残りの問題
 
@@ -368,8 +466,12 @@ MVP仕様では、契約条件式の副作用を禁止していません。た�
 - [P0542R5 Support for contract based programming in C++](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0542r5.html)
 - [2019-07 Cologne ISO C++ Committee Trip Report - reddit](https://www.reddit.com/r/cpp/comments/cfk9de/201907_cologne_iso_c_committee_trip_report_the/)
 - [P1823R0 Remove Contracts from C++20](https://www.reddit.com/r/cpp/comments/cfk9de/201907_cologne_iso_c_committee_trip_report_the/)
+- [P2570R0 On side effects in contract annotations](https://onihusube.hatenablog.com/entry/2022/07/09/160343)
 - [P2755R0 A Bold Plan for a Complete Contracts Facility](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2755r0.pdf)
 - [P2932R0 A Principled Approach to Open Design Questions for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2932r0.pdf)
 - [P2961R0 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r0.pdf)
 - [P2695R1 A proposed plan for contracts in C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2695r1.pdf)
 - [標準化会議 - C++ の歩き方 | cppmap](https://cppmap.github.io/standardization/meetings/)
+- [P2817R0 The idea behind the contracts MVP](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2817r0.html)
+- [P2829R0 Proposal of Contracts Supporting Const-On-Definition Style](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2829r0.pdf)
+- [P2861R0 The Lakos Rule](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2861r0.pdf)
