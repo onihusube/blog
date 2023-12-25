@@ -611,8 +611,111 @@ void ::handle_contract_violation(const std::contracts::contract_violation& viola
 
 ### 構文
 
-- [P2961R0 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r0.pdf)
+C++20 Contractsでは契約注釈のための構文として属性（っぽい）構文を採用していました。C++20で議論が紛糾したポイントにこの構文は含まれていなかったのですが、MVP仕様では構文に関しても未決定としてプレースホルダなものを当てていました。しかし、C++20以降のContracts関連の提案では主として属性構文が使用されていました。
+
+```cpp
+// 属性like構文の例
+int select(int i, int j)
+  [[pre: i >= 0]]
+  [[pre: j >= 0]]
+  [[post r: r >= 0]]
+{
+  [[assert: _state >= 0]];
+
+  if (_state == 0)
+    return i;
+  else
+    return j;
+}
+
+int pre;    // ok
+int assert; // ok
+int post;   // ok
+```
+
+MVPに対する構文の提案としては属性構文の他にも、ラムダ式のような構文を提案するもの
+
+- [P2461R1 Closure-based Syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2461r1.pdf)
+
+```cpp
+// ラムダ式like構文の例
+int select(int i, int j)
+  pre{i >= 0}
+  pre{j >= 0}
+  post(r){r >= 0}
+{
+  assert{_state >= 0};
+
+  if (_state == 0)
+    return i;
+  else
+    return j;
+}
+
+int pre;    // ok
+int assert; // ???
+int post;   // ok
+```
+
+新しいキーワードとともに専用の領域を導入する条件中心と呼ばれるもの
+
+- [P2737R0 Proposal of Condition-centric Contracts Syntax](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2737r0.pdf)
+
+```cpp
+// 条件中心構文の例
+int select(int i, int j)
+  precond(i >= 0)
+  precond(j >= 0)
+  postcond(result >= 0)
+{
+  incond(_state >= 0);
+
+  if (_state == 0)
+    return i;
+  else
+    return j;
+}
+
+int precond;  // ng
+int incond;   // ng
+int postcond; // ng
+```
+
+文脈依存のキーワードによる専用の領域を導入する自然な構文と呼ばれるもの
+
+- [P2961R2 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r2.pdf)
+
+```cpp
+// 条件中心構文の例
+int select(int i, int j)
+  pre(i >= 0)
+  pre(j >= 0)
+  post(result : result >= 0)
+{
+  contract_assert(_state >= 0);
+
+  if (_state == 0)
+    return i;
+  else
+    return j;
+}
+
+int pre;  // ok
+int pre;  // ok
+int contract_assert; // ng
+```
+
+の4つの構文候補が提案されていました。
+
+最終的なC++ Contractsの構文選択のためにP2885R3にて契約注釈のための構文に求められる要件をまとめ、その比較基準が示されました
+
 - [P2885R3 Requirements for a Contracts syntax](https://wg21.link/p2885r3)
+
+これに基づいて検討された結果、2023年
+
+
+- [2023-11 Kona ISO C++ Committee Trip Report — Second C++26 meeting!🌴 : r/cpp](https://www.reddit.com/r/cpp/comments/17vnfqq/202311_kona_iso_c_committee_trip_report_second/)
+- [P3028R0 An Overview of Syntax Choices for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p3028r0.pdf)
 
 ### C++26に向けて、残りの問題
 
