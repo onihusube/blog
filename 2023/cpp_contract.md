@@ -613,6 +613,8 @@ void ::handle_contract_violation(const std::contracts::contract_violation& viola
 
 C++20 Contractsでは契約注釈のための構文として属性（っぽい）構文を採用していました。C++20で議論が紛糾したポイントにこの構文は含まれていなかったのですが、MVP仕様では構文に関しても未決定としてプレースホルダなものを当てていました。しかし、C++20以降のContracts関連の提案では主として属性構文が使用されていました。
 
+- [P2935R4 An Attribute-Like Syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2935r4.pdf)
+
 ```cpp
 // 属性like構文の例
 int select(int i, int j)
@@ -686,7 +688,7 @@ int postcond; // ng
 - [P2961R2 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r2.pdf)
 
 ```cpp
-// 条件中心構文の例
+// 自然な構文の例
 int select(int i, int j)
   pre(i >= 0)
   pre(j >= 0)
@@ -701,45 +703,232 @@ int select(int i, int j)
 }
 
 int pre;  // ok
-int pre;  // ok
+int post;  // ok
 int contract_assert; // ng
 ```
 
 の4つの構文候補が提案されていました。
 
-最終的なC++ Contractsの構文選択のためにP2885R3にて契約注釈のための構文に求められる要件をまとめ、その比較基準が示されました
+ロードマップに従って2023年11月の全体会議で構文を決定することになりましたが、その時点でP2737の条件中心構文は新しいキーワードの導入などが忌避されかつ更新が無く、P2461のラムダlike構文はP2961の自然な構文をその後継として認めていたため取り下げられており、実質的に当初の属性構文と自然な構文との二者択一となりました。
+
+構文選択のためにP2885R3にて契約注釈のための構文に求められる要件がまとめれその比較基準が示されました
 
 - [P2885R3 Requirements for a Contracts syntax](https://wg21.link/p2885r3)
 
-これに基づいて検討された結果、2023年
+より正確には、P2961の自然な構文は最後発の構文であり、属性構文の欠点を解消しラムダlikeと条件中心構文の利点を取り入れたうえで、この要件をなるべく満たすように考慮して設計され提案された構文案でした。
 
+P2885に基づいて2つの構文が比較検討された結果、2023年11月のKona会議においてC++ Contractsの構文としてはP2961の自然な構文が採用されました。
 
 - [2023-11 Kona ISO C++ Committee Trip Report — Second C++26 meeting!🌴 : r/cpp](https://www.reddit.com/r/cpp/comments/17vnfqq/202311_kona_iso_c_committee_trip_report_second/)
 - [P3028R0 An Overview of Syntax Choices for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p3028r0.pdf)
 
+議論の過程などは公開されていないためどういう判断基準で決定されたかはわかりませんが、2つの構文の詳細な比較検討はP3028に見ることができます。
+
+P2961では属性構文の欠点として次のような点が挙げられていました
+
+1. 契約注釈の区切りのトークン`[[ ... ]]`が構文として重い
+    - 一部のユーザーからは醜いと認識されている
+2. 契約構文は属性と同様の記法を利用するが属性ではないため、混乱が生じる
+    - 契約構文は違反ハンドラを通じるなどして、関数から新しいコードパスを作成できるが、標準属性はこのようなことを行うように設計されていない
+3. 契約注釈を置ける構文上の位置は関数宣言の自然な読み取り順序に反している
+    - 属性の置ける位置を再利用するため、後置戻り値の前（`override`や`requires`節の前）に事前条件と事後条件がくる
+4. `assert`は式ではないため、Cの`assert`の完全な代替となり得ない
+5. 3と4を属性構文のまま解決しようとすると、属性構文の利点が失われる
+    - 現在それらが可能なように標準属性はできていない、そのため実装経験もない
+6. 属性構文では、その内部の述語の前に`:`がくる場合に、それより前の内容に区切りを導入しない
+    - 視覚的な情報の区別（契約種別や戻り値の名前、ラベルなどの見分け）が難しくなり、将来的に構文解析の曖昧さを生じさせる
+7. 契約注釈自体に属性を付加する場合、属性内の属性という文法を導入させなければならない
+
+そして、P2961は既存の構文が満たしていない部分を満足することを設計ゴールとし、次のような目標を掲げていました
+
+- 構文は既存のC++に自然に馴染む。
+    - 契約機能に慣れていないユーザーでも混乱を招くことなく直感的に理解できるものである必要がある
+- 契約注釈構文は、属性やラムダ式など既存のC++の構成要素に似ていてはならない
+    - ぱっと見で認識可能な独自の設計空間に置かれているべき
+- 構文はエレガントかつ軽量である
+    - 必要以上にトークンや文字を使用するべきではない
+- 読みやすくするために、一次情報とニ次情報を構文的に分離する
+    - 一次情報（条件種別、契約条件式、戻り値名、キャプチャなど）をそれ以外のニ次情報（ラベルなど）よりも視覚的に強調する
+
+P3028R0より、P2961の自然な構文による契約注釈の例
+
+```cpp
+// フリー関数に対する契約注釈
+template <typename T>
+auto f() noexcept -> int requires something<T> pre( true );
+
+// 配列ポインタを返す関数に対する契約注釈
+int (*g(char i))[17] pre( true );
+
+// 事後条件における戻り値参照と戻り値型
+auto f() -> int post( r : r > 0 );
+
+// 事後条件と属性
+auto f()
+  [[ function_type_attribute1 ]]
+  [[ function_type_attribute2 ]]
+  -> int
+  [[ return_type_attribute1 ]]
+  pre( 1 || true )
+  pre( 2 || true )
+
+
+// メンバ関数に対する契約注釈
+struct S {
+
+  // デフォルト宣言への注釈（C++29以降）
+  bool operator=(const S&) pre( true ) = default;
+
+  template <typename T>
+  auto f() const&& -> int requires something<T>
+    pre( true )
+    post( r : true )
+  {
+    return 17; 
+  }
+};
+
+// メンバ初期化子でのアサーション
+struct S {
+  int d_x;
+  
+  S : d_x( contract_assert( true ) , 17 ) {}
+};
+
+// ラムダ式
+auto x = [] (int a) -> int pre( true ) { return 17; };
+auto y = [] -> int pre( true ) { return 17; };
+
+// ラムダ式 + requires節
+auto x = [](auto a) requires something<decltype(a)>
+  pre( true ) { ... };
+```
+
 ### C++26に向けて、残りの問題
 
+契約注釈のセマンティクスに契約構文というとても大きな問題がP2695R1のロードマップ通りのスケジュールで解決を見たことで、C++26 ContractsのSG21における作業完了は俄然現実味を帯びてきました。
+
+とはいえまだC++26に間に合わせるにあたってのすべての問題が解決したわけではありません。細かいながらも決定を必要とする問題がいくつか残っています。
+
 - [P2896R0 Outstanding design questions for the Contracts MVP](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2896r0.pdf)
-- [P2932R0 A Principled Approach to Open Design Questions for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2932r0.pdf)
+
+P2896でまとめて提示されている残りの設計上の問題は次のものです
+
+1. 異なる翻訳単位の最初の宣言における契約について
+    - 現在のMVPでは、`f`が異なる翻訳単位で宣言されている場合、その契約は同一（*identical*）でなけれならない（そうでない場合診断不用のill-formed）とされているが、同一（*identical*）の意味が定義されていない。この定義が必要
+    - 選択肢
+      1. 同一（*identical*）の意味を定義し、これが実装可能であることを確認する
+      2. 異なる翻訳単位の同じ関数の2つの宣言について、両方に契約がなされている場合をill-formed（診断不用）として問題を回避する。ただしこれは実用的ではない
+2. オーバーライドする関数とされる関数の契約について
+    - 現在のMVPでは、オーバーライドする関数はされる関数の契約を継承し、追加の契約を行えない。これについて異論があり、どうするかを選択する必要がある。
+    - 選択肢
+      1. なにもしない（現在のMVPのまま）
+      2. MVPの制限を強め、オーバーライドする関数もされる関数も契約を行えないようにする
+      3. 継承された契約をオーバーライドする機能などの仮想関数に対するより柔軟なソリューションを考案し、MVPを緩和する
+3. ラムダ式に対する契約と暗黙キャプチャについて
+    - 契約機能はラムダ式においても機能しなければならない。その際、ラムダの本体で使用されていないが契約指定で使用されている名前はキャプチャされるかどうか（契約に表れている名前がODR-usedであるかどうか）が未解決
+    - 選択肢
+      1. ラムダにおける契約は他の所と同じルールに従う。すなわち、契約条件式でのみ使用されている名前はキャプチャされる
+          - P2890R0が提案している
+      2. ill-formedとする。ラムダにおける契約条件式は、他の方法でキャプチャされない名前をキャプチャできない
+          - P2834R1が提案している
+      3. ラムダ式における契約機能を無効にする
+4. コルーチンにおける契約
+    - コルーチンに対する契約は通常の関数と同様に動作するのかが未解決
+    - 選択肢
+      1. コルーチンで事前・事後条件とアサーションを許可し、事前条件と事後条件のセマンティクスを指定する
+          - P2957R0が提案し、セマンティクスについても提供している
+      2. コルーチンではアサーションのみ許可する
+      3. コルーチンでは契約機能は無効とする
+5. 定数式における契約について
+    - 定数評価中に契約条件は評価されるのか、どういうセマンティクスを持つのかが未解決。特に、契約条件式はコア定数式ではない場合と、契約条件式はコア定数式だが`false`に評価された場合にどうなるのかが問題。
+    - 選択肢（2つの場合のどちらについても）
+      1. ill-formed
+      2. ill-formed、ただし診断不要
+      3. 契約条件式は無視される（定数評価中のみ）
+      4. 契約条件式は無視するが、警告を発することを推奨する
+      5. いずれの場合も定数式における契約注釈のセマンティクスは実装定義とする
+6. トリビアルな特殊メンバ関数に対する契約について
+    - トリビアルな関数に契約がなされている場合、そのトリビアル性に影響するかどうかが未解決
+    - 選択肢
+      1. 契約が指定されていてもトリビアルのまま
+      2. 契約が指定されていてもトリビアルのままだが、その結果として事前・事後条件がチェックされない可能性がある
+          - P2834R1が提案している
+
+これら問題に対する設計についてはそれぞれ既に提案が提出されています。
+
+- [P2932R2 A Principled Approach to Open Design Questions for Contracts](https://wg21.link/p2932r2)
+    - P2896で提示されている問題すべてに対する解決策を提案
+- [P3066R0 Allow repeating contract annotations on non-first declarations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p3066r0.pdf)
+    - 1の問題に対する提案
+    - 同じリストを持つ限り後の宣言での契約注釈を許可する
+    - 契約注釈の同じリストの定義を提案している
+- [P2954R0 Contracts and virtual functions for the Contracts MVP](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2954r0.html)
+    - 2の問題に対する提案
+    - 次のようにすることを提案
+      - 関数をオーバーライドする仮想関数には契約指定を行えず、オーバーライドされる関数の契約指定を継承する
+      - 関数が複数の関数をオーバーライドする場合、オーバーライドされる関数は契約指定を持ってはならない
+- [P2890R2 Contracts on lambdas](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2890r2.pdf)
+    - 3の問題に対する提案
+    - 契約注釈で使用された名前は暗黙的にキャプチャされる
+- [P2834R1 Semantic Stability Across Contract-Checking Build Modes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2834r1.pdf)
+    - 3と6の問題に対する提案を含む
+    - 契約注釈で使用された名前は暗黙的にキャプチャされない
+    - トリビアルな関数の契約注釈は関数のトリビアル性に影響を与えない
+      - そのような契約注釈は評価されない（*ignore*セマンティクスを持つ）可能性がある
+- [P2957R0 Contracts and coroutines](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2957r0.html)
+    - 4の問題に対する提案
+    - コルーチンでも契約注釈を使用可能にするためのセマンティクスを提案
+- [P2894R1 Constant evaluation of Contracts](https://wg21.link/p2894r1)
+    - 5の問題に対する提案
+    - 定数式における契約チェックを許可し、そのセマンティクスは実装定義とする
+
+ただし、このうち一部のものについては2023年11月の会議で解決が採択されています。
+
+- [2023-11 Kona ISO C++ Committee Trip Report — Second C++26 meeting!🌴 : r/cpp](https://www.reddit.com/r/cpp/comments/17vnfqq/202311_kona_iso_c_committee_trip_report_second/)
+
+4と6についてはC++26に向けた設計が決定されており、それぞれ次のようになりました
+
+- コルーチンにおける契約
+    - コルーチンに対しては事前条件と事後条件を指定できない（コンパイルエラー）
+    - アサーション（`contract_assert`）は使用可能
+- トリビアルな特殊メンバ関数に対する契約について
+    - 最初の宣言で`default`指定されている関数には契約注釈（事前条件/事後条件）を行えない（コンパイルエラー）
+
+これらはどちらも契約注釈の存在をコンパイルエラーとしており、これが最終的に確定した仕様というわけではありません。MVPの当初の理念に基づいて、この問題の詳細な設計の確定は将来のバージョンで行い、C++26 Contractsに向けてはエラーとしておくことで将来の拡張を妨げないようにしています。
+
+残りの問題については、来春3月末の東京における会議でその設計が決定される予定です。
+
+### 2023年末時点でのMVP
+
+これらの議論をすべて反映した現時点でのMVP仕様、すなわちC++26 Contracts仕様候補はP2900にまとめられています。この記事を執筆している時点ではR3が最新版です。
+
+- [P2900R3 Contracts for C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2900r3.pdf)
+
+順当にいけば、この提案がC++26 Contractsの提案文書としてC++26のワーキングドラフトにマージされることになるでしょう。ロードマップ通りならそれは2025年2月ごろになるはずで、来年の今頃にはC++26 Contracts仕様がほぼ固まりEWGのレビューを終えているはずです。
+
+ただ1つ不安な点があるとすれば、契約注釈からの例外送出に伴うセマンティクスの問題で、`noexcept(contract_assert(...))`の結果がどうなるべきか？など一筋縄ではいきそうにない問題が提起されていることです。
+
+- [P2969R0 Contract annotations are potentially-throwing](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2969r0.pdf)
+
+この問題はどう決定しても禍根を残しそうで、このあたりの問題に関してはまた変更があるかもしれません。
 
 ### 参考文献
 
 - [P1995R0 Contracts — Use Cases](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1995r0.html)
 - [P2466R0 The notes on contract annotations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2466r0.html)
+- [P0542R5 Support for contract based programming in C++](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0542r5.html)
 - [C++20 Contract - Qiita](https://qiita.com/niina/items/440a44cd74ec4588cd15)
 - [契約に基づくプログラミング - cpprefjp](https://cpprefjp.github.io/lang/future/contract-based_programming.html)
 - [C++20 Contract #C++ - Qiita](https://qiita.com/niina/items/440a44cd74ec4588cd15)
-- [P0542R5 Support for contract based programming in C++](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0542r5.html)
+- [標準化会議 - C++ の歩き方 | cppmap](https://cppmap.github.io/standardization/meetings/)
 - [2019-07 Cologne ISO C++ Committee Trip Report - reddit](https://www.reddit.com/r/cpp/comments/cfk9de/201907_cologne_iso_c_committee_trip_report_the/)
 - [P1823R0 Remove Contracts from C++20](https://www.reddit.com/r/cpp/comments/cfk9de/201907_cologne_iso_c_committee_trip_report_the/)
-- [P2570R0 On side effects in contract annotations](https://onihusube.hatenablog.com/entry/2022/07/09/160343)
 - [P2755R0 A Bold Plan for a Complete Contracts Facility](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2755r0.pdf)
-- [P2932R0 A Principled Approach to Open Design Questions for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2932r0.pdf)
-- [P2961R0 A natural syntax for Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2961r0.pdf)
 - [P2695R1 A proposed plan for contracts in C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2695r1.pdf)
-- [標準化会議 - C++ の歩き方 | cppmap](https://cppmap.github.io/standardization/meetings/)
 - [P2817R0 The idea behind the contracts MVP](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2817r0.html)
 - [P2829R0 Proposal of Contracts Supporting Const-On-Definition Style](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2829r0.pdf)
 - [P2861R0 The Lakos Rule](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2861r0.pdf)
 - [P2969R0 Contract annotations are potentially-throwing](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2969r0.pdf)
 - [2023-06 Varna ISO C++ Committee Trip Report — First Official C++26 meeting! : r/cpp](https://www.reddit.com/r/cpp/comments/14h4ono/202306_varna_iso_c_committee_trip_report_first/?rdt=63459)
+- [2023-11 Kona ISO C++ Committee Trip Report — Second C++26 meeting!🌴 : r/cpp](https://www.reddit.com/r/cpp/comments/17vnfqq/202311_kona_iso_c_committee_trip_report_second/)
