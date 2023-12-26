@@ -1,5 +1,7 @@
 # ［C++］契約プログラミング機能のこれまでとこれから
 
+この記事は[C++アドベントカレンダー2023](https://qiita.com/advent-calendar/2023/cxx) 25日目の記事です。ご参加の皆様お疲れ様でした！
+
 [:contents]
 
 ### C++ Contracts
