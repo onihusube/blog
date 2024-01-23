@@ -1,4 +1,4 @@
-# ［C++］ コンパイル時`std::string`を実行時に持ち越す方法
+# ［C++］ コンパイル時std::stringを実行時に持ち越す方法
 
 [:contents]
 
@@ -136,7 +136,7 @@ int main() {
 
 ### 最大文字数
 
-SSOは`std::string`内部に文字列を保持するため、SSOが行われる文字列の最大長は`std::string`のサイズ以下になります。実装の制限などが加わることでその長さは減り、主要3実装ではコンパイル時SSOが可能な文字列長（`\0`は除く）は次の様になります
+SSOは`std::string`内部に文字列を保持するため、SSOが行われる文字列の最大長は`std::string`のサイズ以下になります。実装の制限などが加わることでその長さは減り、主要3実装ではコンパイル時SSOが可能な文字列長（`char`の場合かつ`\0`は除く）は次の様になります
 
 - Clang libc++ : 22
 - GCC libstdc++ : 15
@@ -188,7 +188,7 @@ constinit std::string contant_init_str = make_string('a', 16);
 
 ### 実装状況
 
-`std::string`のSSOはほぼ全ての実装で実装されていますが必須ではなく、コンパイル時の`std::string`に対しても求められていません。そのため、ほとんどの実装では`std::string`の`constexpr`対応よりも遅れてコンパイル時SSOへの対応が行われています。また、これは実装品質の問題であるため個別の提案による機能に比べて扱いが小さく、どのバージョンから導入されたのか分かりづらいものがあります。
+`std::string`のSSOはほぼ全ての実装で行われていますが必須ではなく、コンパイル時の`std::string`に対しても求められていません。そのため、ほとんどの実装では`std::string`の`constexpr`対応よりも遅れてコンパイル時SSOへの対応が行われています。また、これは実装品質の問題であるため個別の提案による機能に比べて扱いが小さく、どのバージョンから導入されたのか分かりづらいものがあります。
 
 ここに、主要3実装において`std::string`のコンパイル時SSOが利用可能になる最小のバージョンについてメモしておきます
 
@@ -214,7 +214,7 @@ int main() {
 
 実装についてはこちらの記事を参照
 
-- [std::stringのSSO(Small-string optimization)がどうなっているか調べた · melpon/qiita · GitHub](https://github.com/melpon/qiita/tree/master/items/stdstringのSSO(Small-string%20optimization)がどうなっているか調べた)
+- https://github.com/melpon/qiita/tree/master/items/stdstring%E3%81%AESSO(Small-string%20optimization)%E3%81%8C%E3%81%A9%E3%81%86%E3%81%AA%E3%81%A3%E3%81%A6%E3%81%84%E3%82%8B%E3%81%8B%E8%AA%BF%E3%81%B9%E3%81%9F
 
 主要3実装はそれぞれ異なる実装を取っているわけですが、GCCの実装は`std::string`オブジェクト内部にSSO文字列へのポインタを保持する様な実装になっています。これは実行時に条件分岐を削減するためのものと思われますが、このことがローカル`constexpr`変数としてSSO`std::string`を保持することを妨げています。
 
@@ -319,7 +319,6 @@ constinit std::vector<int> constant_init_vec{};
 - [c++ - C++20 constexpr vector and string not working - Stack Overflow](https://stackoverflow.com/questions/69498115/c20-constexpr-vector-and-string-not-working?noredirect=1&lq=1)
 - [Implement SSO for constexpr string by miscco · Pull Request #1735 · microsoft/STL](https://github.com/microsoft/STL/pull/1735)
 - [[libcxx] Allow string to use SSO in constant evaluation. by jyknight · Pull Request #66576 · llvm/llvm-project · GitHub](https://github.com/llvm/llvm-project/pull/66576)
-- [std::stringのSSO(Small-string optimization)がどうなっているか調べた · melpon/qiita · GitHub](https://github.com/melpon/qiita/tree/master/items/stdstringのSSO(Small-string%20optimization)がどうなっているか調べた)
 - [Small String Optimization で Rust ライブラリ ratatui を最適化した話 - はやくプログラムになりたい](https://rhysd.hatenablog.com/entry/2023/11/30/200857)
 - [GitHub - elliotgoodrich/SSO-23: Memory optimal Small String Optimization implementation for C++](https://github.com/elliotgoodrich/SSO-23)
 - [Just how `constexpr` is C++20's `std::string`? – Arthur O'Dwyer – Stuff mostly about C++](https://quuxplusone.github.io/blog/2023/09/08/constexpr-string-firewall/)
