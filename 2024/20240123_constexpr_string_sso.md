@@ -99,7 +99,7 @@ static_assert(simple_format("Hello % !!", "world") == "Hello world !!");
 
 実は、`std::string`に限ってはこの制限を回避することが可能です。
 
-この制限はコンパイル時に確保したメモリをコンパイル時に解放しなければならないことから来ているため、そもそもメモリを確保しなければその様な制限に引っかからないわけです。そして、`std::string`はSSOという短い文字列に対して動的メモリ確保を回避してそのオブジェクト内に文字列を保持する最適化が行われています。
+この制限はコンパイル時に確保したメモリをコンパイル時に解放しなければならないことから来ているため、そもそもメモリを確保しなければその様な制限に引っかからないわけです。そして、`std::string`はSSO（*small string optimization*）という短い文字列に対して動的メモリ確保を回避してそのオブジェクト内に文字列を保持する最適化が行われています。
 
 コンパイル時の`std::string`でもSSOが実装されている場合、短い文字列に対してはコンパイル時にもメモリ確保が行われないため、SSOが行われている`std::string`オブジェクトは実行時に持ち越すことができます。
 
@@ -324,3 +324,6 @@ constinit std::vector<int> constant_init_vec{};
 - [Just how `constexpr` is C++20's `std::string`? – Arthur O'Dwyer – Stuff mostly about C++](https://quuxplusone.github.io/blog/2023/09/08/constexpr-string-firewall/)
 - [111351 – constexpr std::string objects permitted to escape constant evaluation when SSO](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=111351)
 - [C++20 コンパイル時初期化を強制する`constinit`キーワードを追加 - cpprefjp](https://cpprefjp.github.io/lang/cpp20/constinit.html)
+
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2024/20240123_constexpr_string_sso.md)
