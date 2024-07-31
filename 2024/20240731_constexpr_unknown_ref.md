@@ -255,14 +255,14 @@ static_assert(to_char_narrowing_check<std::array<int, 1>>);
 static_assert(to_char_narrowing_check<std::array<int, 127>>);
 static_assert(to_char_narrowing_check<std::array<int, 128>> == false);
 ```
-GCC14: https://wandbox.org/permlink/ikcs2twJfdfumqa7
+GCC14: https://wandbox.org/permlink/ikcs2twJfdfumqa7  
 clang15: https://wandbox.org/permlink/dRmTPwTNeGMMrs0e
 
 この`to_char_narrowing_check`コンセプトは、`std::int8_t{ t.size() }`という式の有効性をチェックしています。引数型がすべて`std::array`であるとすると、その`.size()`の戻り値型は`std::size_t`なので常に縮小変換となり、`{}`初期化では縮小変換が許可されないことから常にコンパイルエラーになります（P2280R4以前は）。
 
 ただし、このような縮小変換は定数式で行われた場合にのみ、変換元の値が変換先の型で表現可能であれば許可されます。
 
-ただ前述のように、P2280R4以前は`std::array::size()`は`this`ポインタのコピーが必要になり、それが定数式ではないのでエラーになっていました。P2280R4以前の世界では、この例の上2つの`static_assert`が満たされることはありません（clang15の例）。しかし、P2280R4以降ではこの例の上2つの`static_assert`は満たされるようになります（GCC14の例）。
+ただ前述のように、P2280R4以前は`std::array::size()`は`this`ポインタのコピーが必要になり、それが定数式ではないので定数式における縮小変換のチェックは行われませんでした。P2280R4以前の世界では、この例の上2つの`static_assert`が満たされることはありません（clang15の例）。しかし、P2280R4以降ではこの例の上2つの`static_assert`は満たされるようになります（GCC14の例）。
 
 何が起きているかというと、`requires`式内部の`std::int8_t{ t.size() }`の式の妥当性チェックの際に、定数式で縮小変換が可能かどうかがチェックされており、P2280R4の緩和によってそれを妨げるものが無くなったことで、`t.size()`の値が取得されてその値がチェックされるようになっていいます。
 
@@ -292,7 +292,7 @@ static_assert(to_char_narrowing_check_v<std::array<int, 1>>);
 static_assert(to_char_narrowing_check_v<std::array<int, 127>>);
 static_assert(to_char_narrowing_check_v<std::array<int, 128>> == false);
 ```
-GCC14: https://wandbox.org/permlink/doHxvy8q1Mgw9C5g
+GCC14: https://wandbox.org/permlink/doHxvy8q1Mgw9C5g  
 clang15: https://wandbox.org/permlink/0tqFtsGEJSMF620m
 
 かなり複雑な実装ですが、GCC14の実行結果を見れば、SFINAEの制約においても縮小変換が定数式でチェックされていることが分かります。
@@ -318,6 +318,16 @@ std::variant<float> v = ic; // C++23でもすべての実装でエラー
 
 この際に問題となったのがまさに、`std::variant`の制約の実装がSFINAEによって行われていることで、ここで説明していることはP3146R1でより詳細に解説されています。特に、SFINAEでもP2280R4の恩恵にあずかれるようにするテクニックは私が思いついたものではなく、この提案に例として載っているものをより簡易に直しただけです。
 
+そして、この恩恵は提案中の`constexpr_t`のような型（汎用的な`constexpr`引数のための型）でより重要になってくるでしょう。
+
+### 余談
+
+P2280R4の変更は、定数式における未知の参照（と`this`）の利用を許可するというよりも、それらのものが実際にその参照先にアクセスするまでエラーにしないようにするという性質のものです。元々参照されるされないにかかわらず危険な可能性があるとしてまず使用が禁止されていたものが、実際に危険になるまでは様子見するようにした感じです。
+
+これはC++20以降の定数式の制限緩和に見られる、定数式をエラーにするのは実際に実行してみて実行できないものに出会ってから、という方針に従ってものです。
+
+このことはあまり明言されてこなかったのですが、C++23のP2448R2の採択によって明示的にされました。P2448R2では、定数式におけるコンパイルエラーの発生条件を可能な限り遅延し、実行してみて実行できなかった場合にのみエラーにするという様に変更するものです。
+
 ### 参考文献
 
 - [P2280R4 Using unknown references in constant expressions](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2280r4.html)
@@ -325,3 +335,5 @@ std::variant<float> v = ic; // C++23でもすべての実装でエラー
 - [P3146R1 Clarifying `std::variant` converting construction](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3146r1.html)
     - [P3146R0 Clarifying `std::variant` converting construction - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P3146R0-Clarifying-stdvariant-converting-construction)
 - [c++ - クラスの非静的メンバーの配列の要素数を定数式として取得したい - スタック・オーバーフロー](https://ja.stackoverflow.com/questions/93436/%E3%82%AF%E3%83%A9%E3%82%B9%E3%81%AE%E9%9D%9E%E9%9D%99%E7%9A%84%E3%83%A1%E3%83%B3%E3%83%90%E3%83%BC%E3%81%AE%E9%85%8D%E5%88%97%E3%81%AE%E8%A6%81%E7%B4%A0%E6%95%B0%E3%82%92%E5%AE%9A%E6%95%B0%E5%BC%8F%E3%81%A8%E3%81%97%E3%81%A6%E5%8F%96%E5%BE%97%E3%81%97%E3%81%9F%E3%81%84)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2024/20240731_constexpr_unknown_ref.md)
