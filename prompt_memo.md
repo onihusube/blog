@@ -13,9 +13,6 @@
 指令ここまで、以降入力
 
 
-P2831R0	Functions having a narrow contract should not be noexcept	Timur Doumler, Ed Catmur	2023-05-16	2023-05		Library Evolution	
-P2834R0	Semantic Stability Across Contract-Checking Build Modes	Joshua Berne, John Lakos	2023-05-15	2023-05		SG21 Contracts	
-P2835R0	Expose std::atomic_ref's object address	Gonzalo Brito Gadeschi	2023-05-18	2023-05		SG1 Concurrency and Parallelism	
 ```
 
 ```
@@ -33,7 +30,7 @@ P2835R0	Expose std::atomic_ref's object address	Gonzalo Brito Gadeschi	2023-05-1
 - 入力データを出力に含めない。結果だけを出力する
 - データは複数の表が連続して入力される
 - データを省略しない！
-- データを無視しない！！！
+- 似た番号（PxxxxRn）を持つリンクが続けて現れることがよくあります。あなたはそれを無視する傾向があるので、無視しないようにしましょう
 - 1つの表につき1つのリンクを出力する。出力できない場合は空行を出力する
 - 結果はコピペしやすい形で出力する、番号などはふらない
 
