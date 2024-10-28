@@ -40,7 +40,7 @@ void notify_thread() {
 
 従来`std::atomic`でこのような同期を行おうとすると待機側ではCASループのようなビジーループを使用せざるを得ず、それはあまり効率的な待機方法ではありませんでした。これらのAPIはそれを改善するために追加されたもので、`.wait()`による待機はOSのAPIを用いるなどして効率的に処理されることが期待されます。
 
-C++20ではいくつかの同期プリミティブクラスが追加されましたが、`std::atomic`とこの待機・通知APIを用いるとそれらのクラスを簡単かつ効率的に構成することができます。
+C++20ではいくつかの同期プリミティブクラスが追加されましたが、`std::atomic`とこの待機・通知APIによってそれらのクラスを効率的に構成することができます
 
 ### `std::condition_variable`
 
@@ -53,8 +53,7 @@ std::condition_variable cv;
 
 void wait_thread() {
   while (...) {
-    // 通知スレッドからの通知を待機する
-    shared_val.wait();
+
     {
       // まずロックを取得
       std::unique_lock lock{mtx};
@@ -82,7 +81,7 @@ void notify_thread() {
       std::lock_guard _{mtx};
       
       // 値を更新
-      int val = new_num;
+      shared_val = new_num;
 
       // wait()中のスレッドへ通知
       cv.notify_one();
@@ -90,7 +89,7 @@ void notify_thread() {
       
       // 待機しているのが複数のスレッドの場合
       // wait()中の全てのスレッドへ通知
-      shared_val.notify_all();
+      cv.notify_all();
     }
   }
 }
@@ -104,7 +103,7 @@ C++20`std::atomic`の待機・通知APIは`std::condition_variable`の基本的�
 
 ||`atomic`による通知と待機|`condition_variable`|
 |---|---|---|
-|必要なもの|`atomic`オブジェクト |保護するリソース+`mutex`+`condition_variable`オブジェクト|
+|必要なもの|`atomic`オブジェクト |保護するリソース+`mutex`+`condition_variable`|
 |効率的な待機を行う|Yes|Yes|
 |複数リソースの保護|`atomic<T>`の`T`にまとめることができれば可能|可能|
 |時間を指定して待機|不可|`wait_until()/wait_for()`|
@@ -119,11 +118,13 @@ C++20`std::atomic`の待機・通知APIは`std::condition_variable`の基本的�
 
 まず、`.wait()`はその性質上明らかに現在のスレッドをブロックするため、シグナルセーフではありません。
 
-では通知関数はというと、ロックフリーな実装を取ることができるものの、オブジェクトサイズや環境によってはロックフリーとならない場合があるようです。
+では通知関数はというと、ロックフリーな実装を取ることができるものの、オブジェクトサイズや環境によってはロックフリーとならない場合があるようです（詳しいことはP3255R1で報告されています）。
 
-詳しいことはP3255R1で報告されていますが、待機・通知API以外は`is_always_lock_free == true`ならばシグナルセーフとなりますが待機・通知APIはそうならないため、規定を修正して待機・通知APIがシグナルセーフかどうかは別のプロパティで指定するように修正しようとしています（R1によれば待機関数もシグナルセーフとなる場合があるようです、どういうことでしょう・・・）。
+待機・通知API以外は`is_always_lock_free == true`ならばシグナルセーフとなりますが待機・通知APIはその例外であるため、P3255では規定を修正して待機・通知APIをシグナルセーフ条件から除外したうえで、それらがシグナルセーフかどうかは別のプロパティで指定するように修正しようとしています（R1によれば待機関数もシグナルセーフとなる場合があるようです、どういうことでしょう・・・）。
 
 ### 参考文献
 
 - [条件変数の利用方法 - cpprefjp](https://cpprefjp.github.io/article/lib/how_to_use_cv.html)
 - [P3255R1 Expose whether atomic notifying operations are lock-free](https://wg21.link/p3255r1)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2024/20241029_atomic_wait_notify.md)
