@@ -12,7 +12,8 @@ std::atomic<int> shared_val{};  // C++20から0で初期化される
 void wait_thread() {
   while (...) {
     // 通知スレッドからの通知を待機する
-    shared_val.wait();
+    const auto old = shared_val.load();
+    shared_val.wait(old);
     int val = shared_val.load();
 
     ...
