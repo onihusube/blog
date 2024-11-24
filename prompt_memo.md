@@ -75,3 +75,63 @@ https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0260r6.html
 例示と指令はここまで、以降入力
 
 ```
+
+
+## NotebookLM
+
+（該当期間部分のHTMLソースを入力として）
+
+このHTMLソースに含まれているpdf/htmlファイルへのリンク及びその番号とタイトルを抽出して、次のような形式のMrkdownでリストアップしてください
+
+```
+### [提案番号 文書タイトル](文書へのリンク)
+```
+
+- 提案番号: P1234R0やN5678のような形式の番号
+- 文書へのリンクはhttpsから始まる絶対リンクにしてください
+    - カレントのリンクは"https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/"を使用してください
+- 文書は全部で113本あります
+
+# 例
+
+文書1つは例えば次のようなhtmlの1ブロックに対応しています
+
+```html
+ 	 <tr > 
+	 	 <td > <a href="../2023/n4955.pdf">N4955</a> </td>
+	 	 <td > WG21 2023-06 Admin telecon minutes </td>
+	 	 <td > Nina Ranns </td>
+	 	 <td > 2023-06-05 </td>
+	 	 <td > 2023-06 </td>
+	 	 <td >  </td>
+	 	 <td > WG21 </td>
+	 	 <td > </td>
+	 </tr>
+```
+
+この例の場合、結果は次のようになります
+
+```
+### [N4955 WG21 2023-06 Admin telecon minutes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/n4955.pdf)
+```
+
+別の例です
+
+```html
+	 <tr > 
+	 	 <td > <a href="../2023/p0260r6.html">P0260R6</a> </td>
+	 	 <td > C++ Concurrent Queues </td>
+	 	 <td > Detlef Vollmann, Lawrence Crowl, Chris Mysen, Gor Nishanov </td>
+	 	 <td > 2023-06-16 </td>
+	 	 <td > 2023-06 </td>
+	 	 <td > <a href="../2023/p0260r5.html">P0260R5</a> </td>
+	 	 <td > SG1 Concurrency and Parallelism,LEWG Library Evolution </td>
+	 	 <td > </td>
+	 </tr>
+```
+
+この例の場合、結果は次のようになります
+
+```
+### [P0260R6 C++ Concurrent Queues](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0260r6.html)
+```
