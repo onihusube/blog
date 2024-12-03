@@ -1,11 +1,13 @@
 # ［C++］ 拡張浮動小数点数型の変換ランクに関する規定のある一文について
 
-なんか書いてみたら自明な感じがしてきましたが、一応備忘録です。
+この記事は[C++ Advent Calendar 2024](https://qiita.com/advent-calendar/2024/cxx)の3日目の記事です。
 
 拡張浮動小数点数型についてはあまり詳しく説明しないので他のページを参照してください。
 
 - [`<stdfloat>` - cpprefjp](https://cpprefjp.github.io/reference/stdfloat.html)
 - [Standard library header <stdfloat> (C++23) - cppreference](https://en.cppreference.com/w/cpp/header/stdfloat)
+
+なんか書いてみたら自明な感じがしてきましたが、一応備忘録です。
 
 [:contents]
 
