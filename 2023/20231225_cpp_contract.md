@@ -518,7 +518,7 @@ namespace std::contracts {
     // また、実装定義の値を許可する
   };
 
-  enum class contract_semantic : /int {
+  enum class contract_semantic : int {
     enforce = ...
     observe,
     // 将来の標準によって追加されうる、例えば以下のもの
