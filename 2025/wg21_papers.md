@@ -11,6 +11,9 @@
 [:contents]
 
 ### [N4990 Business Plan and Convener's Report](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/n4990.pdf)
+
+ビジネスユーザ向けのC++およびWG21の現状報告書。
+
 ### [P0472R2 Put std::monostate in <utility>](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0472r2.pdf)
 ### [P1030R7 std::filesystem::path_view](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1030r7.pdf)
 ### [P1061R9 Structured Bindings can introduce a Pack](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1061r9.html)
