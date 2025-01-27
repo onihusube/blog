@@ -1,0 +1,63 @@
+# ［C++］WG21月次提案文書を眺める（2024年09月）
+
+文書の一覧
+
+- [JTC1/SC22/WG21 - Papers 2024 mailing2024-09](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/#mailing2024-09)
+
+全部で51本あります。
+
+もくじ
+
+[:contents]
+
+### [N4990 Business Plan and Convener's Report](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/n4990.pdf)
+### [P0472R2 Put std::monostate in <utility>](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0472r2.pdf)
+### [P1030R7 std::filesystem::path_view](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1030r7.pdf)
+### [P1061R9 Structured Bindings can introduce a Pack](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1061r9.html)
+### [P2019R7 Thread attributes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2019r7.pdf)
+### [P2287R3 Designated-initializers for base classes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2287r3.html)
+### [P2319R1 Prevent path presentation problems](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2319r1.html)
+### [P2688R2 Pattern Matching: `match` Expression](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2688r2.html)
+### [P2786R7 Trivial Relocatability For C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r7.pdf)
+### [P2835R5 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r5.html)
+### [P2835R6 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r6.html)
+### [P2841R4 Concept and variable-template template-parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2841r4.pdf)
+### [P2846R3 reserve_hint: Eagerly reserving memory for not-quite-sized lazy ranges](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2846r3.pdf)
+### [P2879R0 Proposal of std::dump](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2879r0.pdf)
+### [P2945R1 Additional format specifiers for time_point](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2945r1.html)
+### [P2988R7 std::optional<T&>](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2988r7.pdf)
+### [P3016R4 Resolve inconsistencies in begin/end for valarray and braced initializer lists](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3016r4.html)
+### [P3019R9 Vocabulary Types for Composite Class Design](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3019r9.html)
+### [P3037R3 constexpr std::shared_ptr](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3037r3.pdf)
+### [P3074R4 trivial unions (was std::uninitialized<T>)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3074r4.html)
+### [P3096R3 Function Parameter Reflection in Reflection for C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3096r3.pdf)
+### [P3128R1 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r1.pdf)
+### [P3128R2 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r2.pdf)
+### [P3210R2 A Postcondition *is* a Pattern Match](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3210r2.pdf)
+### [P3245R2 Allow `[[nodiscard]]` in type alias declarations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3245r2.html)
+### [P3248R2 Require [u]intptr_t](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3248r2.html)
+### [P3290R2 Integrating Existing Assertions With Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3290r2.pdf)
+### [P3295R1 Freestanding constexpr containers and constexpr exception types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r1.html)
+### [P3299R1 Range constructors for std::simd](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3299r1.html)
+### [P3309R2 constexpr atomic and atomic_ref](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3309r2.html)
+### [P3335R1 Structured Core Options](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3335r1.html)
+### [P3371R1 Fix C++26 by making the rank-1, rank-2, rank-k, and rank-2k updates consistent with the BLAS](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3371r1.html)
+### [P3372R1 constexpr containers and adapters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3372r1.html)
+### [P3375R0 Reproducible floating-point results](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3375r0.html)
+### [P3379R0 Constrain std::expected equality operators](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3379r0.html)
+### [P3380R0 Extending support for class types as non-type template parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3380r0.html)
+### [P3381R0 Syntax for Reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3381r0.html)
+### [P3382R0 Coarse clocks and resolutions](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3382r0.html)
+### [P3383R0 mdspan.at()](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3383r0.html)
+### [P3384R0 __COUNTER__](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3384r0.html)
+### [P3385R0 Attributes reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3385r0.html)
+### [P3388R0 When Do You Know connect Doesn't Throw?](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3388r0.pdf)
+### [P3389R0 Of Operation States and Their Lifetimes (LEWG Presentation 2024-09-10)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3389r0.pdf)
+### [P3390R0 Safe C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3390r0.html)
+### [P3391R0 constexpr std::format](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3391r0.html)
+### [P3392R0 Do not promise support for function syntax of operators](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3392r0.pdf)
+### [P3396R0 std::execution wording fixes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3396r0.html)
+### [P3397R0 Clarify requirements on extended floating point types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3397r0.pdf)
+### [P3398R0 User specified type decay](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3398r0.pdf)
+### [P3401R0 Enrich Creation Functions for the Pointer-Semantics-Based Polymorphism Library - Proxy](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3401r0.pdf)
+### [P3402R0 A Safety Profile Verifying Class Initialization](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3402r0.html)
