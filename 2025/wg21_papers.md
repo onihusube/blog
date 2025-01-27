@@ -47,6 +47,154 @@
 ### [P3371R1 Fix C++26 by making the rank-1, rank-2, rank-k, and rank-2k updates consistent with the BLAS](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3371r1.html)
 ### [P3372R1 constexpr containers and adapters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3372r1.html)
 ### [P3375R0 Reproducible floating-point results](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3375r0.html)
+
+計算結果の再現性の保証された浮動小数点数型の提案。
+
+C++標準では、浮動小数点数の動作（計算）のほとんどの部分は実装定義とされており、同じ計算式が異なるプラットフォームで同じ結果をもたらすとは限りません。
+
+例えば次のようなコードは実装によって異なる結果を生成します。
+
+```cpp
+int main() {
+	float line_0x(0.f);
+	float line_0y(7.f);
+
+	float normal_x(0.57f);
+	float normal_y(0.8f);
+
+	float px(10.f);
+	float py(0.f);
+
+	float v2p_x = px - line_0x;
+	float v2p_y = py - line_0y;
+
+	float distance = v2p_x * normal_x + v2p_y * normal_y;
+
+	float direction_x = normal_x * distance;
+	float direction_y = normal_y * distance;
+
+	float proj_vector_x = px - direction_x;
+	float proj_vector_y = py - direction_y;
+
+	std::cout << "distance:      " << distance << std::endl;
+	std::cout << "proj_vector_y: " << proj_vector_y << std::endl;
+}
+```
+
+オプションなしでNvidia C++ compiler 24.5でビルドすると
+
+```
+distance:  	   0.0999997
+proj_vector_y: -0.0799998
+```
+
+オプションなしでclang 18.1.0でビルドすると
+
+```
+distance:  	   0.0999999
+proj_vector_y: -0.0799999
+```
+
+`-march=skylake`を指定してclangでビルドすると
+
+```
+distance:  	   0.1
+proj_vector_y: -0.08
+```
+
+のようになります。これは出力が異なっているのではなく、実際にビットレベルで異なった結果となっています。特に、最適化を有効にするとプログラム中で実行される浮動小数点演算の性質・数・順序が実装ごとに異なり、これによって丸め演算の回数や順序が異なってくることから、プラットフォームによって異なった値を生成します。
+
+ISO/IEC 60559:2020（IEEE 754）では浮動小数点演算の再現可能性についても指定しているものの、それを達成するには言語標準・実装・およびユーザーの強力が必要としています。しかし、C++では規格からして再現可能な浮動小数点演算をサポートしていません。
+
+一部のアプリケーションにおいては浮動小数点演算の再現性が重要となる場合があります。例えば、ゲーム開発においては、クロスプラットフォームで展開する場合が多いため、異なるプラットフォーム間で浮動小数点演算結果が一致するようになるとコードの移植性を向上させることができます。あるいは、オンラインマルチプレイが可能なゲームにおいては、より簡単に異なるプラットフォーム間でデータを交換することができます。
+
+科学計算では実装が浮動小数点演算に対して行う最適化（命令の融合や並べ替え）が計算結果に致命的な丸め誤差を導入してしまい、計算結果が不正確なものになる場合があります。これを回避・あるいは制御するためには、計算の順序が厳密に指定されていることが重要になります。
+
+この提案では、再現性のある浮動小数点演算を実現するために、新しいライブラリ実装の浮動小数点数型を追加することを提案しています。
+
+```cpp
+namespace std {
+  // 丸めモードの指定
+  enum class iec_559_rounding_mode : unspecified;                                                                             // freestanding
+  inline constexpr iec_559_rounding_mode iec_559_round_ties_to_even = iec_559_rounding_mode::round_ties_to_even;              // freestanding
+  inline constexpr iec_559_rounding_mode iec_559_round_toward_positive = iec_559_rounding_mode::round_toward_positive;        // freestanding
+  inline constexpr iec_559_rounding_mode iec_559_round_toward_negative = iec_559_rounding_mode::round_toward_negative;        // freestanding
+  inline constexpr iec_559_rounding_mode iec_559_round_toward_zero = iec_559_rounding_mode::round_toward_zero;                // freestanding
+
+
+  // 再現性のある浮動小数点数型
+  template<class T, iec_559_rounding_mode R = round_ties_to_even>
+  class strict_float {
+  public:
+    using value_type = T;
+
+    constexpr strict_float(T);
+    constexpr strict_float(const strict_float&) = default;
+    template<class X, iec_559_rounding_mode Y>
+    constexpr explicit strict_float(const strict_float&);
+
+    constexpr operator value_type() const;
+
+    constexpr strict_float& operator= (const T&);
+    constexpr strict_float& operator+=(const T&);
+    constexpr strict_float& operator-=(const T&);
+    constexpr strict_float& operator*=(const T&);
+    constexpr strict_float& operator/=(const T&);
+  };
+}
+```
+
+提案されているのは`strict_float<T, R>`というクラステンプレートで、`T`に浮動小数点数型（IEE754交換形式であることが規定される`float16_t, float32_t, float64_t, float128_t`のいずれか）を指定し、`R`に丸めモードの指定（`iec_559_rounding_mode`列挙型の値）を指定します。
+
+この型は浮動小数点数型`T`のごく薄いラッパであり、この型の値に対する操作（計算）は実行時にソースコード上での順序と意味を保持する事（並べ替えや融合が許可されないこと）が要求され、保証されます。すなわち、再現可能性という性質はこの型の暗黙のプロパティとして（ISO/IEC 60559:2020に準拠した形で）指定されます。
+
+計算における丸めモードに関しては`iec_559_rounding_mode`列挙型の値として型に埋め込まれており、演算子オーバーロードによってその丸めを使用する計算が静的に指定されます。
+
+```cpp
+namespace std {
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator+(strict_float<T, R>, <T, R>);              // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator+(strict_float<T, R>, T);                   // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator+(T, strict_float<T, R>);                   // freestanding
+  
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator-(strict_float<T, R>, <T, R>);              // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator-(strict_float<T, R>, T);                   // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator-(T, strict_float<T, R>);                   // freestanding
+  
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator*(strict_float<T, R>, <T, R>);              // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator*(strict_float<T, R>, T);                   // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator*(T, strict_float<T, R>);                   // freestanding
+  
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator/(strict_float<T, R>, <T, R>);              // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator/(strict_float<T, R>, T);                   // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator/(T, strict_float<T, R>);                   // freestanding
+  
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator+(strict_float<T, R>);                      // freestanding
+  template<class T, iec_559_rounding_mode R>
+  constexpr strict_float<T, R> operator-(strict_float<T, R>);                      // freestanding
+}
+```
+
+この提案ではひとまず、四則演算のみをサポートする最小限の演算のみを提案しています。`<cmath>`にある関数などはアルゴリズムや丸めが指定されていないためそのまま利用できず、そのための作業は多大なものになるためです。また同様に、異なる形式の浮動小数点数間の再現可能な変換も将来のサポートとしています。
+
+なお、よく似た提案がP2746R5で提案されていますが、P2746がFenvによる丸めモードの廃止と置換（よく似たクラステンプレートによる）だけを提案するものであるのに対して、この提案はさらに操作の融合や並べ替えを禁止することで計算の再現可能性を達成することを目指すものです。
+
+- [浮動小数点演算の結果が環境依存なのはどんなときか - Zenn](https://zenn.dev/mod_poppo/articles/floating-point-portability)
+- [P2746R5 Deprecate and Replace Fenv Rounding Modes - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P2746R5-Deprecate-and-Replace-Fenv-Rounding-Modes)
+- [P3375 進行状況](https://github.com/cplusplus/papers/issues/2035)
+
 ### [P3379R0 Constrain std::expected equality operators](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3379r0.html)
 ### [P3380R0 Extending support for class types as non-type template parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3380r0.html)
 ### [P3381R0 Syntax for Reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3381r0.html)
