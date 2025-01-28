@@ -60,6 +60,8 @@ std::dump(x, y, z);         // output: 10 20 30
 
 などが挙げられています。
 
+この提案はLEWGIにおいて時間をかけることに合意が得られませんでした。
+
 - [パラメータパックをprint/formatする - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2024/06/28/230207)
 - [P2879 進行状況](https://github.com/cplusplus/papers/issues/2034)
 
