@@ -14,7 +14,20 @@
 
 ビジネスユーザ向けのC++およびWG21の現状報告書。
 
-### [P0472R2 Put std::monostate in <utility>](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0472r2.pdf)
+### [P0472R2 Put `std::monostate` in `<utility>`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0472r2.pdf)
+
+`std::monostate`を`<utility>`からも利用できるようにする提案。
+
+以前の記事を参照
+
+- [0472R1 Put `std::monostate` in `<utility>` - ［C++］WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P0472R1-Put-stdmonostate-in-utility)
+
+このリビジョンでの変更は、`std::nullptr_t`をその代替として使用しない理由の説明と、提案する文言の書き直しなどです。
+
+`std::nullptr_t`をその用途に使わない理由として、`std::monostate`の方が誤用が少ないからと説明しています。`std::nullptr_t`は任意のポインタ型に対してコピー可能で、ストリーム出力（C/C++双方）も動作します。`std::monostate`はどのような代入や変換も不可能であるためこのような誤用の可能性が著しく低く、何もできないことを表す型として適しています（Cのストリームには出力できるようです）。
+
+- [P0472 進行状況](https://github.com/cplusplus/papers/issues/1993)
+
 ### [P1030R7 std::filesystem::path_view](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1030r7.pdf)
 ### [P1061R9 Structured Bindings can introduce a Pack](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1061r9.html)
 ### [P2019R7 Thread attributes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2019r7.pdf)
