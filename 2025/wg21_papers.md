@@ -26,7 +26,43 @@
 ### [P2835R6 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r6.html)
 ### [P2841R4 Concept and variable-template template-parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2841r4.pdf)
 ### [P2846R3 reserve_hint: Eagerly reserving memory for not-quite-sized lazy ranges](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2846r3.pdf)
-### [P2879R0 Proposal of std::dump](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2879r0.pdf)
+### [P2879R0 Proposal of `std::dump`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2879r0.pdf)
+
+指定された任意個数の引数をスペース区切りで出力する関数である`std::dump()`の提案。
+
+ここで提案されている`std::dump()`は`std::print()`のラッパーであり、`std::dump(arg1, arg2, ..., argn)`は`std::println("{} {} ... {}", arg1, arg2, ..., argn)`と等価になります。
+
+```cpp
+std::dump(“Hello, World!”); // output: Hello, World!
+std::dump(2 + 2);           // output: 4
+std::dump(1, 2, 3, 4, 5);   // output: 1 2 3 4 5
+
+int x = 10, y = 20, z = 30;
+std::dump(x, y, z);         // output: 10 20 30
+```
+
+モチベーションとしては
+
+- 他のプログラミング言語での既存の慣習とする
+    - Pythonの`print(a, b, c)`は`std::dump(a, b, c)`と書ける
+- 簡単なテスト、デモ、実験プログラムでの利用
+    - 短いプログラムや一時的なコードで、変数の値を手軽に出力するのに便利
+- コード例の簡潔化
+    -  `std::print({}, {}, {}, ...)`や`std::cout << ... << ...`等のように余計な文字列を省いて例示できる
+- デバッグの補助
+    - デバッガを使用せずに実行時に変数値を確認するための簡単なコードとして使用可能
+    - デバッガが使えない環境や、リアルタイム制約がある環境（一時停止で動作が変わる環境）において、一時的なprintデバッグのために活用できる
+- 科学計算での利用
+    - 行が改行で区切られ、数値がスペースで区切られた形式は、行列や表の一般的な形式であり、科学計算での利用に適している
+      - これは`std::dump()`が生成する形式
+- Unixツールとの連携
+    - UNIX環境で一般的なトークンベースのCLIツールは`std::dump()`が生成するシンプルな形式で動作する
+
+などが挙げられています。
+
+- [パラメータパックをprint/formatする - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2024/06/28/230207)
+- [P2879 進行状況](https://github.com/cplusplus/papers/issues/2034)
+
 ### [P2945R1 Additional format specifiers for time_point](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2945r1.html)
 ### [P2988R7 std::optional<T&>](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2988r7.pdf)
 ### [P3016R4 Resolve inconsistencies in begin/end for valarray and braced initializer lists](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3016r4.html)
