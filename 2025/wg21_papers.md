@@ -246,7 +246,20 @@ namespace std {
 - [P2746R5 Deprecate and Replace Fenv Rounding Modes - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P2746R5-Deprecate-and-Replace-Fenv-Rounding-Modes)
 - [P3375 進行状況](https://github.com/cplusplus/papers/issues/2035)
 
-### [P3379R0 Constrain std::expected equality operators](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3379r0.html)
+### [P3379R0 Constrain `std::expected` equality operators](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3379r0.html)
+
+`std::expected`の`==`演算子の制約の指定を変更する提案。
+
+P2944R3（`reference_wrapper`の`==`比較の動作修正提案）ではそのメインの提案とはほとんど関係ない編集上の提案として`pair, tuple, optional, variant`の比較演算子の制約についての指定がMandatesだったのをConstraintsに修正しました。
+
+しかし、その時に`std::expected`が漏れていたため、この提案では同様の変更を提案しています。
+
+`std::optional`については、P2944R3の変更が行われた際に挙動に差が出てしまったようで、それがLWG Issue 4072で修正されています（Mandatesの場合はill-formedになっていて代わりの候補の探索が行われなかった用法が、Constraintsになったことによってオーバーロード候補から外れて代わりの候補が探索されることで有効になってしまう問題）。ここでは、その修正と同じく追加の制約を行うことで同様の問題に対処しています。
+
+- [C++20標準ライブラリ仕様：Constraints／Mandates／Preconditions - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20200605/p1)
+- [LWG Issue 4072. std::optional comparisons: constrain harder](https://cplusplus.github.io/LWG/issue4072)
+- [P3375 進行状況](https://github.com/cplusplus/papers/issues/2035)
+
 ### [P3380R0 Extending support for class types as non-type template parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3380r0.html)
 ### [P3381R0 Syntax for Reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3381r0.html)
 
