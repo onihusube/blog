@@ -324,6 +324,79 @@ type-id(^ident)();
 - [P3381 進行状況](https://github.com/cplusplus/papers/issues/2038)
 
 ### [P3382R0 Coarse clocks and resolutions](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3382r0.html)
+
+より解像度の粗い時計型を追加する提案。
+
+プログラム中でタイムスタンプを取得したい場合というのは比較的よくあり、C++では`<chrono>`の時計型の`Clock::now()`で取得することができます。しかし、これらの時計型は通常マイクロ秒あるいはそれ以上の解像度を持っており、このような高い解像度の時刻取得にはコストがかかります。一部のユースケースにおいてはそのような高い解像度は必要なく、100msから秒の解像度で十分な場合があります。たとえば
+
+- HTTP Dateヘッダの生成: 秒単位で十分
+- 定期実行される処理の周期の指定: 周期の単位が秒より大きい場合、秒単位で十分
+- 大きめのタイムアウト値: 大規模データベースへのクエリなど、分単位の時間がかかる場合のタイムアウト判定には秒単位以上で十分
+- 統計: 応答時間のパーセンタイルや平均をカウントする場合、高い解像度は不要
+
+一部のプラットフォームではこのような需要に応えられる粗いクロックが用意されており、標準ライブラリの時計型よりも70倍以上高速になる場合があります。また、パフォーマンスを重視する一部のプラットフォームでは既に粗いクロックが使用されています。そのような場所では、次のように必要な場合にのみ高い解像度の時刻を取得するようなフォールバックが良く行われています
+
+```cpp
+bool is_expired(std::chrono::steady_clock::time_point deadline) {
+  // 粗い時刻とその時計の解像度から大雑把に判定
+  auto max_time = coarse_steady_clock() + coarse_steady_clock_resolution();
+  if (max_time < deadline) {
+    return false;
+  }
+
+  // 正確な判定にはより高い解像度の時刻を使用
+  return deadline < std::chrono::steady_clock::now()
+}
+```
+
+この提案は、より粗い解像度で時刻を取得できる時計型を標準ライブラリに追加しようとするものです。
+
+提案されているのは`coarse_steady_clock`と`coarse_system_clock`の2種類で、これらは`coarse_`を取り除いた名前の時計型に対応する性質を持つより粗い解像度の時計型です。
+
+```cpp
+namespace std::chrono {
+  // より粗いsteady_clock
+  class coarse_steady_clock {
+  public:
+    using rep        = steady_clock::rep;
+    using period     = steady_clock::period;
+    using duration   = steady_clock::duration;
+    using time_point = steady_clock::time_point;
+    static constexpr bool is_steady = true;
+
+    static time_point now() noexcept;
+    static duration resolution() noexcept;
+  };
+  
+  // より粗いsystem_clock
+  class coarse_system_clock {
+  public:
+    using rep        = system_clock::rep;
+    using period     = system_clock::period;
+    using duration   = system_clock::duration;
+    using time_point = system_clock::time_point;
+    static constexpr bool is_steady = system_clock::is_steady;
+
+    static time_point now() noexcept;
+    static duration resolution() noexcept;
+
+    // mapping to/from C type time_t
+    static time_t      to_time_t(const time_point& t) noexcept {
+      return system_clock::to_time_t(t);
+    }
+    static time_point  from_time_t(time_t t) noexcept { 
+      return system_clock::from_time_t(t);
+    }
+  };
+}
+```
+
+また、`Cpp17TrivialClock`を変更して`.resolution()`メンバからその時計型の解像度を取得することができるようにして、既存の時計型にも`.resolution()`を追加します。
+
+この2つの時計型において、`duration`と`time_point`の型が元の時計型と同じにされているのは、利便性のためです。例えば先ほどのフォールバックのサンプルコードのように、同じ`duration`と`time_point`型を使用しておけば、元の時計型の時刻と簡単に組み合わせて使用できるようになります。
+
+- [P3382 進行状況](https://github.com/cplusplus/papers/issues/2039)
+
 ### [P3383R0 mdspan.at()](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3383r0.html)
 ### [P3384R0 __COUNTER__](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3384r0.html)
 ### [P3385R0 Attributes reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3385r0.html)
