@@ -256,9 +256,11 @@ P2944R3（`reference_wrapper`の`==`比較の動作修正提案）ではその�
 
 `std::optional`については、P2944R3の変更が行われた際に挙動に差が出てしまったようで、それがLWG Issue 4072で修正されています（Mandatesの場合はill-formedになっていて代わりの候補の探索が行われなかった用法が、Constraintsになったことによってオーバーロード候補から外れて代わりの候補が探索されることで有効になってしまう問題）。ここでは、その修正と同じく追加の制約を行うことで同様の問題に対処しています。
 
+この提案はこのリビジョンがそのまま2024年11月の全体会議で承認され、C++26WDに適用されています。
+
 - [C++20標準ライブラリ仕様：Constraints／Mandates／Preconditions - yohhoyの日記](https://yohhoy.hatenadiary.jp/entry/20200605/p1)
 - [LWG Issue 4072. std::optional comparisons: constrain harder](https://cplusplus.github.io/LWG/issue4072)
-- [P3375 進行状況](https://github.com/cplusplus/papers/issues/2035)
+- [P3379 進行状況](https://github.com/cplusplus/papers/issues/2036)
 
 ### [P3380R0 Extending support for class types as non-type template parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3380r0.html)
 ### [P3381R0 Syntax for Reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3381r0.html)
