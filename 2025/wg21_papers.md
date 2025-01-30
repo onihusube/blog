@@ -454,7 +454,52 @@ namespace std {
 - [Add element access via `at()` to `std::mdspan` by stephanlachnit · Pull Request #302 · kokkos/mdspan](https://github.com/kokkos/mdspan/pull/302)
 - [P3383 進行状況](https://github.com/cplusplus/papers/issues/2040)
 
-### [P3384R0 __COUNTER__](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3384r0.html)
+### [P3384R0 `__COUNTER__`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3384r0.html)
+
+`__COUNTER__`マクロを標準化する提案。
+
+`__COUNTER__`マクロは、翻訳単位ごとに0から始まり展開され度にインクリメントされる、整数リテラルへと展開されるマクロです。これは、プリプロセッサメタプログラミングで使用され、ユニークな名前やインデックスを生成するのに使用されます。
+
+このマクロは多くのCおよびC++コンパイラで拡張として使用可能ではあるもののCでもC++でも標準化されてはいません。これにより、そのセマンティクスや移植性には何ら保証がありません。そのため、移植性が重要なコードベースにおいてはマクロによって使用可能かどうか検出して使用するか、使用しないように注意されています。
+
+それでもCおよびC++のコードベースの両方で広く使用されているため、移植性とセマンティクスの保証を提供するために既存の実装を取り込む形で`__COUNTER__`マクロを標準化しようとする提案です。
+
+```cpp
+int main() {
+  int a = __COUNTER__ ; // 0
+  int b = __COUNTER__ ; // 1
+  int c = __COUNTER__  + __COUNTER__; // 5
+}
+```
+
+`__COUNTER__ `マクロの展開結果は整数リテラルになるため厳密にはマクロの結果そのものに型は無いのですが、この提案では少なくとも`2^32 - 1`の値を表現できるように実装することを推奨しており、その実装定義の最大値に達したらコンパイルエラーにするようにしています。
+
+この手のマクロにありがちで問題になるのは、巧妙に使用するとODR違反コードを生成できてしまうことです。
+
+```cpp
+// foo.hpp
+#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+#define NEW_VAR(name) CONCAT(name, __COUNTER__)
+
+inline void foo() {
+  int NEW_VAR(x) = 2; // __COUNTER__マクロの値次第で、変数名が異なる
+}
+
+// a.cpp
+#include "foo.hpp"
+
+// b.cpp
+int x = __COUNTER__;
+#include "foo.hpp"  // a.cppのインクルード内容と異なるfoo()が定義されてしまう
+```
+
+既存の実装ではこのような問題に対して特別に検出して警告を発するなどの事は行っておらず、この提案でも特にケアをしていません。解決のためにはモジュールを使用する（`__COUNTER__`マクロはモジュールローカルであるため）か、ODRフレンドリー名前`_`（同じスコープで何度も再使用できる）を使用する事を推奨しています。
+
+これ以外の部分でも、既存の実装の動作やセマンティクスに準じた機能になっています。
+
+- [P3384 進行状況](https://github.com/cplusplus/papers/issues/2041)
+
 ### [P3385R0 Attributes reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3385r0.html)
 ### [P3388R0 When Do You Know connect Doesn't Throw?](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3388r0.pdf)
 ### [P3389R0 Of Operation States and Their Lifetimes (LEWG Presentation 2024-09-10)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3389r0.pdf)
