@@ -412,7 +412,48 @@ namespace std::chrono {
 
 - [P3382 進行状況](https://github.com/cplusplus/papers/issues/2039)
 
-### [P3383R0 mdspan.at()](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3383r0.html)
+### [P3383R0 `mdspan.at()`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3383r0.html)
+
+`std::mdspan`に`.at()`メンバ関数を追加する提案。
+
+`std::mdspan`の添え字アクセスは境界チェックが行われないアクセスであり、境界チェックを行う場合ユーザーが明示的に行わなければなりません。一方で、添え字アクセス可能な標準のコンテナは全て`.at()`メンバ関数を備えています（`std::span`も含めて）。
+
+この提案は、安全性と一貫性のために、`std::mdspan`にも`.at()`メンバ関数を追加しようとするものです。
+
+```cpp
+namespace std {
+  
+  template<
+    class ElementType,
+    class Extents,
+    class LayoutPolicy = layout_right,
+    class AccessorPolicy = default_accessor<ElementType>>
+  class mdspan {
+
+    ...
+
+    // 提案されているat()の宣言例
+    template<class... OtherIndexTypes>
+      constexpr reference at(OtherIndexTypes... indices) const;
+    
+    template<class OtherIndexType>
+      constexpr reference at(span<OtherIndexType, rank()> indices) const;
+
+    template<class OtherIndexType>
+      constexpr reference at(const array<OtherIndexType, rank()>& indices) const;
+
+    ...
+  };
+}
+```
+
+この意味論は他のコンテナの`.at()`とほとんど同じです。
+
+この提案の内容はすでに`dmspan`の参照実装であるkokkos/mdspanにて実装されています。
+
+- [Add element access via `at()` to `std::mdspan` by stephanlachnit · Pull Request #302 · kokkos/mdspan](https://github.com/kokkos/mdspan/pull/302)
+- [P3383 進行状況](https://github.com/cplusplus/papers/issues/2040)
+
 ### [P3384R0 __COUNTER__](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3384r0.html)
 ### [P3385R0 Attributes reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3385r0.html)
 ### [P3388R0 When Do You Know connect Doesn't Throw?](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3388r0.pdf)
