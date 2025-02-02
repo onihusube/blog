@@ -612,7 +612,32 @@ std::meta::define_class(^MigratedUser, liveMembers(currentUser));
 ### [P3388R0 When Do You Know connect Doesn't Throw?](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3388r0.pdf)
 ### [P3389R0 Of Operation States and Their Lifetimes (LEWG Presentation 2024-09-10)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3389r0.pdf)
 ### [P3390R0 Safe C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3390r0.html)
-### [P3391R0 constexpr std::format](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3391r0.html)
+### [P3391R0 `constexpr std::format`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3391r0.html)
+
+`std::format()`を`constexpr`化する提案。
+
+P2741R3の採択によって、`static_assert()`のエラーメッセージとして`std::string`を渡せるようになりました。ただし、ここに渡す`std::string`を生成するために便利な`std::format()`は定数式では使用できません。
+
+`std::format()`は内部的に型消去を用いてフォーマット対象引数を扱っていた（`const T*`から`const void*`へのキャストが必要だった）ために定数式で使用可能にすることはできませんでしたが、これはP2738R1の採択によって可能になっており、さらにはそれを`placement new`を用いて構築することもできるようになっています（P2747R2）。
+
+これにより、`std::format()`を`constexpr`化する事を妨げるものは無くなっているため、ここではそれを提案しています。
+
+ただ、そのまま`constexpr`を付加するだけで終わるほど簡単ではなく、定数式で使用可能な型のうち2種類の型ではそれが困難なことが分かっています。
+
+1つは浮動小数点数型です。`std::format()`においては整数型と浮動小数点数型の文字列化に`std::to_chars()`を使用しています（実装は直接使用していないかもしれませんが、やっていることは同じです）。しかし、`std::to_chars()`のオーバーロードのうち定数式で使用可能なのは整数型のもののみで浮動小数点数型のオーバーロードは使用可能ではありません。
+
+これは`std::to_chars()`が文字列化のアルゴリズムを明示的に指定していないことや、そのようなアルゴリズムが定数式で実行可能ではないことなどの事情があり、整数型が`constexpr`指定された時点（P2291R3）でも現在でも浮動小数点数型のオーバーロードを`constexpr`にすることはできないようです。
+
+もう1つは`<chrono>`の型で、こちらは`std::basic_ostringstream<char>`を介してストリーミングされるのと同様にフォーマットされるように規定されており、当然iostreamの型（および内部のフォーマット実装）には`constexpr`を付加できません。
+
+これを動作させるには`<chrono>`型のフォーマットの動作を変更する必要があると思われます。
+
+この提案では、どちらの型に対しても更なる議論を行わずに、これらの型と定数式で使用可能ではない型（`stacktrace_entry`や`filesystem::path`など）を除いた、既存の標準のフォーマット可能な型についてのみ、コンパイル時のフォーマットを有効化することを提案しています。
+
+{fmt}ライブラリでは`<chrono>`型を除いて`constexpr`な`format()`がすでにサポートされているほか、libstdc++の実装においても関数に`constexpr`を付加するほかは2か所の変更のみでこの提案の内容を実装可能だったようです。
+
+- [P3391 進行状況](https://github.com/cplusplus/papers/issues/2046)
+
 ### [P3392R0 Do not promise support for function syntax of operators](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3392r0.pdf)
 ### [P3396R0 std::execution wording fixes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3396r0.html)
 ### [P3397R0 Clarify requirements on extended floating point types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3397r0.pdf)
