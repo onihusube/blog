@@ -501,6 +501,114 @@ int x = __COUNTER__;
 - [P3384 進行状況](https://github.com/cplusplus/papers/issues/2041)
 
 ### [P3385R0 Attributes reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3385r0.html)
+
+リフレクションにおいて、エンティティに指定されている属性の情報を取得・付加できるようにする提案。
+
+P2996で提案中の静的リフレクション機能には、属性に関するリフレクション（付加されている属性の情報を取得する or 属性情報のリフレクションを用いて属性を付加する）の機能が欠けています。標準属性は現在でも広く使用されており、今後も増加していくことが予想されるため、その重要性は時間とともに増していきます。
+
+この提案は、P2996の静的リフレクションをベースとして、そこに属性に関するリフレクションの機能を追加することを提案するものです。
+
+次のサンプルコードは提案のモチベーションを端的に示したものです
+
+```cpp
+enum class Result {
+  success,
+  warn,
+  fail,
+};
+
+struct [[nodiscard]] StrictNormalize {
+  static constexpr bool operator() (Result status) {
+    return status == Result::success;
+  }
+};
+
+template <class F> 
+[[ [: ^F :] ]] // [[ nodiscard ]] に展開される
+auto transform(auto... args) {
+  return F()(args...);
+};
+
+int main() {
+  transform<StrictNormalize>(Result::success); // "nodiscard"による警告が表示される
+  bool isOk = transform<StrictNormalize>(Result::success); // OK、警告なし
+}
+```
+
+`transform`の定義においては、呼び出し可能な型`F`に付加されている属性を取得して自身にも付加します。この例では、`StrictNormalize`に付加されている`[[nodiscard]]`を復元しています。
+
+このような属性のイントロスペクションはP2237で提案されているようなコードインジェクション機能の利用時に特に重要になることが予想されます。例えば、`[[deprecated]]`メンバを選択的にスキップするなどです
+
+```cpp
+struct User {
+  [[deprecated]] std::string name;
+  std::string uuidv5;
+
+  [[deprecated]] std::string country;
+  std::string countryIsoCode;
+};
+
+template<class T>
+constexpr std::vector<std::meta::info> liveMembers(const T& user) {
+  std::vector<std::meta::info> liveMembers;
+  
+  // [[deprecated]]属性のリフレクションを取得しておく
+  auto deprecatedAttribute = std::meta::attributes_of(^[[deprecated]])[0];
+
+  auto keepLive = [&] <auto r> {
+    // [[deprecated]]指定されているメンバを無視する
+    if (!std::ranges::any_of(
+      attributes_of(^T),
+      [deprecatedAttribute] (auto meta) { meta == deprecatedAttributes; }
+    )) {
+      liveMembers.push_back(r);
+    }
+  };
+
+  // T の[[deprecated]]ではないメンバのリフレクションだけをliveMembersに入れていく
+  template for (auto member : std::meta::members_of(^T)) {
+    keepLive(member);
+  }
+
+  return os;
+}
+
+// Migratedのユーザーはdeprecatedなメンバをサポートしない
+struct MigratedUser;
+std::meta::define_class(^MigratedUser, liveMembers(currentUser));
+```
+
+このために、ここでは次の変更を提案しています
+
+- `std::meta::info`
+    - 属性をリフレクション可能なプロパティとしてサポートする
+    - これにより、`std::meta::info` 型の値で属性を表現できるようになる
+- リフレクション演算子 `^`
+    - 属性に対するリフレクションをサポートする。
+      - `^[[deprecated]]`を有効にする
+    - 結果の値は、属性エンティティの関連情報が埋め込まれたリフレクション値（`std::meta::info`型の値）
+    - 標準属性でない場合、この式はill-formed
+- スプライサー `[[ [: r :] ]]`
+    - 属性が許可されているコンテキストで、`r`（属性のリフレクション）に映されている属性に対応する属性リストを生成できるようにする
+    - 例えば、`[[ [: ^ErrorCode :] ]]` のように記述することで、`ErrorCode`型の属性を別の型に付与できる
+    - 文法として参照している`attribute-list`は`alignas`をカバーしていないが、これは別の提案で議論する予定
+- メタ関数
+    - `attributes_of(info) -> std::vector<info>`: 指定されたリフレクション値に付随する各属性を表す`std::meta::info` のシーケンスを返す
+    - `is_attribute(info) -> bool`: 指定されたリフレクション値が属性を指している場合に `true` を返す
+    - 属性名の取得: 属性のリフレクションから、属性トークンに対応する文字列や、属性を識別するのに役立つテキストを返す
+      - `name_of(info) -> string_view`
+      - `u8name_of(info) -> u8string_view`
+      - `qualified_name_of(info) -> string_view`
+      - `u8qualified_name_of(info) -> u8string_view`
+      - `display_name_of(info) -> string_view`
+      - `u8display_name_of(info) -> u8string_view`
+    - `data_member_spec()`と`define_class()`
+      - 属性をサポートできるように`data_member_options_t`を拡張する
+
+属性のリフレクションというと、標準属性と非標準属性（特に、ユーザー定義属性）の2種類の話がありますが、この提案では標準属性のサポートに主眼を置きそれのみを提案しています。ただ、標準属性へこれらのサポートを拡大することを念頭に置いて機能は設計されているようです。
+
+- [P3385 進行状況](https://github.com/cplusplus/papers/issues/2042)
+
 ### [P3388R0 When Do You Know connect Doesn't Throw?](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3388r0.pdf)
 ### [P3389R0 Of Operation States and Their Lifetimes (LEWG Presentation 2024-09-10)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3389r0.pdf)
 ### [P3390R0 Safe C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3390r0.html)
