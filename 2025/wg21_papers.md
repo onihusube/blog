@@ -28,7 +28,36 @@
 
 - [P0472 進行状況](https://github.com/cplusplus/papers/issues/1993)
 
-### [P1030R7 std::filesystem::path_view](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1030r7.pdf)
+### [P1030R7 `std::filesystem::path_view`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1030r7.pdf)
+
+パス文字列を所有せず参照する`std::filesystem::path_view`の提案。
+
+以前の記事を参照
+
+- [P1030R4 `std::filesystem::path_view` - WG21月次提案文書を眺める（2020年12月）](https://onihusube.hatenablog.com/entry/2021/01/17/005823#P1030R4-stdfilesystempath_view)
+- [P1030R5 `std::filesystem::path_view` - WG21月次提案文書を眺める（2022年09月）](https://onihusube.hatenablog.com/entry/2022/10/09/021557#P1030R5-stdfilesystempath_view)
+- [P1030R6 `std::filesystem::path_view` - WG21月次提案文書を眺める（2023年07月）](https://onihusube.hatenablog.com/entry/2023/09/23/203644#P1030R6-stdfilesystempath_view)
+
+このリビジョンでの変更は
+
+- 最新のWDにリベース
+- `render_*()`メンバ関数が`const`修飾されていなかったのを修正
+- `c_str()`の要件はnull終端のみとなり、その他の事前条件は不要になった
+- `[[nodiscard]]`を削除
+- `<filesystem>`から分離され、`<path_view>`ヘッダを新設し移動
+- `path-view-like`によって、ソースコードの変更なしに既存のコードがこの提案で追加された新しいフリー関数を呼び出すことは無いことの証明を追記
+- `path_view`に対して将来的にABIを破損することなく新しいエンコーディングを追加できることの証明を追記
+- `filesystem::path`のフォーマッタを複製する形でフォーマッタを追加
+- エラーコード引数を持つフリー関数の多くが`noexcept`である理由についての文言を追加
+- `path_view`の使用例を追加
+- `path_view`の比較演算子を追加
+- `<=>`演算子と削除定義されている演算子の相互作用に関するテストを実施
+- `filesystem::path`をとるiosteream関数についての文言を調整
+
+などです。
+
+- [P1030 進行状況](https://github.com/cplusplus/papers/issues/406)
+
 ### [P1061R9 Structured Bindings can introduce a Pack](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1061r9.html)
 ### [P2019R7 Thread attributes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2019r7.pdf)
 ### [P2287R3 Designated-initializers for base classes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2287r3.html)
