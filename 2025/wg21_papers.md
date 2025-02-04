@@ -719,6 +719,26 @@ P2741R3の採択によって、`static_assert()`のエラーメッセージと�
 ### [P3392R0 Do not promise support for function syntax of operators](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3392r0.pdf)
 ### [P3396R0 std::execution wording fixes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3396r0.html)
 ### [P3397R0 Clarify requirements on extended floating point types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3397r0.pdf)
+
+拡張浮動小数点数型の算術演算について、ISO/IEC 60559に準拠すべきかどうかを明確にする提案。
+
+C++23では`std::float32_t`などの拡張浮動小数点数型が導入されました。`std::bfloat16_t`を除いて、これらの型はISO/IEC 60559(IEEE 754)の定める交換形式と対応する表現を持つように指定されています。
+
+ただ、ISO/IEC 60559では浮動小数点数型の表現やフォーマットだけでなく、算術演算の再現性についても指定しています。そこでは、浮動小数点数型に対する算術演算が実行されたハードウェアやソフトウェアによらず、それらをどう組み合わされて実行された時でも同じ計算について同じ結果を生成することを要求するほか、丸めも正しく行うことを要求しています。良く知られているように、C++の標準浮動小数点数型はこの要件を全く満たしていません。
+
+この提案が問題にしているのは、拡張浮動小数点数型についても同じことがいえるのか？という点です。`std::float32_t`等の型が定義される場合、その性質はISO/IEC 60559で指定される、というように規定していますが、これがフォーマット（表現）のみなのか、算術演算についてもなのかが不透明です。
+
+委員会の中でもこの解釈は割れているようで、ある小グループではこの規定は表現にのみ適用されるという合意がされている一方で、SG6は逆に演算にも適用されるという投票を行ったことがあります。
+
+もし仮に、表現に加えて演算についてもISO/IEC 60559に準拠する場合、その実装は既存の標準浮動小数点数型とは全く異なる実装が必要になり、`<cmath>`の関数群も同様に厳格な実装が求められます。そしてその実装では最適化は著しく制限され、拡張浮動小数点数型は標準浮動小数点数型と比較するとパフォーマンスで劣るようになるでしょう。特に、一部のハードウェアではサポートされていない場合もあるため、ソフトウェアによる実装になる場合もあります。これは、拡張浮動小数点数型が導入されたきっかけが機械学習におけるパフォーマンス目的であるという明らかな文脈にはそぐわない解釈です。
+
+しかし、それでもなお現在の規格の文面は拡張浮動小数点数型のISO/IEC 60559への準拠が「表現のみ」なのか「演算も」なのかが曖昧であるため、これを明確化する必要があります。この提案ではそれについて文言を修正することを提案しています。
+
+方向性について合意が取れたものではないですが、拡張浮動小数点数型の経緯などから、現在のリビジョンでは「表現のみ」の解釈を明確化する方向で文面を調整する提案を行っています。
+
+- [`<stdfloat>` - cpprefjp](https://cpprefjp.github.io/reference/stdfloat.html)
+- [P3397 進行状況](https://github.com/cplusplus/papers/issues/2049)
+
 ### [P3398R0 User specified type decay](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3398r0.pdf)
 ### [P3401R0 Enrich Creation Functions for the Pointer-Semantics-Based Polymorphism Library - Proxy](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3401r0.pdf)
 ### [P3402R0 A Safety Profile Verifying Class Initialization](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3402r0.html)
