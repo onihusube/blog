@@ -59,6 +59,25 @@
 - [P1030 進行状況](https://github.com/cplusplus/papers/issues/406)
 
 ### [P1061R9 Structured Bindings can introduce a Pack](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1061r9.html)
+
+構造化束縛可能なオブジェクトをパラメータパックに変換可能にする提案。
+
+以前の記事を参照
+
+- [P1061R2 Structured Bindings can introduce a Pack - WG21月次提案文書を眺める（2022年04月）](https://onihusube.hatenablog.com/entry/2022/05/08/195618#P1061R2-Structured-Bindings-can-introduce-a-Pack)
+- [P1061R3 Structured Bindings can introduce a Pack - WG21月次提案文書を眺める（2022年10月）](https://onihusube.hatenablog.com/entry/2022/11/13/233529#P1061R3-Structured-Bindings-can-introduce-a-Pack)
+- [P1061R4 Structured Bindings can introduce a Pack - WG21月次提案文書を眺める（2023年02月）](https://onihusube.hatenablog.com/entry/2023/03/19/184146#P1061R4-Structured-Bindings-can-introduce-a-Pack)
+- [P1061R5 Structured Bindings can introduce a Pack - WG21月次提案文書を眺める（2023年05月）](https://onihusube.hatenablog.com/entry/2023/07/08/205803#P1061R5-Structured-Bindings-can-introduce-a-Pack)
+- [P1061R6 Structured Bindings can introduce a Pack - WG21月次提案文書を眺める（2023年12月）](https://onihusube.hatenablog.com/entry/2024/02/29/191439#P1061R6-Structured-Bindings-can-introduce-a-Pack)
+- [P1061R7 Structured Bindings can introduce a Pack - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P1061R7-Structured-Bindings-can-introduce-a-Pack)
+- [P1061R8 Structured Bindings can introduce a Pack - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P1061R8-Structured-Bindings-can-introduce-a-Pack)
+
+このリビジョンでの変更は、提案する文言の調整と実装経験セクションを更新したことです。
+
+この提案はこの次のリビジョンが2024年11月の全体会議で採択されています。
+
+- [P1061R2 進行状況](https://github.com/cplusplus/papers/issues/294)
+
 ### [P2019R7 Thread attributes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2019r7.pdf)
 ### [P2287R3 Designated-initializers for base classes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2287r3.html)
 ### [P2319R1 Prevent path presentation problems](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2319r1.html)
