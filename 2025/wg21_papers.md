@@ -770,5 +770,106 @@ C++23では`std::float32_t`などの拡張浮動小数点数型が導入され�
 - [P3397 進行状況](https://github.com/cplusplus/papers/issues/2049)
 
 ### [P3398R0 User specified type decay](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3398r0.pdf)
+
+あるクラス型について、推論される型を指定するための`decays_to(T)`の提案。
+
+この提案のモチベーションは、未発表の文字列補完提案（`f`リテラル）におけるパフォーマンス低下やダングリングの問題を回避する事にあります。`f`リテラルはその使用が`std::format()`の呼び出しになる事を要求するリテラルで、`f""`の形の文字列リテラル内の`{}`内を置換フィールドとしてその内部の文字列については識別子名としてそのコンテキストから拾ってくるものです。
+
+```cpp
+// fリテラルによって構築される型
+template<...>
+struct formatted_string decays_to(std::string) {
+  ...
+};
+
+std::string x = "x";
+auto s = f"value {x + "y"}";  // ok "xy"
+// sは"xy"という文字列を保持するstd::string型、ダングリングの心配はない
+
+// std::printの新しいオーバーロード
+extern void std::print(const formatted_string& s);
+
+std::print(f"value {x + "y"}"); // パフォーマンスの劣化が無い（std::stringの生成をしない）
+```
+
+`f`リテラルの生成結果が`std::string`である場合、`std::cout << std::format(...)`と同じパフォーマンスの問題が発生します。それを回避するために、`f`リテラルの結果はフォーマットに必要な情報（`format_args`と`format_string`）を保持している独自の型（例の`formatted_string`）となっています。ただし、この場合は`f`リテラルの結果を`auto`で受けたりするとダングリング参照を生成してしまいます。
+
+この場合に、`f`リテラルの結果を`auto`で受けるような場合にのみ、その結果を`std::string`に変換してしまうための仕組みがこの提案です。
+
+型の定義時に`decays_to(T)`と指定（`final`等と同じ）しておくことで、`auto`やテンプレートパラメータの推論時にこの指定した型`T`に推論されるように指定します。
+
+上記の例だと、`formatted_string`型に`decays_to(std::string)`と指定されていることで、`auto s = f"value {x + "y"}"`で推論される`s`の型は`std::string`になり、`formatted_string`型が`std::string`に暗黙変換可能であることによって`f`リテラルの結果はダングリング化する前に`std::string`に変換され、以降安全に使用可能になります。
+
+`std::print`には`formatted_string`型を直接受け取るオーバーロードが用意されることで、`formatted_string`型を直接受け取ることができるため、`f`リテラルの出力のために`std::string`が逐一生成されることはありません。
+
+この提案の内容はまた、式テンプレートにおけるよく知られた問題に対処することもできるようになります。式テンプレートは、型に式の構造を埋め込んでしまうことで式の構造を保存して、結果が必要になった時に初めて実際の計算を行うようにします。これにより、複雑な計算を実行する際の中間変数やコピーを削減することができます。
+
+例えばC++の行列演算ライブラリの実装においては式テンプレートを用いて行列演算の実行を遅延評価することが行われますが、式テンプレートという技法を知らない場合に、式テンプレートが適用されている演算の結果を`auto`で受けたりテンプレートパラメータとして推論されるところににそのまま渡してしまったりすると、計算結果ではなく式テンプレートの中間構造型が得られてしまいます。この型は本来欲しかった結果型と同じように扱うことができなかったり、そのまま結果取得をしようと何度もアクセスすると、アクセスの旅に再計算が走ってしまうなどの問題があります。
+
+```cpp
+template<typename L, typename R, typename Op>
+class Binop<L, R, Op> decays_to(Matrix) {
+public:
+  Binop(explicit const& L lhs, explicit const& R rhs) :
+    lhs(lhs), rhs(rhs)
+  {}
+
+  operator Matrix() {
+    Matrix ret;
+    for (int r = 0; r < lhs.height(); r++)
+    for (int c = 0; c < lhs.width(); c++)
+    ret[r, c] = operator[](r, c);
+    return ret;
+  }
+
+  double operator[](size_t r, size_t c) const { return op(lhs[r, c], rhs[r, c]); }
+  size_t width() const { return lhs.width(); }
+  size_t height() const { return lhs.height(); }
+
+private:
+  L lhs;
+  R rhs;
+  OP op;
+};
+
+template<typename LHS, typename RHS>
+explicit auto operator+(LHS&& lhs, RHS&& rhs) {
+  return Binop<LHS, RHS, std::plus<>>(lhs, rhs);
+}
+
+Matrix a, b, c;
+
+Matrix d = a + b + c;     // 両方の加算は要素ごとにまとめて行われる（遅延評価が効いている）
+auto e = a + b + c;       // eはMatrix型
+explicit auto p = a + b;  // decayを無効化する（Binop型が得られる
+auto f = p + c;           // fはMatrix型であり、この計算のパフォーマンスはd,eと同じ
+```
+
+式テンプレートにおける計算の中間型にこの提案の`decays_to`によって結果となる行列型を指定しておくことで、`auto`で受けられた時に中間型ではなく結果の行列型として取得させることができます。
+
+この提案では`explicit`を提案する`decays_to`の抑制指示に使用しており、この例の`operator+`は戻り値型推論時にdecayすることなく中間の`Binop`型をそのまま返し、変数宣言において`explicit auto`とすることで`decays_to`の指示する型ではなく本来の型に推論させることができます。
+
+あるクラス型`C`に対して`decays_to(T)`と指定している時に`auto`推論などで`C`オブジェクトの型が`T`に推論される場合、あくまで結果型が`T`に推論されるようにするところまでがこの提案で、`C -> T`への変換については従来通りの扱いとなり、変換が可能ではない場合はコンパイルエラーとなります。
+
+また、`decltype(auto)`の場合は`decays_to(T)`に対して`T`が推論されますが、それ以外の場合（`const auto&`や`const T`等の推論時）はプレイスホルダ型もしくはテンプレートパラメータに付加されているCV・参照修飾が`T`に対して適用されます。
+
+`decays_to(T)`によって`T`に推論されるのは、型推論が実行されるすべてのコンテキストで行われます（関数戻り値型推論や、構造化束縛などを含む）。
+
+同様に、型推論が行われるすべてのコンテキストにおいて、推論対象の型を表すもの（テンプレートパラメータやプレイスホルダ型）に対して`explicit`を付加しておくことで、この機能による推論を無効化して本来の型を得ることができます。
+
+```cpp
+template<typename T>
+void f(explicit const T& x);
+
+
+f<std::string>(f"Not deduced {"and not decayed"}"; // Call f<std::string>
+```
+
+最後に、この機能に関する型特性として`std::decay`を更新し、`std::decay`が`decays_to(T)`指定されている型に対しては`T`を帰す様に更新し、ある型に`decays_to(T)`が指定されているかどうかを取得する型特性`std::has_decays_to<T>`の追加を提案しています。
+
+この提案はEWGiのレビューにおいてさらに時間をかけて議論する合意を得られませんでした。
+
+- [P3398 進行状況](https://github.com/cplusplus/papers/issues/2050)
+
 ### [P3401R0 Enrich Creation Functions for the Pointer-Semantics-Based Polymorphism Library - Proxy](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3401r0.pdf)
 ### [P3402R0 A Safety Profile Verifying Class Initialization](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3402r0.html)
