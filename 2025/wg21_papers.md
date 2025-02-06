@@ -79,6 +79,28 @@
 - [P1061R2 進行状況](https://github.com/cplusplus/papers/issues/294)
 
 ### [P2019R7 Thread attributes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2019r7.pdf)
+
+`std::thread/std::jthread`において、そのスレッドのスタックサイズとスレッド名を実行開始前に設定できるようにする提案。
+
+- [P2019R1 Usability improvements for `std::thread` - ［C++］WG21月次提案文書を眺める（2022年08月）](https://onihusube.hatenablog.com/entry/2022/09/04/141015#P2019R1-Usability-improvements-for-stdthread)
+- [P2019R2 Usability improvements for `std::thread` - ［C++］WG21月次提案文書を眺める（2022年10月）](https://onihusube.hatenablog.com/entry/2022/11/13/233529#P2019R2-Usability-improvements-for-stdthread)
+- [P2019R3 Thread attributes - ［C++］WG21月次提案文書を眺める（2023年05月）](https://onihusube.hatenablog.com/entry/2023/07/08/205803#P2019R3-Thread-attributes)
+- [P2019R4 Thread attributes - ［C++］WG21月次提案文書を眺める（2023年10月）](https://onihusube.hatenablog.com/entry/2024/01/08/203712#P2019R4-Thread-attributes)
+- [P2019R5 Thread attributes - ［C++］WG21月次提案文書を眺める（2024年01月）](https://onihusube.hatenablog.com/entry/2024/03/10/170322#P2019R5-Thread-attributes)
+- [P2019R6 Thread attributes - ［C++］WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P2019R6-Thread-attributes)
+
+このリビジョンでの変更は
+
+- `char8_t`サポートを削除
+    - スレッド名の指定`char8_t`文字列を指定できていたが禁止化
+    - `wchar_t/char16_t/char32_t`のサポートは意味がないとしてされていませんでしたが`char8_t`はされていた
+    - ただし、これは議論不足のための措置であり、将来に追加する事にして別の提案で議論するようです
+    - ABI互換性確保のために、名前を受け取るAPIでは`basic_string_view<T>`を取るようにすることにしています
+
+などです。
+
+- [P2019 進行状況](https://github.com/cplusplus/papers/issues/817)
+
 ### [P2287R3 Designated-initializers for base classes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2287r3.html)
 ### [P2319R1 Prevent path presentation problems](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2319r1.html)
 ### [P2688R2 Pattern Matching: `match` Expression](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2688r2.html)
@@ -873,3 +895,4 @@ f<std::string>(f"Not deduced {"and not decayed"}"; // Call f<std::string>
 
 ### [P3401R0 Enrich Creation Functions for the Pointer-Semantics-Based Polymorphism Library - Proxy](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3401r0.pdf)
 ### [P3402R0 A Safety Profile Verifying Class Initialization](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3402r0.html)
+
