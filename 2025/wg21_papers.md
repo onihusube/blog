@@ -333,6 +333,15 @@ P2944R3（`reference_wrapper`の`==`比較の動作修正提案）ではその�
 - [P3379 進行状況](https://github.com/cplusplus/papers/issues/2036)
 
 ### [P3380R0 Extending support for class types as non-type template parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3380r0.html)
+
+NTTPとして扱えるクラス型の制限を拡張する提案。
+
+この提案のアイデアはP2484R0で以前に提案されたものをベースにしています。
+
+
+- [P2484R0 Extending class types as non-type template parameters - WG21月次提案文書を眺める（2021年11月）](https://onihusube.hatenablog.com/entry/2021/12/11/220126#P2484R0-Extending-class-types-as-non-type-template-parameters)
+- [P3380 進行状況](https://github.com/cplusplus/papers/issues/2037)
+
 ### [P3381R0 Syntax for Reflection](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3381r0.html)
 
 リフレクション構文のための演算子として`^^`を使用する提案。
@@ -894,5 +903,76 @@ f<std::string>(f"Not deduced {"and not decayed"}"; // Call f<std::string>
 - [P3398 進行状況](https://github.com/cplusplus/papers/issues/2050)
 
 ### [P3401R0 Enrich Creation Functions for the Pointer-Semantics-Based Polymorphism Library - Proxy](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3401r0.pdf)
+
+Proxyを構築するユーティリティ関数の提案。
+
+Proxyとは、P3086で提案されている仮想関数と継承を利用しないで動的なポリモルフィズムを実現しようとするライブラリです。この提案はそこから構築に関するユーティリティを分離したものです。
+
+提案されているの次の3つです
+
+- `make_proxy()`: 指定された値によって`proxy`オブジェクトを構築する際に、SBOを有効化して構築する
+- `allocate_proxy()`: カスタムアロケータを用いて`proxy`オブジェクトを構築する。`std::allocate_shared`と同じ使用感
+- `make_proxy_inplace`: std::optionalと同様に、与えられた値を自身のストレージ内に保存するSBOポインタを提供します。inplace proxiable targetというコンセプトを満たす型に対して使用できます.
+
+`proxy`クラスは通常ヒープを用いてその値を保持しますが、内部バッファに収まる場合はSBO(small buffer optimization)によってメモリ確保を回避することができます。ただしそれが可能な型のサイズなどは実装詳細でありユーザーが気にするべきことではなく、自動的に判定してほしいものがあります。ところが、`proxy`のコンストラクタは保持する型`T`のポインタを受け入れるようになっているため、`proxy`に渡された時点で動的メモリ確保は完了しています。
+
+例えば`year`というクラスの値を`proxy`で保持するためには次のように書きます
+
+```cpp
+struct year {
+  static constexpr proxiable_ptr_constraints constraints{
+    .max_size = sizeof(void*[2]),
+    .max_align = alignof(void*[2]),
+    .copyability = constraint_level::none,
+    .relocatability = constraint_level::nothrow,
+    .destructibility = constraint_level::nothrow
+  };
+  // other members to meet the facade name-requirement.
+};
+
+std::proxy<year> CreateYear() {
+  return std::make_unique<int>(2024); // std::proxy<year>へ暗黙変換
+}
+```
+
+`int`の値などは明らかにSBOの対象ですが、ユーザーが指定したポインタを受け取る以上`proxy`の型内部でSBOを自動適用することができません。そこで、この提案のファクトリ関数`make_proxy()`でそれを行うようにします。
+
+```cpp
+std::proxy<year> CreateYear() {
+  return std::make_proxy<year>(2024); // 動的メモリ確保されない
+}
+```
+
+`make_proxy()`は内部で渡された値がSBO可能かどうかによってSBOを適用するしないを自動で判定したうえで`proxy`オブジェクトを構築するものです。SBOが適用されない場合、ヒープ領域に確保されたうえで、所有権管理が行われます（おそらく`unique_ptr`によって）。
+
+`proxy`は通常所有権を引き取らないため渡すポインタのリソースの管理はユーザーの責任ですが、`make_proxy()`を使うと`proxy`にそれを委ねることができます。この場合にメモリの確保をカスタマイズしようとすると再び手動でリソース管理を行わなければならなくなるため、アロケータも一緒に渡すようにするのが`allocate_proxy()`です。
+
+```cpp
+auto CreateHugeYear(){
+  // sizeof(std::array<int, 1000>) is usually greater than the max size defined in facade,
+  // calling allocate proxy has no limitation to the size and alignment of the target
+  using HugeYearData = std::array<int, 1000>;
+
+  return std::allocate_proxy<year, HugeYearData>(std::allocator<HugeYearData>{});
+}
+```
+
+この関数はちょうど`std::allocate_shared()`とよく似た使用感になります。
+
+`make_proxy_inplace()`はinplace構築を行う`make_proxy`です。これは`std::optional`のinplaceコンストラクタに対応する`std::make_optional()`と同じような役割のものです。
+
+先ほどの`make_proxy()`の例に対して
+
+```cpp
+auto CreateYear() {
+  return std::make_proxy_inplace<year, int>(2024);
+}
+```
+
+この提案の内容はP3086で提案されているライブラリ機能をベースとして、その構築を便利にするためのユーティリティだけを分離して提案しているものです。
+
+- [P3086R0 Proxy: A Pointer-Semantics-Based Polymorphism Library - WG21月次提案文書を眺める（2024年01月）](https://onihusube.hatenablog.com/entry/2024/03/10/170322#P3086R0-Proxy-A-Pointer-Semantics-Based-Polymorphism-Library)
+- [P3401 進行状況](https://github.com/cplusplus/papers/issues/2051)
+
 ### [P3402R0 A Safety Profile Verifying Class Initialization](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3402r0.html)
 
