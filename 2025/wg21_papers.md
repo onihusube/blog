@@ -336,9 +336,417 @@ P2944R3（`reference_wrapper`の`==`比較の動作修正提案）ではその�
 
 NTTPとして扱えるクラス型の制限を拡張する提案。
 
-この提案のアイデアはP2484R0で以前に提案されたものをベースにしています。
+この提案のアイデアはP2484R0で以前に提案されたものをベースにして発展させたものです。
 
+クラス型のNTTPを許可する際に最も問題になることは、NTTP値の等価性をどのように判定するかということです。例えば次のようなコードにおいて
 
+```cpp
+// NTTPとして使用可能なクラス型とする
+struct C { ... };
+
+template<atuo NTTP>
+struct X {};
+
+static_assert(std::same_as<X<C{}>, X<C{}>>);  // 常にパスする？
+```
+
+最後のアサーションが常に成功することが重要です。これらはコード上から見た時に同じ型であり、これが同じ型とならない場合は余計なインスタンス化が行われていることになり、関数のインターフェースに現れる場合に一見同じな二つの宣言が異なるオーバーロードになってしまうなど、ODRの問題を引き起こすためです。これは実装的にはマングル名の問題であり、NTTP値をマングリングする時は同じ値は同じ文字列にマングルされる必要があります。
+
+C++20でNTTPとして使用可能な構造的型 (structural type) という型の分類は、この問題が起こらないと思われる要件をまとめたものです。しかし、全てのメンバが`public`である必要があるために多くのクラス型（特に型の構造以上の意味論を持つクラス型）はNTTPとして使用することができません。
+
+`private`メンバを持つクラス型は単にそのサブオブジェクトに分割して等価性を判断するということが必ずしも正しくなく、その型の持つ意味論を考慮する必要がある場合があります。
+
+この提案では、シリアル化（Serialization）・正規化（Normalization）・逆シリアル化（Deserialization）の3ステップによってNTTP値を構築することによって、NTTPの等価性判定に意味論も反映する仕組みを提案するとともに、それをクラス型で宣言するための構文を提案するものです。
+
+1つ目のステップであるシリアル化とは、（NTTPとして使用する）値`V`を受け取り、それを構造的型のタプルへ分解する過程です。結果の型はそれ自体も構造的型である必要があるため、この分解破砕機的に行われます（スカラ型か左辺値参照型に行きつくと終了）。
+
+これはつまりC++20時点の仕様と実装がやっていることであり、クラス型は0個以上スカラ型によって構成されているものとして扱って、そのスカラ型の等価性によってクラス型の等価性を定義しようとするものです。
+
+ただし`private`メンバを持つ型などでは、そのクラス型の等価性判定のためにどのようにシリアライズを行えば良いのか（どのような型に分解するのが適切なのか）をコンパイラに伝える必要があります。
+
+その手段さえ用意すれば、`std::tuple`や`std::string_view`などの型ではこのシリアル化だけでNTTPの等価性問題をクリアできます。ただし、これだけでは不十分な型もあります。
+
+例えば次のような小さな文字列型があって
+
+```cpp
+class SmallString {
+  char data[32];
+  int length = 0; // always <= 32
+
+public:
+  // the usual string API here, including
+  SmallString() = default;
+
+  constexpr auto data() const -> char const* {
+    return data;
+  }
+
+  constexpr auto push_back(char c) -> void {
+    assert(length < 31);
+    data[length] = c;
+    ++length;
+  }
+
+  constexpr auto pop_back() -> void {
+    assert(length > 0);
+    --length;
+  }
+};
+```
+
+この型がNTTPとして使用可能であるとして、次のような関数がある時
+
+```cpp
+// SmallStringをNTTPで受ける型
+template <SmallString S>
+struct C { };
+
+constexpr auto f() -> SmallString {
+  auto s = SmallString();
+  s.push_back('x');
+  return s;
+}
+
+constexpr auto g() -> SmallString {
+  auto s = f();
+  s.push_back('y');
+  s.pop_back(); // yは配列上に残ったままになる
+  return s;
+}
+```
+
+`SmallString`クラスの意味論的には、`f()`と`g()`の返す文字列型は同じ値を持ちます（`x`1文字からなる文字列）。しかし、そのデータ配列の内容は異なり、最初にゼロクリアされているとしても`g()`の配列には`y`が記録されたままになっています。このため、単にシリアル化の結果のみから等価性を判定（C++20のデフォルト、サブオブジェクト列の等価性によって判定）すると、`C<f()>`と`C<g()>`は異なる型になります。
+
+ここではその意味論を反映する必要がありそうで、シリアル化をカスタムすることで`data[0]`から`data[length - 1]`までの文字のみを等価性判定に参加させた方がいいような気がします。ただしこの方法はまた別の問題を孕んでいます
+
+```cpp
+template <SmallString S>
+constexpr auto bad() -> int {
+  if constexpr (S.data()[1] == 'y') {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+```
+
+この関数を用いた、`bad<f()>()`と`bad<g()>()`は`0`と`1`のどちらの値を返すでしょうか？あるいは両方でしょうか？今はカスタムのシリアル化によって`C<f()>`と`C<g()>`は同一であるようにしているため、これはODR違反になります。
+
+つまり、デフォルトのシリアル化を選ぶと等しさが正しくなくなり（意味を反映できず）、カスタムのシリアル化を選ぶとODR違反が発生します。
+
+この問題を回避するためのステップが正規化です。ここでの正規化は他のところで使用される場合と同じ意味で、本質的に同じであるものを同じになるようにする作業です。例えばこの場合、カスタムのシリアル化を行った後で、`data[]`全体をゼロクリアしてから`length`個の要素をコピーしてその値により等価性判定を行うようにすることで、`C<f()>`と`C<g()>`は同一になりかつ`bad<f()>()`と`bad<g()>()`はどちらも1を返すようになります。
+
+この正規化の実際の作業は型ごとに必要性や方法が異なりえます。
+
+ただし、これを経てもなおまだ十分ではない型が存在します。その代表例は`std::vector`をはじめとする可変長コンテナです。
+
+`std::vector`の実装はとても単純には次のようになっています
+
+```cpp
+template <typename T>
+class vector {
+  T* begin_;
+  size_t size_;
+  size_t capacity_;
+};
+```
+
+ポインタのNTTP等価性判定はそのポインタの値によって行われ、ポインタ値が等しい時に等価であるとされますが、`std::vector`の場合はその要素によって判定を行う必要があります（ポインタ値が異なる場合でも`std::vector`的には等価な場合がありうる）。`std::vector`をはじめとするコンテナのシリアル化と正規化においては、可変長の要素列を取り扱う必要があります。
+
+ここまでなら前の`SmallString`と話は変わらないのですが、`std::vector`の場合はキャパシティというプロパティがあります。2つの`std::vector`の全要素が完全に同一だったとしても、キャパシティの値は異なる可能性があります。しかし単にキャパシティの値を等価性判定に参加させただけでは不十分です。なぜなら、キャパシティの値は実態に合っている必要があるためで、すなわち確保されている配列の全体が等価性判定に参加してしまい、先ほどと同じ問題が起こります。
+
+逆シリアル化はこれを上手く取り扱うためのステップで、（カスタム/デフォルトの）シリアル化を行った結果をデシリアライズして実際のNTTP値を構成することによってこの問題を解決します。逆シリアル化は再構築をおこなうことによって正規化を暗黙に実行しており、これによって正規化の方法を慎重に指定する負担を軽減する事もできます。
+
+また、コンパイラは次のようなチェックを実行してこれらの3ステップの過程が健全であることを確認することもできます
+
+```cpp
+serialize(deserialize(serialize(v))) === serialize(v)
+```
+
+ユーザーがコード内で見るNTTP値は、元の値はをシリアルライズしてデシリアライズ（シリアル化結果をクラスに渡して再構築）した値であり、この結果得られる値はNTTP値として等価であるとみなされる元の型のすべての値に対して信頼できる単一のテンプレート引数となります（同値類の代表元みたいなものになる）。
+
+P2484R0では、このカスタムのシリアル化と逆シリアル化を含むNTTP仕様の設計を提案するものではありましたが、可変長コンテナをサポートできていないなどの問題がありました。この提案ではそれを考慮して正規化というステップを入れることによってこれを解消しています。
+
+残った問題は、このシリアル化と逆シリアル化をどのように行うか、中間表現をどうするか、という点です。`std::vector`や`std::tuple`をシリアル化するには新しい`std::vector`や`std::tuple`が必要になり、表現型についても設計しなければなりません。
+
+この提案では、これに静的リフレクションを活用することを提案しています。すなわち、シリアル化の表現は`std::meta::info`で行い、シリアル化の結果は`std::meta::info`の配列になります。逆シリアル化はこれを受け取るコンストラクタによって行います。
+
+`SmallString`の場合、カスタムのシリアル化（`length`個分の要素だけをシリアル化）は次のようになります
+
+```cpp
+class SmallString {
+  char data[32];
+  int length;
+
+  // 自身をstd::meta::infoの配列に分解
+  consteval auto operator template() const -> std::vector<std::meta::info> {
+    std::vector<std::meta::info> repr;
+
+    // lengthこの範囲の要素だけをシリアライズする
+    for (int i = 0; i < length; ++i) {
+      repr.push_back(std::meta::reflect_value(data[i]));  // meta::infoに値を保持する
+    }
+    
+    return repr;
+  }
+};
+```
+
+そして、逆シリアル化（+正規化）は次のように実装されます
+
+```cpp
+class SmallString {
+
+  ...
+
+  // オーバーロード解決を容易にするためにタグ付きコンストラクタにする
+  consteval SmallString(std::meta::from_template_t, std::vector<std::meta::info> repr)
+    : data{} // 配列をまずゼロクリアしておく（正規化）
+    , length(repr.size())
+  {
+    // 各要素を復帰する
+    for (int i = 0; i < length; ++i) {
+      data[i] = extract<char>(repr[i]);
+    }
+  }
+};
+```
+
+`std::vector`の場合もこれと同様に実装できます
+
+```cpp
+template <typename T>
+class vector {
+  T* begin_;
+  size_t size_;
+  size_t capacity_;
+
+  // vectorのシリアライズ表現型
+  struct Repr {
+    std::unique_ptr<std::meta::info const[]> p;
+    size_t n;
+
+    consteval auto data() const -> std::meta::info const* {
+      return p.get();
+    }
+
+    consteval auto size() const -> size_t {
+      return n;
+    }
+  };
+
+  // シリアライズ処理
+  consteval auto operator template() const -> Repr {
+    auto data = std::make_unique<std::meta::info const[]>(size_);
+
+    // 要素の値を保持しておく
+    for (size_t i = 0; i < size_; ++i) {
+      data[i] = std::meta::reflect_value(begin_[i]);
+    }
+
+    // サイズと一緒に保存
+    return Repr{
+      .p=std::move(data),
+      .n=size_,
+    };
+  }
+
+  // デシリアライズ処理
+  consteval vector(std::meta::from_template_t, Repr r) {
+    // キャパシティの値はサイズと同一になる
+    begin_ = std::allocator<T>::allocate(r.size());
+    size_ = capacity_ = r.size();
+
+    // 要素を復帰
+    for (size_t i = 0; i < size_; ++i) {
+      ::new (begin_ + i) T(extract<T>(r.p[i]));
+    }
+  }
+};
+```
+
+ここでは、シリアル化の結果として`Repr`という型を返しています。シリアル化の結果は`meta::info`の配列として扱えればよく`std::vector`である必要はありません（というか`std::vector`は`std::vector`のためには使用できない）。求められているのは、`.data()`が`const std::meta::info*`に変換可能であり、`.size()`でその要素数が取得できることです。
+
+このアプローチは非常に強力である一方で、一部の型に対しては目的は達せられるものの最適とは言えない部分があります。例えば`optional`であり
+
+```cpp
+template <typename T>
+class Optional {
+  union { T value; };
+  bool engaged;
+
+  // null reflectionを用いることで長さ0 or 1の配列を表現できる（vector<info>は必要ない
+  struct Repr {
+    std::meta::info r;
+
+    explicit operator bool() const {
+      return r != std::meta::info();
+    }
+
+    consteval auto data() const -> std::meta::info const* {
+      return *this ? &r : nullptr;
+    }
+    consteval auto size() const -> size_t {
+      return *this ? 1 : 0;
+    }
+  };
+
+  consteval auto operator template() -> Repr {
+    if (engaged) {
+      return Repr{.r=meta::reflect_value(value)};
+    } else {
+      return Repr{.r=meta::info()};
+    }
+  }
+
+  consteval Optional(meta::from_template_t, Repr repr)
+    : engaged(repr)
+  {
+    if (engaged) {
+      ::new (&value) T(extract<T>(repr.r));
+    }
+  }
+};
+```
+
+`tuple`もそうです
+
+```cpp
+template <typename... Ts>
+class Tuple {
+  // let's assume this syntax works (because the details are not important here)
+  Ts... elems;
+
+  // Note that here we're returning an array instead of a vector
+  // just to demonstrate that we can
+  consteval auto operator template() -> array<meta::info, sizeof...(Ts)> {
+    array<meta::info, sizeof...(Ts)> repr;
+    size_t idx = 0;
+    template for (constexpr auto mem : nonstatic_data_members_of(^Tuple) {
+      // references and pointers have different rules for
+      // template-argument-equivalence, and thus we need to
+      // capture those differences... differently
+      if (type_is_reference(type_of(mem))) {
+          repr[idx++] = reflect_object(this->[:mem:]);
+      } else {
+          repr[idx++] = reflect_value(this->[:mem:]);
+      }
+    }
+    return repr;
+  }
+
+  consteval Tuple(meta::from_template_t tag,
+                  array<meta::info, sizeof...(Ts)> repr)
+      : Tuple(tag, std::make_index_sequence<sizeof...(Ts)>(), repr)
+  { }
+
+  template <size_t... Is>
+  consteval Tuple(meta::from_template_t,
+                  index_sequence<Is...>,
+                  array<meta::info, sizeof...(Ts)> repr)
+      : elems(extract<Ts>(repr[Is]))...
+  { }
+}
+```
+
+これらの型の場合はいずれも、メンバ毎の等価性によって自身の等価性を表現しているにすぎません。すなわち、（C++20とは異なるが）その動作はデフォルトです（シリアライズのみで十分）。したがって、この場合はデフォルト実装が利用可能であるはずです。
+
+```cpp
+template <typename... Ts>
+class Tuple {
+  Ts... elems;
+
+  consteval auto operator template() = default;
+  consteval Tuple(meta::from_template_t, auto repr) = default;
+}
+```
+
+ただしこれはまだ微妙（1つの操作に2つの宣言がいる、正規化を行う必要がある型で役に立たないなど）な部分があります。この提案では`operator template`の戻り値型`void`であるかどうかによって、その意味を変えるようにしています。
+
+`operator template`の戻り値型`void`である場合、正規化を行う必要があるものの、そのシリアル化および逆シリアル化はデフォルト（メンバ毎のもの）であり、カスタムの逆シリアル化が必要ないことを表します。
+
+```cpp
+template <typename T>
+class Optional {
+  union { T value; };
+  bool engaged;
+
+  consteval auto operator template() -> void { }
+};
+
+template <typename... Ts>
+class Tuple {
+  Ts... elems;
+
+  consteval auto operator template() -> void { }
+}
+```
+
+この戻り値型`void`の`operator template`は、C++20に欠けていた、メンバ毎の等価性によって等価性が判定可能だが`private`なメンバを持ってしまっているクラスに対するオプトイン構文になります。
+
+`SmallString`の場合も実装は単純になります
+
+```cpp
+class SmallString {
+  char data[32];
+  int length;
+
+  consteval auto operator template() -> void {
+    // 正規化方法のみを書く（シリアル化と逆シリアル化はデフォルトで良い
+    std::fill(this->data + this->length, this->data + 32, '\0');
+  }
+};
+```
+
+この提案では最終的に
+
+- コア言語
+    - テンプレート表現関数 (`operator template`)の導入: クラス型`T`は次の2つの形式のいずれかで`consteval`な`operator template`を提供できる
+        1. `void`を返す: すべての基底クラスと非静的データメンバは構造型でなければならず、`mutable`であってはならない
+        2. `R`を返す:
+            - `R.data()`は`std::meta::info const*`に変換可能で、`R.size()`は`size_t`に変換可能である必要がある
+            - `T(std::meta::from_template, R)`が有効な式である必要がある
+    - テンプレート引数の正規化の概念の導入
+        - 構造型`T`の値`v`は、以下のようにテンプレート引数として正規化されます
+            1. `T`がスカラー型または左辺値参照型の場合、何も行わない
+            2. `T`が配列型の場合、配列のすべての要素がテンプレート引数として正規化される
+            3. `T`がクラス型の場合
+                - `T`が`void`を返すテンプレート表現関数を提供する場合、その関数が`v`上で呼び出され、`v`のすべてのサブオブジェクトがテンプレート引数として正規化される
+                - `T`が`std::meta::info`の範囲を返すテンプレート表現関数を提供する場合、新しい値`T(std::meta::from_template, v.operator template())`が`v`の代わりに使用される
+                - `T`がテンプレート表現関数を提供しない場合、`v`のすべてのサブオブジェクトがテンプレート引数として正規化される
+    - P2996の`std::meta::reflect_value`の意味を、引数に対してテンプレート引数の正規化を実行するように変更
+    - 構造的型の定義の拡張
+        - 構造的型は、スカラー型、左辺値参照型、または要素型が構造的型である配列型
+        - または、以下のプロパティを持つリテラルクラス型
+            - クラスが資格のあるテンプレート表現関数を持つ
+            - あるいは
+              - すべての基底クラスと非静的データメンバが`public`かつ非`mutable`であり
+              - すべての基底クラスと非静的データメンバの型が構造的型である
+    - テンプレート引数として等価（template-argument-equivalent）の定義の拡張
+        - 2つの値がテンプレート引数として等価であるのは、それらが同じ型であり、次の場合
+            - [...]
+            - どちらもクラス型`T`であり
+              - `T`が非`void`を返す資格のあるテンプレート表現関数を持つクラス型である場合、2つの値に対してテンプレート表現関数を呼び出した結果である`r1`と`r2`について、`r1.size() == r2.size()`であり、`0 <= i < r1.size()`の各`i`について、`r1.data()[i] == r2.data()[i]`である
+              - それ以外の場合、対応する直接のサブオブジェクトと参照メンバがテンプレート引数として等価である
+    - クラス型の非型テンプレートパラメータを初期化する際に、テンプレート引数の正規化を実行するようにする
+- ライブラリ
+    - 新しいタグ型`std::meta::from_template_t`と、その値`std::meta::from_template`を追加
+    - 新しい型特性`std::is_structural`を追加
+    - 次のライブラリ型すべてに、制約付きの`consteval void operator template() { }`（つまり、正規化なしのデフォルトのサブオブジェクトごとのシリアル化）を追加
+        - `std::tuple<Ts...>`
+        - `std::optional<T>`
+        - `std::expected<T, E>`
+        - `std::variant<Ts...>`
+        - `std::basic_string_view<CharT, Traits>`
+        - `std::span<T, Extent>`
+        - `std::chrono::duration<Rep, Period>`
+        - `std::chrono::time_point<Clock, Duration>`
+
+を提案しています。
+
+`std::meta::info`の配列を返す`operator template`はリフレクション提案に依存していますが、`void`を返す方には依存はありません。前者はあらゆる型をサポートするために（特に可変長コンテナ型のために）必要なソリューションであり、後者は前者の略記であるものの多くの一般的な型をカバーしています。そのため、リフレクションの進行とは関係なく、`void`を返す形式は検討しておくことができます。
+
+- [C++20 非型テンプレートパラメータとしてクラス型を許可する [P0732R2] - cpprefjp](https://cpprefjp.github.io/lang/cpp20/class_types_in_non-type_template_parameters.html)
 - [P2484R0 Extending class types as non-type template parameters - WG21月次提案文書を眺める（2021年11月）](https://onihusube.hatenablog.com/entry/2021/12/11/220126#P2484R0-Extending-class-types-as-non-type-template-parameters)
 - [P3380 進行状況](https://github.com/cplusplus/papers/issues/2037)
 
