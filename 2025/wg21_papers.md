@@ -1384,3 +1384,151 @@ auto CreateYear() {
 
 ### [P3402R0 A Safety Profile Verifying Class Initialization](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3402r0.html)
 
+クラスのすべてのサブオブジェクトが初期化されていることを保証するプロファイルの提案。
+
+この提案はP3274で提案されているプロファイル機能の1つとして、クラスを構築した後でそのクラスのすべてのサブオブジェクト（メンバ変数と基底クラス）が何かしら初期化済みであることを強制し保証するプロファイルを提案するものです。
+
+提案するのは`[[Profiles::enable(initialization)]]`というプロファイル属性で、クラスの定義に対して付加します。
+
+```cpp
+struct [[Profiles::enable(initialization)]] parent1 {
+  int i;
+  parent1() = default; // iが初期化されていないためプロファイルに準拠していない（parent1は未検証）
+};
+
+struct [[Profiles::enable(initialization)]] child1 : public parent {
+  int j;
+  child1() : parent1(), j(42) {} // child1自体はプロファイル準拠している
+}
+
+// 検証済みのクラスではない
+// プロファイルが指定されれば準拠できる
+struct parent2 {
+  int i = 0;
+  parent2() = default;
+};
+
+struct [[Profiles::enable(initialization)]] child2 : public parent2 {
+  int j;
+  child2() : parent2(), j(42) {} // parent2が検証済みではないため、child2も未検証
+}
+```
+
+スカラ型もしくはこのプロファイルが指定されているクラス型は検証済みのクラスと呼びます。検証済みのクラスのすべてのコンストラクタは次のプロパティを満たす必要があります
+
+- 全ての基底クラスは検証済み
+- 全ての基底クラスは、その非静的メンバ変数が読み取られる前に初期化されている
+- 全ての検証済みメンバ変数は、その非静的メンバ変数が読み取られる前に初期化されている
+- 全ての検証済みメンバ変数は、全てのパスで初期化されている
+- 明示的に除外されているメンバ変数やそのメンバ変数は読み取れない
+- 全ての非静的メンバ変数が初期化されるまで、オブジェクト引数（`this` or 明示的オブジェクト引数）の使用は制限される
+    - 制限されている場合、オブジェクト引数は非静的メンバ変数へのアクセスにのみ使用できる（初期化のため）
+- 全ての非静的メンバ変数が初期化されるまで、コンストラクタは検証済みのクラスのコンストラクタのみを呼び出すことができる
+    - それまでは、他の関数の呼び出しは禁止される
+- 関数呼び出しの戻り値は、直接的にも間接的にもメンバ変数に代入することはできない
+- 検証においては、デフォルト初期化は何かを初期化しているとはみなされない
+
+任意の関数内において非静的メンバ変数が参照されている場合、次の場合を除いてそれは読み取られたとみなされます
+
+- 評価されないオペランドで使用されている
+- 破棄された文の一部である
+- 代入式の左オペランドである
+- コンストラクタ呼び出しの受け取りオブジェクトである
+
+提案文書より、サンプルコード
+
+```cpp
+struct [[Profiles::enable(initialization)]] clazz1 {
+  int i;
+  int j;
+  int z = 0;
+
+  clazz1() {
+    i = 123;
+
+    if (nondet) {
+      j = 456;
+    }
+    // 非準拠: jは全てのパスで初期化されていない
+  }
+};
+```
+```cpp
+struct [[Profiles::enable(initialization)]] clazz2 {
+  int i;
+  int j;
+
+  clazz2() : i(j), j(42) {} // 非準拠: jが初期化される前に読み取られる
+};
+```
+```cpp
+struct [[Profiles::enable(initialization)]] clazz3 {
+  int i;
+  int j;
+
+  // 準拠できているものの、良くない形
+  clazz3() {
+    this->i = 0;
+    this->j = 42;
+  }
+};
+```
+```cpp
+struct pod {
+  int i;
+  int j;
+};
+
+struct [[Profiles::enable(initialization)]] clazz4 {
+  pod p;
+  clazz4() = default; // pはデフォルト初期化のため、非準拠
+};
+
+struct [[Profiles::enable(initialization)]] clazz5 {
+  pod p{};
+  clazz5() = default; // pは値初期化されており、準拠している
+}
+
+
+struct [[Profiles::enable(initialization)]] clazz6 {
+  pod podFactory() {
+    pod p;    // pはデフォルト初期化されている
+    return p;
+  }
+
+  clazz6() : p(podFactory()) {} ; // 非準拠、pは関数戻り値で初期化されている
+}
+```
+```cpp
+struct [[Profiles::enable(initialization)]] clazz7 {
+  int i;
+  int j;
+
+  clazz7(int i) : i(i), j() {}; // jは値初期化されており、準拠している
+};
+```
+
+クラステンプレートの場合は、インスタンス化にあたって検証作業が行われます
+
+```cpp
+class NotAnnotated{/**/};
+class [[Profiles::enable(initialization)]] Annotated {/**/};
+
+template<typename T>
+class [[Profiles::enable(initialization)]] AnnotatedTemplate {
+  T field = T();
+};
+
+
+void foo() {
+  AnnotatedTemplate<NotAnnotated> nat {}; // 非準拠、検証されていないクラスのコンストラクタを呼び出している
+  AnnotatedTemplate<Annotated>     at {}; // 準拠している
+}
+```
+
+このプロファイルに準拠しているクラス型は、そのコンストラクタ呼び出しの後で全てのメンバ変数と基底クラスが初期化済みであることが保証され、その観点からは安全に使用することができます（明確ではないですが、検証に失敗するとコンパイルエラーになるはずです）。
+
+また、提案するプロファイルの下で特定のデータメンバを検証から除外するためには、`[[indeterminate]]`属性を利用することを提案しています（この属性自体はC++23で追加されたもの）。
+
+- [P3274R0 A framework for Profiles development - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3274R0-A-framework-for-Profiles-development)
+- [P3402 進行状況](https://github.com/cplusplus/papers/issues/2052)
