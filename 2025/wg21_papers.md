@@ -102,6 +102,89 @@
 - [P2019 進行状況](https://github.com/cplusplus/papers/issues/817)
 
 ### [P2287R3 Designated-initializers for base classes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2287r3.html)
+
+基底クラスに対して指示付初期化できるようにする提案。
+
+以前の記事を参照
+
+- [P2287R0 Designated-initializers for base classes - ［C++］WG21月次提案文書を眺める（2021年1月）](https://onihusube.hatenablog.com/entry/2021/02/11/153333#P2287R0-Designated-initializers-for-base-classes)
+- [P2287R1 Designated-initializers for base classes - ［C++］WG21月次提案文書を眺める（2021年2月）](https://onihusube.hatenablog.com/entry/2021/03/12/225547#P2287R1-Designated-initializers-for-base-classes)
+- [P2287R2 Designated-initializers for base classes - ［C++］WG21月次提案文書を眺める（2023年4月）](https://onihusube.hatenablog.com/entry/2023/04/23/192236#P2287R2-Designated-initializers-for-base-classes)
+
+このリビジョンでの変更は
+
+- 指示子（designator）なしで基底クラスのサブオブジェクトを直接初期化する構文の追加
+- 実装経験の追記
+
+このリビジョンでは、R2で可能だった
+
+```cpp
+struct A {
+  int a;
+};
+
+struct B : A {
+  int b;
+};
+
+int main() {
+  // R0で提案されていた構文、R2で削除（このリビジョンでも不可
+  B b1{:A = {.a = 1}, b = 2};
+  B b2{:A{.a = 1}, b = 2};
+  B b3{:A{1}, .b{2}};
+
+  // R1で追加され、R2でも可能な構文
+  B b4{.a = 1, .b = 2};
+  B b5{.a{1}, .b{2}};
+
+  // このリビジョンで追加された構文
+  B b6{ A{1}, .b = 2};
+}
+```
+
+特に、派生クラスと基底クラス（どちらも集成体型とする）で同じメンバ変数名を持つ場合に区別して初期化することができるようになります
+
+```cpp
+struct D { int x; };
+struct E : D { int x; };
+
+int main() {
+  auto e1 = E{.x=1};         // E::xを1で初期化、D::xではない
+  auto e2 = E{{.x=1}, .x=2}; // D::xを1で、E::xを2で初期化
+  auto e3 = E{D{1}, .x=2};   // 同上
+}
+```
+
+また、この形式によって非集成体の基底クラスが含まれている場合にそのクラスだけ非指示付き初期化によって初期化することができるようになります
+
+```cpp
+struct C : std::string { int c; };
+
+// どちらも同じ意味、ok
+auto c1 = C{"hello", .c=3};
+auto c2 = C{{"hello"}, .c=3};
+```
+
+ただし、指示付き初期化によって初期化できるのは集成体型のみです。
+
+```cpp
+struct A { int a; };
+struct B : A { int b; };
+struct C : A { C(); int c; };
+struct D : C { int d; };
+
+A{.a=1};       // C++20からok
+B{.a=1, .b=2}; // 提案、'a' は集成体型の直接のメンバであり、Aは基底クラス
+C{.c=1};       // error: Cは集成体型ではない
+D{.a=1};       // error: 'a' は集成体型の直接のメンバだが、中間の基底クラスCは集成体型ではない
+```
+
+この提案では、現在の指示付き初期化時の識別子に対する制約を拡張して、指示付き初期化しようとしている型`T`の直接の非静的メンバ変数に加えて、全ての間接メンバ（集成体型基底クラスの非静的メンバ変数名）もその対象に加えています。
+
+この提案では、指示付き初期化において基底クラス名を指定して初期化する方法を考え出すことをやめており、メンバを指定する間接的な初期化方法をサポートすることを目指しています（ただし、それは直交した問題であり後からでも可能としています）。
+
+- [P2285 進行状況](https://github.com/cplusplus/papers/issues/978)
+
 ### [P2319R1 Prevent path presentation problems](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2319r1.html)
 ### [P2688R2 Pattern Matching: `match` Expression](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2688r2.html)
 ### [P2786R7 Trivial Relocatability For C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r7.pdf)
@@ -1148,6 +1231,31 @@ std::meta::define_class(^MigratedUser, liveMembers(currentUser));
 
 ### [P3389R0 Of Operation States and Their Lifetimes (LEWG Presentation 2024-09-10)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3389r0.pdf)
 ### [P3390R0 Safe C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3390r0.html)
+
+```cpp
+// safety関連の機能をonにする
+#feature on safety
+
+// 安全な標準ライブラリをインクルード
+#include <std2.h>
+
+// safe指定子付きmain()
+// UBにつながる操作を禁止する
+int main() safe {
+  std2::vector<int> vec { 11, 15, 20 };
+
+  for(int x : vec) {
+    // Ill-formed. mutate of vec invalidates iterator in ranged-for.
+    if(x % 2) {
+      // safetyコンテキストでは、左辺値はデフォルトでimmutable
+      mut vec.push_back(x);
+    }
+
+    std2::println(x);
+  }
+}
+```
+
 ### [P3391R0 `constexpr std::format`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3391r0.html)
 
 `std::format()`を`constexpr`化する提案。
