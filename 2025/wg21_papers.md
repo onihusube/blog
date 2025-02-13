@@ -186,6 +186,17 @@ D{.a=1};       // error: 'a' は集成体型の直接のメンバだが、中間
 - [P2285 進行状況](https://github.com/cplusplus/papers/issues/978)
 
 ### [P2319R1 Prevent path presentation problems](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2319r1.html)
+
+`filesystem::path`の`.string()`メンバ関数を非推奨にする提案。
+
+以前の記事を参照
+
+- [P2319R0 Prevent path presentation problems - WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P2319R0-Prevent-path-presentation-problems)
+
+このリビジョンでの変更は、`.string()`メンバ関数の非推奨化のみに主眼を置いて、代替関数の追加をやめたことです。
+
+- [P2319 進行状況](https://github.com/cplusplus/papers/issues/1987)
+
 ### [P2688R2 Pattern Matching: `match` Expression](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2688r2.html)
 ### [P2786R7 Trivial Relocatability For C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r7.pdf)
 ### [P2835R5 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r5.html)
