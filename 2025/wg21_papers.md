@@ -198,6 +198,25 @@ D{.a=1};       // error: 'a' は集成体型の直接のメンバだが、中間
 - [P2319 進行状況](https://github.com/cplusplus/papers/issues/1987)
 
 ### [P2688R2 Pattern Matching: `match` Expression](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2688r2.html)
+
+C++へのパターンマッチング導入に向けて、別提案との基本構造の違いに焦点を当てた議論。
+
+以前の記事を参照
+
+- [P2688R0 Pattern Matching Discussion for Kona 2022 - WG21月次提案文書を眺める（2022年10月）](https://onihusube.hatenablog.com/entry/2022/11/13/233529#P2688R0-Pattern-Matching-Discussion-for-Kona-2022)
+- [P2688R1 Pattern Matching: `match` Expression - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P2688R1-Pattern-Matching-match-Expression)
+
+このリビジョンでの変更は
+
+- 実装経験の追加
+- 提案する文言を追加
+- `match`演算子の優先順位を定義
+- リフレクションベースのtuple-like/variant-likeなプロトコルを提案してないことを決定
+
+などです。
+
+- [P2688 進行状況](https://github.com/cplusplus/papers/issues/1353)
+
 ### [P2786R7 Trivial Relocatability For C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r7.pdf)
 ### [P2835R5 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r5.html)
 ### [P2835R6 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r6.html)
