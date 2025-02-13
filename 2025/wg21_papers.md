@@ -254,7 +254,37 @@ C++へのパターンマッチング導入に向けて、別提案との基本�
 - [P2786 進行状況](https://github.com/cplusplus/papers/issues/1463)
 
 ### [P2835R5 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r5.html)
+
+↓
+
 ### [P2835R6 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r6.html)
+
+`std::atomic_ref`が参照しているオブジェクトのアドレスを取得できるようにする提案。
+
+以前の記事を参照
+
+- [P2835R0 Expose `std::atomic_ref`'s object address - WG21月次提案文書を眺める（2023年05月）](https://onihusube.hatenablog.com/entry/2023/07/08/205803#P2835R0-Expose-stdatomic_refs-object-address)
+- [P2835R1 Expose `std::atomic_ref`'s object address - WG21月次提案文書を眺める（2023年07月）](https://onihusube.hatenablog.com/entry/2023/09/23/203644#P2835R1-Expose-stdatomic_refs-object-address)
+- [P2835R2 Expose `std::atomic_ref`'s object address - WG21月次提案文書を眺める（2024年01月）](https://onihusube.hatenablog.com/entry/2023/09/23/203644#P2835R1-Expose-stdatomic_refs-object-address)
+- [P2835R3 Expose `std::atomic_ref`'s object address - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P2835R3-Expose-stdatomic_refs-object-address)
+- [P2835R4 Expose `std::atomic_ref`'s object address - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P2835R4-Expose-stdatomic_refs-object-address)
+
+R5での変更は
+
+- P3309とP3323を考慮して更新
+- 戻り値型を`T*`に戻す
+    - `constexpr`をサポートする唯一の設計であるため
+- 既存のポインタを返すAPIを参考に名前を変更
+
+このリビジョンでの変更は
+
+- LEWGは戻り値型として`T*`を確認
+- LEWGは名前として`address()`を選択
+
+などです。
+
+- [P2835 進行状況](https://github.com/cplusplus/papers/issues/1545)
+
 ### [P2841R4 Concept and variable-template template-parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2841r4.pdf)
 ### [P2846R3 reserve_hint: Eagerly reserving memory for not-quite-sized lazy ranges](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2846r3.pdf)
 ### [P2879R0 Proposal of `std::dump`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2879r0.pdf)
