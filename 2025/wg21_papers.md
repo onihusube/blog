@@ -218,6 +218,41 @@ C++へのパターンマッチング導入に向けて、別提案との基本�
 - [P2688 進行状況](https://github.com/cplusplus/papers/issues/1353)
 
 ### [P2786R7 Trivial Relocatability For C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r7.pdf)
+
+*trivially relocatable*をサポートするための提案。
+
+以前の記事を参照
+
+- [P2786R0 Trivial relocatability options - WG21月次提案文書を眺める（2023年02月）](https://onihusube.hatenablog.com/entry/2023/03/19/184146#P2786R0-Trivial-relocatability-options)
+- [P2786R1 Trivial relocatability options - WG21月次提案文書を眺める（2023年05月）](https://onihusube.hatenablog.com/entry/2023/07/08/205803#P2786R1-Trivial-relocatability-options)
+- [P2786R2 Trivial relocatability options - WG21月次提案文書を眺める（2023年07月）](https://onihusube.hatenablog.com/entry/2023/09/23/203644#P2786R2-Trivial-relocatability-options)
+- [P2786R3 Trivial relocatability options - WG21月次提案文書を眺める（2023年10月）](https://onihusube.hatenablog.com/entry/2024/01/08/203712#P2786R3-Trivial-Relocatability-For-C26)
+- [P2786R4 Trivial relocatability options - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P2786R4-Trivial-Relocatability-For-C26)
+- [P2786R5 Trivial relocatability options - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P2786R5-Trivial-Relocatability-For-C26)
+- [P2786R6 Trivial relocatability options - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P2786R6-Trivial-Relocatability-For-C26)
+
+このリビジョンでの変更は
+
+- EWG/LEWGでの懸念の提起に対処するために大幅に書き直し
+- trivial relocatabilityの提示と議論を簡素化
+- swapに関する議論を統合（P3239R0から
+- 動作の変更
+  - ユーザー定義のムーブ代入演算子によって、型が暗黙的にtrivial relocatableにならないようになった
+  - コンテキスト依存キーワード
+      - 改訂されたセマンティクスを適切に表現するために、`memberwise_trivially_relocatable`という新しい名前が付けられた
+      - オプトインのみ
+      - 基底クラスとメンバのrelocatabilityを推定する
+  - コンテキスト依存キーワードの後に述語が続かないため、オプトアウトの方法はない
+  - 新しい`relocate()`関数は非トリビアルな型と定数評価をサポートする
+- P3239R0からの動作の変更
+  - trivial swappabilityは置換可能であることとtrivially relocatableに基づいている
+  - `memberwise_replaceable`（コンテキスト依存キーワード）の追加
+  - `swap_value_representations()`関数と新しいプロパティにより、`std::swap`を最適化する
+
+などです。
+
+- [P2786 進行状況](https://github.com/cplusplus/papers/issues/1463)
+
 ### [P2835R5 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r5.html)
 ### [P2835R6 Expose std::atomic_ref's object address](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2835r6.html)
 ### [P2841R4 Concept and variable-template template-parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2841r4.pdf)
