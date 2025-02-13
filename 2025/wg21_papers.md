@@ -286,6 +286,31 @@ R5での変更は
 - [P2835 進行状況](https://github.com/cplusplus/papers/issues/1545)
 
 ### [P2841R4 Concept and variable-template template-parameters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2841r4.pdf)
+
+コンセプトを受け取るためのテンプレートテンプレートパラメータ構文の提案。
+
+以前の記事を参照
+
+- [P2841R0 Concept Template Parameters - WG21月次提案文書を眺める（2023年05月）](https://onihusube.hatenablog.com/entry/2023/07/08/205803#P2841R0-Concept-Template-Parameters)
+- [P2841R1 Concept Template Parameters - WG21月次提案文書を眺める（2023年10月）](https://onihusube.hatenablog.com/entry/2024/01/08/203712#P2841R1-Concept-Template-Parameters)
+- [P2841R2 Concept Template Parameters - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P2841R2-Concept-and-variable-template-template-parameters)
+- [P2841R3 Concept Template Parameters - WG21月次提案文書を眺める（2024年05月）](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2841r3.pdf)
+
+このリビジョンでの変更は
+
+- テンプレートコンセプトパラメータを参照する関数テンプレートは、包摂の対象外とした
+- 制約の正規化のセクションを改善
+- 例を改善して追加
+- 新しい文法要素の名前を変更
+- テンプレートパラメータとそのパックを紹介するセクションを追加
+- id式を使用しないようにテンプレート引数の文言を変更
+- コンセプト依存制約の導入
+- CWGフィードバックへの対応
+
+などです。
+
+- [P2841 進行状況](https://github.com/cplusplus/papers/issues/1546)
+
 ### [P2846R3 reserve_hint: Eagerly reserving memory for not-quite-sized lazy ranges](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2846r3.pdf)
 ### [P2879R0 Proposal of `std::dump`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2879r0.pdf)
 
