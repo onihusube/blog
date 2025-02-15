@@ -378,7 +378,29 @@ R0では`%S`オプションの動作の変更（秒を2桁で出力し、ミリ�
 
 - [P2945 進行状況](https://github.com/cplusplus/papers/issues/1609)
 
-### [P2988R7 std::optional<T&>](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2988r7.pdf)
+### [P2988R7 `std::optional<T&>`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2988r7.pdf)
+
+`std::optional`が参照を保持することができるようにする提案。
+
+以前の記事を参照
+
+- [P2988R0 `std::optional<T&>` - WG21月次提案文書を眺める（2023年10月）](https://onihusube.hatenablog.com/entry/2024/01/08/203712#P2988R0-stdoptionalT)
+- [P2988R1 `std::optional<T&>` - WG21月次提案文書を眺める（2024年01月）](https://onihusube.hatenablog.com/entry/2024/03/10/170322#P2988R1-stdoptionalT)
+- [P2988R3 `std::optional<T&>` - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P2988R3-stdoptionalT)
+- [P2988R4 `std::optional<T&>` - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P2988R4-stdoptionalT)
+- [P2988R5 `std::optional<T&>` - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P2988R5-stdoptionalT)
+- [P2988R6 `std::optional<T&>` - WG21月次提案文書を眺める（2024年08月）](https://onihusube.hatenablog.com/entry/2025/01/26/185126#P2988R6-stdoptionalT)
+
+このリビジョンでの変更は
+
+- 右辺値参照型の特殊化（`std::optional<T&&>`）を削除したこと
+- 変換代入演算子の追加
+- 変換in-placeコンストラクタの追加
+
+などです。
+
+- [P2988 進行状況](https://github.com/cplusplus/papers/issues/1661)
+
 ### [P3016R4 Resolve inconsistencies in begin/end for valarray and braced initializer lists](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3016r4.html)
 ### [P3019R9 Vocabulary Types for Composite Class Design](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3019r9.html)
 ### [P3037R3 constexpr std::shared_ptr](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3037r3.pdf)
