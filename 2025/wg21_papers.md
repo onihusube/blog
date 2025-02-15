@@ -312,6 +312,19 @@ R5での変更は
 - [P2841 進行状況](https://github.com/cplusplus/papers/issues/1546)
 
 ### [P2846R3 reserve_hint: Eagerly reserving memory for not-quite-sized lazy ranges](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2846r3.pdf)
+
+遅延評価のため要素数が確定しない range の `ranges::to` を行う際に、推定の要素数をヒントとして知らせる `ranges::reserve_hint` CPO を追加する提案。
+
+以前の記事を参照
+
+- [P2846R0 `size_hint`: Eagerly reserving memory for not-quite-sized lazy ranges - WG21月次提案文書を眺める（2023年05月）](https://onihusube.hatenablog.com/entry/2023/07/08/205803#P2846R0-size_hint-Eagerly-reserving-memory-for-not-quite-sized-lazy-ranges)
+- [P2846R1 `size_hint`: Eagerly reserving memory for not-quite-sized lazy ranges - WG21月次提案文書を眺める（2023年09月）](https://onihusube.hatenablog.com/entry/2023/10/29/180915#P2846R1-size_hint-Eagerly-reserving-memory-for-not-quite-sized-lazy-ranges)
+- [P2846R2 `reserve_hint`: Eagerly reserving memory for not-quite-sized lazy ranges - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P2846R2-reserve_hint-Eagerly-reserving-memory-for-not-quite-sized-lazy-ranges)
+
+このリビジョンでの変更は、`reserve_int`を`std::vector`で使用することを義務付ける文言を追加したことです。
+
+- [P2846 進行状況](https://github.com/cplusplus/papers/issues/1549)
+
 ### [P2879R0 Proposal of `std::dump`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2879r0.pdf)
 
 指定された任意個数の引数をスペース区切りで出力する関数である`std::dump()`の提案。
