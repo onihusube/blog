@@ -466,7 +466,49 @@ R0では`%S`オプションの動作の変更（秒を2桁で出力し、ミリ�
 
 - [P3037 進行状況](https://github.com/cplusplus/papers/issues/1713)
 
-### [P3074R4 trivial unions (was std::uninitialized<T>)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3074r4.html)
+### [P3074R4 trivial unions (was `std::uninitialized<T>`)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3074r4.html)
+
+定数式において、要素の遅延初期化のために共用体を用いるコードを動作するようにする提案。
+
+以前の記事を参照
+
+- [P3074R0 constexpr union lifetime - WG21月次提案文書を眺める（2023年12月）](https://onihusube.hatenablog.com/entry/2024/02/29/191439#P3074R0-constexpr-union-lifetime)
+- [P3074R2 `std::uninitialized<T>` - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P3074R2-stduninitializedT)
+- [P3074R3 trivial union (was std::uninitialized<T>) - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P3074R3-trivial-union-was-stduninitialized)
+
+このリビジョンでの変更は、以前に提案していた2つのうちの1つ"Just make it work"の提案に絞ったことと、実装経験を追加したことです。
+
+"Just make it work"の提案は前のリビジョンの`trivial union`の機能性を現在の`union`のまま有効化するものです。すなわち
+
+- デフォルトコンストラクタは無条件でトリビアル
+    - デフォルトメンバ初期化子がある場合、削除される
+- 最初のメンバがimplicit-lifetime typeである場合、デフォルトコンストラクタはそのメンバの生存期間を開始しそれをアクティブメンバとする
+    - 初期化はされない
+- デフォルトコンストラクタは無条件でトリビアル
+
+の3点が、現在の構文のままで動作が変更されるようになります。
+
+```cpp
+// トリビアルデフォルトコンストラクタを持つ (sの生存期間を開始しない、初期化もされていない)
+// トリビアルデストラクタを持つ
+// (現在: デフォルトコンストラクタとデフォルトデストラクタはどちらも削除される)
+union U1 { string s; };
+
+// デフォルトコンストラクタは定義されるもののトリビアルではない
+// デストラクタは削除される
+// (現在: デストラクタは削除される)
+union U2 { string s = "hello"; }
+
+// トリビアルデフォルトコンストラクタを持つ（sの生存期間を開始する
+// トリビアルデストラクタを持つ
+// (現在: デフォルトコンストラクタとデフォルトデストラクタはどちらも削除される)
+union U3 { string s[10]; }
+```
+
+この提案でほしかったものは、定数式で使用可能な遅延初期化用ストレージでした。単一メンバの共用体は遅延初期化用ストレージは供給可能なものの定数式で使用可能ではなくコンストラクタ/デストラクタを定義するとトリビアル性が失われるという問題がありましたが、この提案によりメンバ型に関わらずコンストラクタ/デストラクタを定義しなくても`union`としてのトリビアルなそれら（なにもしない）が宣言されるようになるとともに、implicit-lifetime typeである場合に生存期間を開始するようになることで定数式でも使用可能になります。
+
+- [P3074 進行状況](https://github.com/cplusplus/papers/issues/1734)
+
 ### [P3096R3 Function Parameter Reflection in Reflection for C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3096r3.pdf)
 ### [P3128R1 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r1.pdf)
 ### [P3128R2 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r2.pdf)
