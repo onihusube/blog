@@ -402,6 +402,25 @@ R0では`%S`オプションの動作の変更（秒を2桁で出力し、ミリ�
 - [P2988 進行状況](https://github.com/cplusplus/papers/issues/1661)
 
 ### [P3016R4 Resolve inconsistencies in begin/end for valarray and braced initializer lists](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3016r4.html)
+
+`std::valarray`と初期化子リストに対して`std::begin`と`std::cbegin`を呼んだ場合の他のコンテナ等との一貫しない振る舞いを修正する提案。
+
+以前の記事を参照
+
+- [P3016R0 Resolve inconsistencies in `begin/end` for `valarray` and braced initializer lists - WG21月次提案文書を眺める（2023年10月）](https://onihusube.hatenablog.com/entry/2024/01/08/203712#P3016R0-Resolve-inconsistencies-in-beginend-for-valarray-and-braced-initializer-lists)
+- [P3016R1 Resolve inconsistencies in begin/end for valarray and braced initializer lists - WG21月次提案文書を眺める（2023年12月）](https://onihusube.hatenablog.com/entry/2024/02/29/191439#P3016R1-Resolve-inconsistencies-in-beginend-for-valarray-and-braced-initializer-lists)
+- [P3016R2 Resolve inconsistencies in begin/end for valarray and braced initializer lists - WG21月次提案文書を眺める（2023年12月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P3016R2-Resolve-inconsistencies-in-beginend-for-valarray-and-braced-initializer-lists)
+- [P3016R3 Resolve inconsistencies in begin/end for valarray and braced initializer lists - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P3016R3-Resolve-inconsistencies-in-beginend-for-valarray-and-braced-initializer-lists)
+
+このリビジョンでの変更は
+
+- LWG Issue 4131の変更（Issue解決）の文面を追加
+    - 提案はしていない
+
+などです。
+
+- [P3016 進行状況](https://github.com/cplusplus/papers/issues/1678)
+
 ### [P3019R9 Vocabulary Types for Composite Class Design](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3019r9.html)
 ### [P3037R3 constexpr std::shared_ptr](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3037r3.pdf)
 ### [P3074R4 trivial unions (was std::uninitialized<T>)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3074r4.html)
