@@ -365,6 +365,19 @@ std::dump(x, y, z);         // output: 10 20 30
 - [P2879 進行状況](https://github.com/cplusplus/papers/issues/2034)
 
 ### [P2945R1 Additional format specifiers for time_point](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2945r1.html)
+
+`<chrono>`の`time_point`型のフォーマット指定を追加する提案。
+
+以前の記事を参照
+
+- [P2945R0 Additional format specifiers for time_point - WG21月次提案文書を眺める（2023年07月）](https://onihusube.hatenablog.com/entry/2023/09/23/203644#P2945R0-Additional-format-specifiers-for-time_point)
+
+このリビジョンでの変更は、既存のコードの意味を変更するオプションをすべて削除したことです。
+
+R0では`%S`オプションの動作の変更（秒を2桁で出力し、ミリ秒未満を出力しないようにする）を提案していましたが、このリビジョンでは削除されたため、この提案は純粋な機能拡張のみとなりました。
+
+- [P2945 進行状況](https://github.com/cplusplus/papers/issues/1609)
+
 ### [P2988R7 std::optional<T&>](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2988r7.pdf)
 ### [P3016R4 Resolve inconsistencies in begin/end for valarray and braced initializer lists](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3016r4.html)
 ### [P3019R9 Vocabulary Types for Composite Class Design](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3019r9.html)
