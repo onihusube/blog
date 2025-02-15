@@ -422,6 +422,28 @@ R0では`%S`オプションの動作の変更（秒を2桁で出力し、ミリ�
 - [P3016 進行状況](https://github.com/cplusplus/papers/issues/1678)
 
 ### [P3019R9 Vocabulary Types for Composite Class Design](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3019r9.html)
+
+動的メモリ領域に構築されたオブジェクトを扱うためのクラス型の提案。
+
+以前の記事を参照
+
+- [P3019R0 Vocabulary Types for Composite Class Design - WG21月次提案文書を眺める（2023年10月）](https://onihusube.hatenablog.com/entry/2024/01/08/203712#P3019R0-Vocabulary-Types-for-Composite-Class-Design)
+- [P3019R3 Vocabulary Types for Composite Class Design - WG21月次提案文書を眺める（2023年12月）](https://onihusube.hatenablog.com/entry/2024/02/29/191439#P3019R3-Vocabulary-Types-for-Composite-Class-Design)
+- [P3019R6 Vocabulary Types for Composite Class Design - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P3019R6-Vocabulary-Types-for-Composite-Class-Design)
+- [P3019R8 Vocabulary Types for Composite Class Design - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P3019R8-Vocabulary-Types-for-Composite-Class-Design)
+
+このリビジョンでの変更は
+
+- コンストラクタの順序を変更
+- `indirect`に変換代入演算子を追加
+- `indirect`と`polymorphic`に変換コンストラクタを追加
+- `indirect`と`polymorphic`に初期化子リストコンストラクタを追加
+-  ‘heap’や‘free-store’等の用語の使用を‘dynamically-allocated storage’に変更
+
+などです。
+
+- [P3019 進行状況](https://github.com/cplusplus/papers/issues/1680)
+
 ### [P3037R3 constexpr std::shared_ptr](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3037r3.pdf)
 ### [P3074R4 trivial unions (was std::uninitialized<T>)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3074r4.html)
 ### [P3096R3 Function Parameter Reflection in Reflection for C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3096r3.pdf)
