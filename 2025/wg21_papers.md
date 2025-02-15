@@ -444,7 +444,28 @@ R0では`%S`オプションの動作の変更（秒を2桁で出力し、ミリ�
 
 - [P3019 進行状況](https://github.com/cplusplus/papers/issues/1680)
 
-### [P3037R3 constexpr std::shared_ptr](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3037r3.pdf)
+### [P3037R3 `constexpr std::shared_ptr`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3037r3.pdf)
+
+`std::shared_ptr`を定数式でも使える様にする提案。
+
+以前の記事を参照
+
+- [P3037R0 `constexpr std::shared_ptr` - WG21月次提案文書を眺める（2023年12月）](https://onihusube.hatenablog.com/entry/2024/02/29/191439#P3037R0-constexpr-stdshared_ptr)
+- [P3037R1 `constexpr std::shared_ptr` - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P3037R1-constexpr-stdshared_ptr)
+- [P3037R2 `constexpr std::shared_ptr` - WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P3037R2-constexpr-stdshared_ptr)
+
+このリビジョンでの変更は
+
+- `reinterpret_pointer_cast`から`constexpr`を取り除いた
+- 関連提案への参照の追加
+- libc++ベースの2つ目の実装経験の追加
+
+などです。
+
+除外されたのは、例外や`reinterpret_cast`などの定数式では実行できない操作を含むものです。
+
+- [P3037 進行状況](https://github.com/cplusplus/papers/issues/1713)
+
 ### [P3074R4 trivial unions (was std::uninitialized<T>)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3074r4.html)
 ### [P3096R3 Function Parameter Reflection in Reflection for C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3096r3.pdf)
 ### [P3128R1 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r1.pdf)
