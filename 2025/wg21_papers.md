@@ -576,6 +576,20 @@ R1での変更は
 - [P3210 進行状況](https://github.com/cplusplus/papers/issues/1861)
 
 ### [P3245R2 Allow `[[nodiscard]]` in type alias declarations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3245r2.html)
+
+`[[nodiscard]]` 属性を型エイリアス宣言で使用できるようにする提案。
+
+以前の記事を参照
+
+- [P3245R0 Allow `[[nodiscard]]` in type alias declarations - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P3245R0-Allow-nodiscard-in-type-alias-declarations)
+- [P3245R1 Allow `[[nodiscard]]` in type alias declarations - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P3245R1-Allow-nodiscard-in-type-alias-declarations)
+
+このリビジョンでの変更は、提案する文言を追加したことです。
+
+この提案は、EWGのレビューにおいてコンセンサスを得られず、リジェクトされています。
+
+- [P3235 進行状況](https://github.com/cplusplus/papers/issues/1888)
+
 ### [P3248R2 Require [u]intptr_t](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3248r2.html)
 ### [P3290R2 Integrating Existing Assertions With Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3290r2.pdf)
 ### [P3295R1 Freestanding constexpr containers and constexpr exception types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r1.html)
