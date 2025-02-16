@@ -529,7 +529,29 @@ C++26に向けた静的リフレクションに対して、関数仮引数に対
 - [P3096 進行状況](https://github.com/cplusplus/papers/issues/1764)
 
 ### [P3128R1 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r1.pdf)
+
+↓
+
 ### [P3128R2 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r2.pdf)
+
+グラフアルゴリズムとデータ構造のためのライブラリ機能の提案のうち、提案するグラフアルゴリズムについてまとめた文書。
+
+- [P3128R0 Graph Library: Algorithms - WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P3128R0-Graph-Library-Algorithms)
+
+R1での変更は
+
+- Traversalセクションを追加し、幅優先探索アルゴリズムとトポロジカルソートアルゴリズムを移動。また、深さ優先探索アルゴリズムを追加
+- ダイクストラ法とベルマン–フォード法のアルゴリズムの改訂
+    - visitorパラメータを追加して、アルゴリズムの動作をカスタマイズできるようにした
+    - `Compare()`,`Combine()`関数を除外したオーバーロードを追加
+    - 複数ソースのオーバーロードを追加
+    - 値がアルゴリズムにおいてどう使用されるかを明確にするために、"invalid distance"を"infinite distance"へ変更
+- ベルマン–フォード法のアルゴリズムにおいて、負の重みサイクルを検出する機能を追加
+
+このリビジョンでの変更は、コントリビューターを追加したことです。
+
+- [P3127 進行状況](https://github.com/cplusplus/papers/issues/1783)
+
 ### [P3210R2 A Postcondition *is* a Pattern Match](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3210r2.pdf)
 ### [P3245R2 Allow `[[nodiscard]]` in type alias declarations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3245r2.html)
 ### [P3248R2 Require [u]intptr_t](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3248r2.html)
