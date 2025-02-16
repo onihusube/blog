@@ -553,6 +553,28 @@ R1での変更は
 - [P3127 進行状況](https://github.com/cplusplus/papers/issues/1783)
 
 ### [P3210R2 A Postcondition *is* a Pattern Match](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3210r2.pdf)
+
+事後条件の構文をパターンマッチングの構文に親和させる提案。
+
+以前の記事を参照
+
+- [P3210R0 A Postcondition *is* a Pattern Match - WG21月次提案文書を眺める（2024年04月）](https://onihusube.hatenablog.com/entry/2024/08/31/233056#P3210R0-A-Postcondition-is-a-Pattern-Match)
+- [P3210R0 A Postcondition *is* a Pattern Match - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3210R1-A-Postcondition-is-a-Pattern-Match)
+
+このリビジョンでの変更は
+
+- 提案1の内容を、P2737のキーワード構文を採用するものではなく、P2688のバインディング構文に一致させる、に変更
+- 他の部分をそれに合わせて変更
+- モチベーションの明確化
+
+などです。
+
+参照する提案が変わっただけで、提案の内容そのものは大きく変化していません。
+
+変更後の内容もSG21でのコンセンサスを得られず、リジェクトされています。
+
+- [P3210 進行状況](https://github.com/cplusplus/papers/issues/1861)
+
 ### [P3245R2 Allow `[[nodiscard]]` in type alias declarations](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3245r2.html)
 ### [P3248R2 Require [u]intptr_t](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3248r2.html)
 ### [P3290R2 Integrating Existing Assertions With Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3290r2.pdf)
