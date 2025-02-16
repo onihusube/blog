@@ -1566,7 +1566,29 @@ P2741R3の採択によって、`static_assert()`のエラーメッセージと�
 
 - [P3391 進行状況](https://github.com/cplusplus/papers/issues/2046)
 
-### [P3396R0 std::execution wording fixes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3396r0.html)
+### [P3396R0 `std::execution` wording fixes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3396r0.html)
+
+`std::execution`に関する規格文言の問題修正をまとめた提案。
+
+これは、`std::execution`提案（P2300）に関するGithubのIssueトラッカー（https://github.com/cplusplus/）において、残ったままになっていた問題（LWG Issue相当）について、効率的な処理のために1つの提案にまとめたものです。
+
+ここでは次の10件の問題とその解決案が提案されています
+
+1. The preconditions on `run_loop::run()` are too strict
+2. `noexcept` clause of basic-state constructor is incomplete
+3. Definition of an async operation’s environment’s ownership seems incorrect
+4. scheduler semantic requirements imply swapability but concept does not require it
+5. `operation-state-task` exposition-only type does not need a move constructor
+6. [exec.general] Wording for AS-EXCEPT-PTR should use 'Precondition:' instead of 'Mandates:' for runtime properties
+7. [exec.schedule.from] Potential access to destroyed state in `impls-for::complete`
+8. scheduler concept should require that move-constructor does not exit with an exception
+9. [exec.bulk] wording should indicate that f is called with i = [0, …, shape-1]
+10. The use of JOIN-ENV leads to inefficient implementations of composed environments
+
+それぞれの詳細は提案を参照してください。
+
+- [P3391 進行状況](https://github.com/cplusplus/papers/issues/2048)
+
 ### [P3397R0 Clarify requirements on extended floating point types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3397r0.pdf)
 
 拡張浮動小数点数型の算術演算について、ISO/IEC 60559に準拠すべきかどうかを明確にする提案。
