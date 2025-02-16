@@ -510,6 +510,24 @@ union U3 { string s[10]; }
 - [P3074 進行状況](https://github.com/cplusplus/papers/issues/1734)
 
 ### [P3096R3 Function Parameter Reflection in Reflection for C++26](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3096r3.pdf)
+
+C++26に向けた静的リフレクションに対して、関数仮引数に対するリフレクションを追加する提案。
+
+以前の記事を参照
+
+- [P3096R0 Function Parameter Reflection in Reflection for C++26 - WG21月次提案文書を眺める（2024年02月）](https://onihusube.hatenablog.com/entry/2024/05/18/235613#P3096R0-Function-Parameter-Reflection-in-Reflection-for-C26)
+- [P3096R1 Function Parameter Reflection in Reflection for C++26 - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3094R2-stdbasic_fixed_string)
+- [P3096R2 Function Parameter Reflection in Reflection for C++26 - WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P3096R2-Function-Parameter-Reflection-in-Reflection-for-C26)
+
+このリビジョンでの変更は
+
+- 提案する文言の改善
+- P2996R5の内容を反映
+
+などです。
+
+- [P3096 進行状況](https://github.com/cplusplus/papers/issues/1764)
+
 ### [P3128R1 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r1.pdf)
 ### [P3128R2 Graph Library: Algorithms](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3128r2.pdf)
 ### [P3210R2 A Postcondition *is* a Pattern Match](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3210r2.pdf)
