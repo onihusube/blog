@@ -604,6 +604,18 @@ R1での変更は
 - [P3248 進行状況](https://github.com/cplusplus/papers/issues/1909)
 
 ### [P3290R2 Integrating Existing Assertions With Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3290r2.pdf)
+
+既存のアサーション機構に契約プログラミング機能を統合する提案。
+
+以前の記事を参照
+
+- [P3290R0 Integrating Existing Assertions With Contracts - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3290R0-Integrating-Existing-Assertions-With-Contracts)
+- [P3290R0 Integrating Existing Assertions With Contracts - WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P3290R1-Integrating-Existing-Assertions-With-Contracts)
+
+このリビジョンでの変更は、バグや説明の修正とライブラリAPIの使用例を追加したことです。
+
+- [P3290 進行状況](https://github.com/cplusplus/papers/issues/1943)
+
 ### [P3295R1 Freestanding constexpr containers and constexpr exception types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r1.html)
 ### [P3299R1 Range constructors for std::simd](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3299r1.html)
 ### [P3309R2 constexpr atomic and atomic_ref](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3309r2.html)
