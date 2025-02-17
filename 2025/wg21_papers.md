@@ -1578,6 +1578,13 @@ std::meta::define_class(^MigratedUser, liveMembers(currentUser));
 - [P3388 進行状況](https://github.com/cplusplus/papers/issues/2043)
 
 ### [P3389R0 Of Operation States and Their Lifetimes (LEWG Presentation 2024-09-10)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3389r0.pdf)
+
+P3373R0の紹介スライド。
+
+P3373R0では、`std::execution`の`operation_state`のライフタイムについて、現状の最長を取るものよりも短くできるようにすることを提案しています。このスライドはその内容を簡単に説明するもので、簡単なサンプルコードとイメージ図を用いて説明されていて分かりやすくなっています。
+
+- [P3373R0 Of Operation States and Their Lifetimes - WG21月次提案文書を眺める（2024年08月）](https://onihusube.hatenablog.com/entry/2025/01/26/185126#P3373R0-Of-Operation-States-and-Their-Lifetimes)
+
 ### [P3390R0 Safe C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3390r0.html)
 
 ```cpp
