@@ -617,6 +617,25 @@ R1での変更は
 - [P3290 進行状況](https://github.com/cplusplus/papers/issues/1943)
 
 ### [P3295R1 Freestanding constexpr containers and constexpr exception types](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r1.html)
+
+フリースタンディング環境の定数式において、`std::vector`等を使用可能にする提案。
+
+- [P3295R0 Freestanding constexpr containers and constexpr exception types - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3295R0-Freestanding-constexpr-containers-and-constexpr-exception-types)
+
+このリビジョンでの変更は
+
+- 実装経験についての議論を追加
+- `<stdexcept>`のすべての例外型を追加
+- デフォルト構築されたコンテナと`operator delete`についての議論を追加
+- 残りの非`constexpr`関数について追記
+- アロケータ要件の難しさについて議論を追加
+- `constexpr`例外の提案とアロケータの提案とのコンフリクトについて追記
+- 文言の改善
+
+などです。
+
+- [P3295 進行状況](https://github.com/cplusplus/papers/issues/1947)
+
 ### [P3299R1 Range constructors for std::simd](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3299r1.html)
 ### [P3309R2 constexpr atomic and atomic_ref](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3309r2.html)
 ### [P3335R1 Structured Core Options](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3335r1.html)
