@@ -656,7 +656,21 @@ R1での変更は
 
 - [P3299 進行状況](https://github.com/cplusplus/papers/issues/1951)
 
-### [P3309R2 constexpr atomic and atomic_ref](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3309r2.html)
+### [P3309R2 constexpr `atomic` and `atomic_ref`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3309r2.html)
+
+`std::atomic/stomic_ref`を`constexpr`化する提案。
+
+以前の記事を参照
+
+- [P3309R0 `constexpr` `atomic` and `atomic_ref` - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3309R0-constexpr-atomic-and-atomic_ref)
+- [P3309R1 `constexpr` `atomic` and `atomic_ref` - WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P3309R1-constexpr-atomic-and-atomic_ref)
+
+このリビジョンでの変更は、`wait(), notify()`関数の動作についての説明を追加したことです。
+
+コンパイル時はシングルスレッドであるため、`wait()`は何もせず、`notify()`は現在値と異なる値で待機するとデッドロック（定数式におけるループ制限によってコンパイルエラー）します。
+
+- [P3309 進行状況](https://github.com/cplusplus/papers/issues/1960)
+
 ### [P3335R1 Structured Core Options](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3335r1.html)
 ### [P3371R1 Fix C++26 by making the rank-1, rank-2, rank-k, and rank-2k updates consistent with the BLAS](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3371r1.html)
 ### [P3372R1 constexpr containers and adapters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3372r1.html)
