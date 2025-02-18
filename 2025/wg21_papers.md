@@ -620,6 +620,8 @@ R1での変更は
 
 フリースタンディング環境の定数式において、`std::vector`等を使用可能にする提案。
 
+以前の記事を参照
+
 - [P3295R0 Freestanding constexpr containers and constexpr exception types - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3295R0-Freestanding-constexpr-containers-and-constexpr-exception-types)
 
 このリビジョンでの変更は
@@ -636,7 +638,24 @@ R1での変更は
 
 - [P3295 進行状況](https://github.com/cplusplus/papers/issues/1947)
 
-### [P3299R1 Range constructors for std::simd](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3299r1.html)
+### [P3299R1 Range constructors for `std::simd`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3299r1.html)
+
+`std::simd`に`range`コンストラクタを追加する提案。
+
+以前の記事を参照
+
+- [P3299R0 Range constructors for `std::simd` - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3299R0-Range-constructors-for-stdsimd)
+
+このリビジョンでの変更は
+
+- 初期化に使用する範囲のサイズが実行時にしか分からない場合で、サイズのミスマッチが検出された場合の動作をerroneous behaviourとする方針の説明の追加
+    - 足りない場合、余った要素はデフォルト初期化し、読み出しはEBとする
+- 例を追加
+
+などです。
+
+- [P3299 進行状況](https://github.com/cplusplus/papers/issues/1951)
+
 ### [P3309R2 constexpr atomic and atomic_ref](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3309r2.html)
 ### [P3335R1 Structured Core Options](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3335r1.html)
 ### [P3371R1 Fix C++26 by making the rank-1, rank-2, rank-k, and rank-2k updates consistent with the BLAS](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3371r1.html)
