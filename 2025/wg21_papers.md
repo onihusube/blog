@@ -672,6 +672,24 @@ R1での変更は
 - [P3309 進行状況](https://github.com/cplusplus/papers/issues/1960)
 
 ### [P3335R1 Structured Core Options](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3335r1.html)
+
+コンパイラフロントエンドの共通コマンドラインオプション構文の提案。
+
+以前の記事を参照
+
+- [P3335R0 Structured Core Options - WG21月次提案文書を眺める（2024年07月）](https://onihusube.hatenablog.com/entry/2025/01/13/204945#P3335R0-Structured-Core-Options)
+
+このリビジョンでの変更は
+
+- デバッグオプションを削除
+- 最適化オプションのうち`safe`を削除
+- ファイル名をキーとして使用しないようにする
+- singly-typedな値のみを使用する
+
+などです。
+
+- [P3335 進行状況](https://github.com/cplusplus/papers/issues/1999)
+
 ### [P3371R1 Fix C++26 by making the rank-1, rank-2, rank-k, and rank-2k updates consistent with the BLAS](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3371r1.html)
 ### [P3372R1 constexpr containers and adapters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3372r1.html)
 ### [P3375R0 Reproducible floating-point results](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3375r0.html)
