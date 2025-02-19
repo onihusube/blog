@@ -691,6 +691,57 @@ R1での変更は
 - [P3335 進行状況](https://github.com/cplusplus/papers/issues/1999)
 
 ### [P3371R1 Fix C++26 by making the rank-1, rank-2, rank-k, and rank-2k updates consistent with the BLAS](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3371r1.html)
+
+`<linalg>`の一部の関数を対応するBLAS関数の仕様と整合させる提案。
+
+以前の記事を参照
+
+- [P3371R0 Fix C++26 by making the symmetric and Hermitian rank-k and rank-2k updates consistent with the BLAS - WG21月次提案文書を眺める（2024年08月）](https://onihusube.hatenablog.com/entry/2025/01/26/185126#P3371R0-Fix-C26-by-making-the-symmetric-and-Hermitian-rank-k-and-rank-2k-updates-consistent-with-the-BLAS)
+
+このリビジョンでの変更は
+
+- 提案する文言の変更
+    - `symmetric`/`hermitian` rank-k/rank-2k update 関数を上書きと更新のオーバーロードに変更するのに加えて、rank-1およびrank-2 update系関数も同様に変更する
+    - 追加する全ての更新オーバーロードについて、入力行列の`C`（または`A`）が`E`とエイリアスすることを許可
+    - 追加する`symmetric`/`hermitian` updateのオーバーロードについて、関数が`E`引数に`C`（または`A`）と同じ方法でアクセスすることを指定
+        - 同じ方法とは例えば、上三角行列や下三角行列として
+    - `hermitian` rank-1/rank-k update関数に必要な、スケーリング係数を非複素数に制限するための説明専用コンセプト`noncomplex`を追加
+- 文言の変更に合わせてタイトルと概要を変更
+- rank-1/rank-2 update関数をrank-k/rank-2k update関数と同様に変更する理由を説明するセクションを追加
+- `hermitian_matrix_vector_product`、`hermitian_matrix_product`、`triangular_matrix_product`および`triangular_*_solve`関数を更新しない理由を説明するセクションの追加
+- 実行時ではなく、コンパイル時に一部のスケーリング係数を非複素数に制限する理由を説明するセクションを追加
+- 説明セクションを拡充し、再編成
+
+などです。
+
+R0での対象は、rank-kおよびrank-2k update系の関数
+
+- `linalg::symmetric_matrix_rank_k_update()`: `C := C + αAA^T`
+- `linalg::hermitian_matrix_rank_k_update()`: `C := C + αAA^H`
+- `linalg::symmetric_matrix_rank_2k_update()`: `C := C + αAB^H + αBA^H`
+- `linalg::hermitian_matrix_rank_2k_update()`: `C := C + αABH + ᾱBAH`（`ᾱ`は`α`の複素共役
+
+のみでしたが、このリビジョンではrank-2およびrank-2 update系の関数
+
+- `symmetric_matrix_rank_1_update()`: `A := A + αxx^T`
+- `hermetian_matrix_rank_1_update()`: `A := A + αxx^H`
+- `symmetric_matrix_rank_2_update()`: `A := A + αxy^T + αyx^T`
+- `hermitian_matrix_rank_2_update()`: `A := A + αxy^H + ᾱxy^H`
+
+も対象に加わりました。これらの関数は現在無条件の更新を行っており、上書き動作が無くスケーリング係数`β`を一項目の`A`に適用する方法がありません（これもやはり、対応するBLASのルーチンと動作が一致しない）。そのため、rank-kおよびrank-2kの関数と同様に、デフォルトの動作を上書きに変更したうえで、更新オーバーロードを追加することを提案しています。
+
+このリビジョンでは次の3つの事を提案しています
+
+1. rank-1, rank-2, rank-2, rank-2k update系関数に、更新オーバーロードを追加
+    - 追加される関数は、`matrix_product()`の更新オーバーロードと類似している
+2. 現在のrank-1, rank-2, rank-2, rank-2k update系関数の動作を、無条件更新から上書きに変更
+3. `hermitian_rank_1_update()`, `hermitian_rank_k_update()`においては、`Scalar`テンプレートパラメータを非複素数になるように制限する
+    - これにより、このupdate動作がエルミートになることが数学的に保証される
+
+2と3はどちらも破壊的変更となるため、C++26正式策定までにこの作業を完了する必要がある、としています。
+
+- [P3371 進行状況](https://github.com/cplusplus/papers/issues/2028)
+
 ### [P3372R1 constexpr containers and adapters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3372r1.html)
 ### [P3375R0 Reproducible floating-point results](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3375r0.html)
 
