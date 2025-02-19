@@ -743,6 +743,19 @@ R0での対象は、rank-kおよびrank-2k update系の関数
 - [P3371 進行状況](https://github.com/cplusplus/papers/issues/2028)
 
 ### [P3372R1 constexpr containers and adapters](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3372r1.html)
+
+標準のコンテナを全て`constexpr`にする提案。
+
+以前の記事を参照
+
+- [P3372R0 constexpr containers and adapters - WG21月次提案文書を眺める（2024年08月）](https://onihusube.hatenablog.com/entry/2025/01/26/185126#P3372R0-constexpr-containers-and-adapters)
+
+このリビジョンでの変更は、`std::less<T*>`の実装における懸念について追記したことです。
+
+`std::less<T*>`の実装における懸念とは、`std::hash<T*>`と同様の問題で、定数式におけるポインタの実装定義全順序比較結果が実行時のものと一致する保証が無い（実行時のアドレス値を知る方法がないので当然）というものです。
+
+- [P3372 進行状況](https://github.com/cplusplus/papers/issues/2029)
+
 ### [P3375R0 Reproducible floating-point results](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3375r0.html)
 
 計算結果の再現性の保証された浮動小数点数型の提案。
