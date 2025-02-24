@@ -1745,6 +1745,34 @@ P3373R0では、`std::execution`の`operation_state`のライフタイムにつ�
 
 ### [P3390R0 Safe C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3390r0.html)
 
+C++に借用チェック（Borrow checking）をはじめとする静的解析を備えた`safe`コンテキストを導入する提案。
+
+C++のメモリ安全性保証の欠如に対する圧力は近年急速に高まっており、Rustをはじめとするより安全な言語への移行が推奨されるなど、C++将来性が脅かされつつあります。この提案はRust言語の設計からインスピレーションを得たメモリ安全性保証を持ち良く知られる未定義動作の無いC++のサブセットを追加することで、C++のスーパーセット言語への発展を提案するものです。
+
+この提案では次のようなことを実現しようとしています
+
+- 安全なサブセットを持つC++のスーパーセットの提案
+    - 安全なサブセットでは、未定義動作が禁止される
+- 言語の安全な部分とそうでない部分は明確に区別される
+- 安全なサブセットは引き続き有用である必要がある
+    - 共用体やポインタなどの有用だが安全ではない機能を削除する場合は、選択型（choice type）や借用などの安全な代替機能を提供する
+- 新しいシステム（この提案のスーパーセットを実装したコンパイラなど）は、既存のコードを壊さない
+    - Safe C++コンパイラで既存のコードをコンパイルしても、そのコードは引き続き正常にコンパイルされる
+    - Safe C++はC++の拡張機能であり、堅牢な安全モデルを追加するものの新しい言語ではない
+
+この文書は、C++を拡張してメモリ安全性を高める提案をしています。具体的には、Rustのような所有権と借用安全性を導入し、以下のような機能を提供します：
+
+このために、安全なサブセットとなる`safe`コンテキストと、そこにおいて次のような機能を追加しようとしています
+
+- 借用チェック: use-after-freeやイテレータ無効化を防ぐ
+- リロケーションとアフィン型システム: オブジェクトのムーブや初期化における型安全性を確保
+- 選択型とパターンマッチング: 安全で型安全なユニオンの代替を提供
+- 安全な標準ライブラリ（`std2`）: ライフタイムを意識したライブラリで、不安全なAPIへの露出を減らす
+- スレッド安全性: `send`や`sync`のような機能でデータ競合を防ぐ
+- ランタイムチェック: 上記のような静的解析では検出できない不健全な動作を実行時に検出する（範囲外アクセスなど）
+
+提案文書より、サンプルコード
+
 ```cpp
 // safety関連の機能をonにする
 #feature on safety
@@ -1768,6 +1796,202 @@ int main() safe {
   }
 }
 ```
+
+この例は、イテレータの無効化というよくあるバグを静的に検出するものです。
+
+`#feature on safety`は翻訳単位ごとに、この提案のsafeコンテキストを有効にするためのオプトインスイッチです。これが無い翻訳単位は既存のC++コードとして解釈され、これによって既存のコードに影響を及ぼさないようになっています。
+
+`#include <std2.h>`はこの提案の機能を使用して記述された、安全な標準ライブラリをインクルードします。これによって、安全ではないAPIに晒されるのを防止し、安全性を強化します。
+
+`int main() safe`では、`main`関数に`safe`指定子を付加することによって関数内を安全なコンテキストとして指定します。安全なコンテキストでは、未定義動作を引き起こす可能性のある操作（ポインタの間接参照など）が禁止されます。
+
+`std2::vector`はこの提案の機能を使用して記述された安全な`std::vecotr`であり、ライフタイムパラメータを認識するため借用チェックはライフタイムを持つ要素型にまで及びます。また、`initializer_list`も所有権オブジェクトモデルをサポートする`std2::initializer_list`が使用されています。
+
+範囲`for`は従来のものと同じですが、安全なコンテキストではライフタイムパラメータを使用して実装されたイテレータ（`slice_iterator`）が使用され、イテレータの無効化に対して安全になっています。
+
+`mut vec.push_back(x)`では値を`vector`に追加していますが、安全なコンテキストでは左辺値はデフォルトで`const`であるため、変更を行うには`mut`を使用して可変借用を取得して可変な参照を得る必要があります。安全なコンテキストでは、オブジェクトに対する変更は明示的になります。
+
+そして、この`push_back()`の呼び出しは、範囲`for`の実行中初期化されて生存している`vector`の`slice_iterator`がライフタイム制約を持つオブジェクトを変更することによって、そのイテレータを無効化し、これを借用チェッカーが検出することでコンパイルエラーになります。
+
+安全な`unique_ptr`である`std2::box`の例
+
+```cpp
+#feature on safety
+#include <std2.h>
+
+int main() safe {
+  // pは未初期化
+  std2::box<std2::string_view> p;
+
+  // Error: pは未初期化
+  println(*p);
+
+  // pが初期化される
+  p = std2::box<std2::string_view>("Hello Safety");
+
+  // Ok.
+  println(*p);
+
+  // pはqにムーブ（リロケーション）され、pは未初期状態になる
+  auto q = rel p;
+
+  // Error: pは未初期化
+  println(*p);
+}
+```
+
+アフィン型システムとリロケーションによって、未初期化状態での使用を防止しムーブを型安全に実行することができます。
+
+安全な`optional`の実装例
+
+```cpp
+template<class T+>
+choice optional
+{
+  default none,
+  [[safety::unwrap]] some(T);
+
+  template<class E>
+  expected<T, E> ok_or(self, E e) noexcept safe {
+    return match(self) -> expected<T, E> {
+      .some(t) => .ok(rel t);
+      .none    => .err(rel e);
+    };
+  }
+
+  T expect(self, str msg) noexcept safe {
+    return match(self) -> T {
+      .some(t) => rel t;
+      .none    => panic(msg);
+    };
+  }
+
+  T unwrap(self) noexcept safe {
+    return match(self) -> T {
+      .some(t) => rel t;
+      .none    => panic("{} is none".format(optional~string));
+    };
+  }
+};
+```
+
+`choice`は選択型とよばれ、パターンマッチングでのみアクセス可能なファーストクラスのタグ付き共用体です。このような型の値はパターンマッチングを介してのみアクセスされることで、危険なアクセスを禁止します。
+
+```cpp
+#feature on safety
+#include <std2.h>
+
+choice Value {
+  i32(int),
+  f32(float),
+  f64(double),
+  str(std2::string)
+};
+
+void print(Value val) safe {
+  match(val) {
+    // パターンマッチング時にマッチングの網羅性を要求することで、パターンマッチング内で型安全性のバグは起こらない
+    .i32(i32) => std2::println(i32);
+    .f32(f32) => std2::println(f32);
+    .f64(f64) => std2::println(f64);
+    .str(str) => std2::println(str);
+  };
+}
+
+int main() safe {
+  print(.i32(5));
+  print(.f32(101.3f));
+  print(.f64(3.15159));
+  print(.str("Hello safety"));
+}
+```
+
+`std2::mutex`の例。共有可変状態がミューテックスを通してのみアクセスされることをコンパイル時に保証する（`sync/send`インターフェース）。
+
+```cpp
+#feature on safety
+#include <std2.h>
+#include <chrono>
+
+using namespace std2;
+
+// mutexはsyncであり、arc<mutex<string>>はsendである
+void entry_point(arc<mutex<string>> data, int thread_id) safe {
+  // dataのロック（ミューテックス）を取得
+  // lock_guardがスコープ外になるとロックが解放される
+  auto lock_guard = data->lock();
+
+  // 文字列データの可変借用を取得する
+  // lock_guardがスコープ外になるとこれはダングリング参照になり、借用チェッカーによってアクセスが防止される
+  string^ s = mut lock_guard.borrow();
+
+  // 共有状態へ書き込み
+  s.append("🔥");
+
+  // 共有状態を出力する前にロックを解除する
+  // これにより、sはダングリング参照になり、ロックの外部でsにアクセス仕様とするとエラーになる
+  //drp lock_guard;
+
+  // 共有状態を出力する前にデータを破棄する
+  // data->lock()からのdataの借用がmut lock_guard.borrow()を介してprintln(*s)で使用されていることでsは有効に保持されており（されなければならず
+  // sの有効な使用の前にdataを削除すると借用エラーになる
+  //drp data;
+
+  // 更新された共有状態を出力
+  println(*s);
+
+  // Sleep 1s before returning.
+  unsafe { std::this_thread::sleep_for(std::chrono::seconds(1)); }
+}
+
+int main() safe {
+  // arc - Shared ownership.
+  // mutex - Shared mutable access.
+  arc<mutex<string>> shared_data(string("Hello world - "));
+
+  // Launch 10 threads.
+  vector<thread> threads { };
+  for(int i : 10) {
+    mut threads.push_back(thread(entry_point, cpy shared_data, i));
+  }
+
+  // rel threadsによって取得されるinto_iteratorでは、thread::join()の呼び出しのためにvectorから要素をリロケーションすることを許可する
+  for(thread t : rel threads) {
+    t rel.join();
+  }
+}
+```
+
+ライフタイムの制約によって`lock_guard`が生存中にのみ共有状態への可変アクセスが許可され、これによってデータ競合のリスクは自然に回避されます。
+
+ここで、`drp lock_guard;`のコメントアウトを外すと、その行でミューテックスのロックが解放され以降の共有状態アクセスは危険なものになるのですが、借用チェッカーはそれを認識し、`s`の使用は期限切れの借用に依存していることが分かるため、`println(*s);`の行でコンパイルエラーになります。
+
+同じように`drp data;`のコメントアウトを解除して`data`を破棄すると参照カウンタの減算によって共有状態が破棄される可能性があります。しかし、`data->lock()`で取得された共有借用の存在により`data`に有効期間の制約が生じ、これに違反していることを借用チェッカが検出するためコンパイルエラーになります。
+
+範囲外アクセスの実行時チェック例。
+
+```cpp
+#feature on safety
+#include <std2.h>
+
+int main() safe {
+  std2::vector<int> vec { 1, 2, 3, 4 };
+  size_t index = 10;
+
+  // Panic on out-of-bounds vector subscript.
+  int x = vec[index];
+}
+```
+
+借用チェッカをはじめとする静的解析で検出できない健全性の問題は、実行時チェックによって検出します。この提案では、実行時エラーが検出されるとpanicを起こすことでプログラムを終了させます。
+
+この例では、`vector`の範囲外アクセスによってpanicが起こり、未定義動作が発生する前にプログラムが終了します。
+
+この提案の内容はcircleというコンパイラ（C++の拡張言語）によって3年をかけて実装されており、このようなスーパーセット拡張が不可能ではないことを証明したうえで提案されています。SG23の投票ではこの提案に時間をかけて議論していくことにほぼ反対なく合意が取れています。
+
+ただし、プロファイル提案と機能が被っている部分があり、どちらを優先すべきかについてはプロファイルを優先する方が好まれているようです（次点で両方）。
+
+- [P3390 進行状況](https://github.com/cplusplus/papers/issues/2045)
 
 ### [P3391R0 `constexpr std::format`](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3391r0.html)
 
