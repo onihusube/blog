@@ -256,3 +256,5 @@ void f(int* ptr) {
 - [P3290R2 Integrating Existing Assertions With Contracts](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3290r2.pdf)
 - [P3227R0 Contracts for C++: Fixing the contract violation handling API](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3227r0.pdf)
 - [P3386R0 Static Analysis of Contracts with P2900](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3386r0.pdf)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2025/20250330_contracts_vaiolation_handler.md)
