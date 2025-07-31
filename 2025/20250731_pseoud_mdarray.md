@@ -1,4 +1,4 @@
-# 擬mdarray
+# ［C++］ 擬mdarray
 
 [:contents]
 
@@ -35,7 +35,7 @@ int main() {
 
 しかしこの例にあるように、`std::mdspan`はビューなので配列のデータ領域を参照しません。参照する領域は別に用意する必要があり、かつそこを別に管理する必要があります。
 
-ビューではない多次元配列クラスの要求もあったため、`std::mdarray`という`std::mdspan`とインターフェース互換で領域を所有する多次元配列クラスの提案も行われていますが、C++29以降の機能になります。
+ビューではない多次元配列クラスの要望もあったため、`std::mdarray`という`std::mdspan`とインターフェース互換で領域を所有する多次元配列クラスの提案も行われていますが、C++29以降の機能になります。
 
 ```cpp
 #include <mdarray>
@@ -64,14 +64,14 @@ int main() {
 
 これは実行できれば先ほどと同じ結果になります。`std::mdarray`はデフォルトでは`std::vector`を内部に保持して、その領域を`std:mdspan`とほぼ同じインターフェースによってアクセスできるようにすることで非ビューの多次元配列クラスとなっています。
 
-ただ実は、C++23でもこの`mdarray`に限りなく近いものを割と簡単に作ることができます。
+C++23でもこの`mdarray`のようなものが欲しくなることもあるでしょう。`std::mdspan`の柔軟なカスタマイズ性を活用すると、割と近いものを作ることができます。
 
 ### mdspanの構造と要件
 
 `std:mdspan`のクラス構造はおおむね次のようになっています
 
 ```cpp
-// mdspanクラス構造再掲
+// mdspanクラス構造概要
 namespace std {
   template<
     class T,                                    // 要素型
@@ -100,7 +100,7 @@ namespace std {
 }
 ```
 
-これら各型の詳細は以前の記事をご覧ください
+これら各型の詳細などは以前の記事をご覧ください
 
 - [［C++］ mdspanでインターリーブレイアウトを扱う - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2023/06/30/200303)
 
@@ -299,13 +299,13 @@ template<class ElementType>
 struct shared_ptr_accessor {
   using offset_policy = std::default_accessor<ElementType>;
   using element_type = ElementType;
-  using reference = ElementType&;
+  using reference = ElementType&; // referenceは非const
   using data_handle_type = std::shared_ptr<element_type[]>;
 
   constexpr shared_ptr_accessor() noexcept = default;
 
   constexpr reference access(const data_handle_type& p, size_t i) const noexcept {
-    return p[i];
+    return p[i];  // ここでconst伝播を切ることができる
   }
 
   constexpr offset_policy::data_handle_type offset(const data_handle_type& p, size_t i) const noexcept {
@@ -339,3 +339,5 @@ int main() {
 - [P1648R5 `mdarray`: An Owning Multidimensional Array Analog of `mdspan`](https://wg21.link/P1684R5)
 - [`std::mdspan` - cpprefjp](https://cpprefjp.github.io/reference/mdspan/mdspan.html)
 - [`AccessorPolicy` - cpprefjp](https://cpprefjp.github.io/reference/mdspan/AccessorPolicy.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2025/20250731_pseoud_mdarray.md)
