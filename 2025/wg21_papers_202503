@@ -11,11 +11,35 @@
 [:contents]
 
 ### [N5004 2025 Sofia Meeting Invitation and Information](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5004.pdf)
+
+2025年6月にブルガリアのソフィアで行われる全体会議のインフォメーション。
+
+予定（2025年6月16日～21日）と場所、ホテルの案内などが記載されています。
+
 ### [N5005 WG21 2025-01 Hagenberg Admin telecon minutes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5005.pdf)
+
+2025年1月27日に行われた、WG21管理者ミーティングの議事録。
+
+前回からどのような活動があったかや、Hagenberg会議で何をするかなどの報告がなされています。
+
 ### [N5006 2025 WG21 admin telecon meetings (revised 2025-02-20)](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5006.pdf)
+
+今後のWG21管理者ミーティングのインフォメーション。
+
 ### [N5007 WG21 02/2025 Hagenberg Minutes of Meeting](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5007.pdf)
+
+2025年2月にHagenbergで行われた全体会議の議事録。
+
+最終日に行われた全体会議での各グループの作業報告と、全体投票の様子が記録されています。
+
 ### [N5008 Working Draft, Programming Languages -- C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5008.pdf)
+
+C++26のワーキングドラフト第7弾
+
 ### [N5009 Editors' Report, Programming Languages -- C++](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5009.html)
+
+↑の変更点をまとめた文書。
+
 ### [P0260R15 C++ Concurrent Queues](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p0260r15.html)
 ### [P0260R16 C++ Concurrent Queues](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p0260r16.html)
 ### [P0876R20 fiber_context - fibers without scheduler](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p0876r20.pdf)
