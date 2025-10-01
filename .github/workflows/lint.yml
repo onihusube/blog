@@ -1,0 +1,40 @@
+name: Textlint
+
+on:
+  pull_request:
+  push:
+    branches: [ master ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 差分を取るため全履歴を取得
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install textlint
+        run: |
+          npm install --save-dev textlint \
+            textlint-rule-preset-ja-technical-writing \
+            textlint-rule-spellcheck-tech-word \
+            textlint-rule-prh
+
+      - name: Run textlint only on changed files
+        run: |
+          # master への push なので、直前のコミットとの差分を取得
+          git diff --name-only HEAD~1 HEAD -- '*.md' > changed_files.txt
+          if [ -s changed_files.txt ]; then
+            echo "Linting changed markdown files:"
+            cat changed_files.txt
+            npx textlint -f pretty-error $(cat changed_files.txt)
+          else
+            echo "No changed markdown files."
+          fi
