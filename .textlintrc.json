@@ -1,6 +1,7 @@
 {
     "rules": {
         "preset-ja-technical-writing": true,
+        "ja-no-mixed-period": false,
         "ja-unnatural-alphabet": true,
         "ja-no-redundant-expression": true,
         "@proofdict/proofdict": {
