@@ -24,10 +24,9 @@ jobs:
         run: |
           npm install --save-dev textlint \
             textlint-rule-preset-ja-technical-writing \
-            textlint-rule-spellcheck-tech-word \
-            textlint-rule-prh \
             textlint-rule-ja-unnatural-alphabet \
-            textlint-rule-ja-no-redundant-expression
+            textlint-rule-ja-no-redundant-expression \
+            @proofdict/textlint-rule-proofdict
 
       - name: Run textlint only on changed files
         run: |

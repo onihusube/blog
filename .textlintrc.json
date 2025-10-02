@@ -1,0 +1,10 @@
+{
+    "rules": {
+        "preset-ja-technical-writing": true,
+        "ja-unnatural-alphabet": true,
+        "ja-no-redundant-expression": true,
+        "@proofdict/proofdict": {
+            "dictURL": "https://azu.github.io/proof-dictionary/"
+        }
+    }
+}
