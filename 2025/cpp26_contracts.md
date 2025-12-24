@@ -456,7 +456,7 @@ C++26時点の各セマンティクスの違いは表にして一覧できます
 |*enforce*|する|呼び出す|しない（条件付）|
 |*quick enfore*|する|呼び出さない|しない|
 
-表のチェック列の意味は、プログラムの実行が契約アサーションに到達した時にそこに指定された契約条件式を評価するかどうかです。チェックするセマンティクスでは契約条件式が評価されてその結果が`bool`値として取得されます。契約条件式が`false`を返した場合、その契約アサーションの表明する契約が破られている状態であり、これを契約違反（が発生した状態）と呼びます。
+表のチェック列の意味は、プログラムの実行が契約アサーションに到達した時にそこに指定された契約条件式を評価するかどうかです。チェックするセマンティクスでは契約条件式が評価されてその結果が`bool`値として取得されます。契約条件式が`false`を返した場合、その契約アサーションの表明する契約が破られている状態であり、これを**契約違反（*contract violation*）**（が発生した状態）と呼びます。
 
 違反ハンドラ列の意味は、契約条件式が評価されて契約違反が発生した後に、契約違反ハンドラと呼ばれるコールバック処理を呼び出すかどうかです。呼び出すセマンティクスでは契約違反発生後に違反ハンドラ（専用のライブラリ関数）を起動して、契約違反をハンドリングします。この違反ハンドラについては次の章で詳しく解説します。
 
@@ -480,6 +480,26 @@ C++26時点の各セマンティクスの違いは表にして一覧できます
 *observe*と*enforce*セマンティクスでは契約違反時の診断情報（違反が発生した場所などの情報）が提供されます（これは推奨事項ではあります）。
 
 *quick enfore*セマンティクスは違反ハンドラ呼び出しを伴わず、チェックして違反が発生すると即プログラムを終了させます。これは契約アサーションによって生成されるコードサイズを最小限に抑えるとともに、違反が起きたらなるべく速やかにプログラムを終了させることを目的としています。*quick enfore*では契約違反に関する診断情報が提供されないか最小限のものになる可能性があります。
+
+##### プログラムの終了方法
+
+単純にプログラムを終了させるといっても、その方法には色々な方法があります。
+
+*enforce*/*quick enfore*セマンティクスにおける終了方法の選択は実装定義とされつつも、次の3つの方法のいずれかによって行われます
+
+1. `std::terminate()`の呼び出し
+2. `std::abort()`の呼び出し
+3. プログラム実行の速やかな終了
+
+3が選択される場合は結局その方法は実装定義となるのですが、このような自由度は実行環境とコンパイラにおける様々なユースケースに対応するためのものです。
+
+例えば、`std::terminate()`はプログラムを終了させると言いつつも`std::set_terminate()`で登録されたハンドラを呼び出してから`std::abort`を呼び出すなど少し時間がかかります。`std::abort()`でも`SIGABRT`に対応するシグナルハンドラが登録されているとそちらが呼び出されてしまいます（これで終了が阻まれることは無いとは思いますが）。
+
+3の選択肢は、そもそも`std::abort()`のような機構でさえも利用できない環境であったり、セキュリティを重視して言葉通り即座にプログラムを終了させるオプションを実装が提供することに対応するためのものです。
+
+例えば、Clangは`__builtin_trap()`や`__builtin_verbose_trap()`（デバッガのアタッチに対応している）といった余計なことをほとんど一切行わずに即座にプログラムを終了させる方法を提供しています。*quick enfore*セマンティクスの場合はこうした実装を取ることがその意義からしても合理的です。
+
+また、このプログラム終了の方法はセマンティクス毎に異なることができ、同じセマンティクスであっても状況によって異なることが許可されています（後の方の「契約条件式の評価中の例外」のところで少し触れています）。
 
 #### 評価セマンティクスの選択
 
@@ -566,12 +586,13 @@ void f(int i)
   contract assert(i < 10);  // #2
 
   // この集合においては次の評価順序と回数は有効（合法）
-  // 有効な評価順序: #1 #2
-  // 有効な評価順序: #1 #1 #2 #2
-  // 有効な評価順序: #1 #2 #1 #2
-  // 有効な評価順序: #1 #2 #2 #1
+  // #1 #2
+  // #1 #1 #2 #2
+  // #1 #2 #1 #2
+  // #1 #2 #2 #1
   
-  // 有効ではない評価順序: #2 #1
+  // 次の評価順序と回数は無効（合法ではない）
+  // #2 #1
 }
 ```
 ```cpp
@@ -695,18 +716,391 @@ C++26 Contractsの設計原則の中には「コンセプトは契約を認識�
 
 ### 契約違反ハンドラ
 
-契約アサーションがどのように評価されるのかは評価セマンティクスによって制御されることは分かりました。次は、評価された後、特にObserveとEnforceの2つのセマンティクスにおいて評価された後にどう振舞うかの部分を見ていきます。
+契約アサーションがどのように評価されるのかは評価セマンティクスによって定義され、制御されることが分かりました。次は、評価された後、特に*observe*と*enforce*の2つのセマンティクスにおいて契約違反が起きた場合にどう振舞うかの部分を見ていきます。
 
-この評価後のセマンティクスは、**契約違反ハンドラ（*contract-violation handler*）**というものによって定義されています。以下この記事では契約違反ハンドラの事を単に違反ハンドラと呼びます。
+この評価後のセマンティクスは、**契約違反ハンドラ（*contract-violation handler*）**というものによって定義されています。以下この記事では契約違反ハンドラの事を単に**違反ハンドラ**と呼びます。
 
+また、前述のように違反ハンドラが考慮されるのは実行時のみなので、ここで説明することは基本的に実行時の振る舞いについてです。
 
-違反ハンドラそのものにもpre/postを指定できる
+#### 違反ハンドラの呼び出し
 
-デフォルトの違反ハンドラの動作
+実行時の契約アサーション評価において契約違反が検出された場合、そのセマンティクスによって行われることは次のようになっていました
+
+- *ignore* : 契約違反は検出されない（のでそのまま継続）
+- *observe* : 違反ハンドラを呼び出す
+- *enforce* : 違反ハンドラを呼び出す
+- *quick enfore* : プログラム終了
+
+*observe*と*enforce*セマンティクスでは契約違反時に違反ハンドラを呼び出して処理を委譲します。違反ハンドラはグローバルにインストールされた専用の関数であり、`::handle_contract_violation()`という名前で次のようなシグネチャを持ちます
+
+```cpp
+// 違反ハンドラのシグネチャ（グローバル名前空間で定義）
+extern "C++" {
+  void handle_contract_violation(const std::contracts::contract_violation&) noexcept(/*実装定義*/);
+}
+```
+
+このシグネチャはあくまで説明のためのものです。また、この関数はグローバルモジュールに属し、C++言語リンケージを持ちます。
+
+この関数の動作の詳細（定義）は実装定義とされますが、引数に提供された`std::contracts::contract_violation`型オブジェクトの持つ契約違反に関する情報を診断情報として出力する実装をデフォルトとすることが推奨されています。
+
+違反ハンドラはかなり特殊な関数であり、`::handle_contract_violation()`という名前を持つことが規定されてはいるもののユーザーがアクセス可能ではないことが規定されています。仮にこの名前でアクセス可能だったとしても、`std::contracts::contract_violation`型のオブジェクトを構築する方法が提供されていないため、結局呼び出すことはできません。
+
+契約違反が発生した場合、実装はその契約違反に関する情報を保持する`std::contracts::contract_violation`型オブジェクトを何らかの手段で作成し、それを渡して違反ハンドラが呼び出されます。この`std::contracts::contract_violation`型オブジェクトの作成方法は未規定（実装定義）ですが、少なくとも`new`を使用して動的メモリ確保を行わない方法によるものであることは指定されています。
+
+デフォルトの違反ハンドラはこのように受け取った`std::contracts::contract_violation`型オブジェクトから契約違反に関する情報を取得して、何らかフォーマットされた診断情報を標準出力などに出力してから正常に終了（リターン）します（するはずです）。違反ハンドラがリターンした後でどうするかは前述のようにセマンティクスによってことなります
+
+- *observe* : 違反を起こした契約アサーションの直後から元の実行パスを再開する
+- *enforce* : プログラムを終了する
+
+このような過程から明らかかもしれませんが、違反ハンドラはシグナルハンドラのようなものではなく、通常の制御フローの延長で呼び出されるものです。あるスレッドで契約アサーションが評価されて違反ハンドラが呼ばれた場合、そのスレッドの実行は違反ハンドラ内に移り、*observe*セマンティクスの場合は違反ハンドラが正常にリターンすると違反が起きた契約注釈の直後から元のプログラムが再開されます。
+
+違反ハンドラは契約違反時の処理を一元的に担い、管理することを目的としています。そのため、プログラム中のどの場所で契約違反が発生したとしても同じ違反ハンドラ呼び出されます。
+
+#### 違反ハンドラの置換
+
+違反ハンドラはユーザーによって上書きして、ユーザー定義の任意の違反ハンドラをインストールする事ができます。ただし、これがサポートされるかは実装定義です。
+
+サポートされる場合、違反ハンドラの置換はグローバル`new/delete`演算子の置換と同じ方法によって行います。つまり、`::handle_contract_violation()`関数を同じシグネチャでユーザー定義することで行います。
+
+```cpp
+// 違反ハンドラのシグネチャ（グローバル名前空間で定義）
+void handle_contract_violation(const std::contracts::contract_violation&) noexcept(/*自由*/);
+```
+
+`noexcept`指定に関しては自由度があり、`noexcept(true)`と`noexcept(false)`のどちらを指定しても置換することができます。属性の指定（`[[noreturn]]`など）も自由なほか、違反ハンドラ自体に事前条件と事後条件を指定することもできます。
+
+```cpp
+// 有効な違反ハンドラ宣言の例
+
+void ::handle_contract_violation(const std::contracts::contract_violation&) noexcept {
+  ...
+}
+
+[[noreturn]]
+void ::handle_contract_violation(const std::contracts::contract_violation&) noexcept(false) {
+  ...
+}
+
+void ::handle_contract_violation(const std::contracts::contract_violation&)
+  pre(...)
+  post(...)
+{
+  ...
+}
+```
+```cpp
+// 無効な宣言の例
+
+// 戻り値は返せない
+int ::handle_contract_violation(const std::contracts::contract_violation&) {
+  ...
+}
+
+// 引数型はconst参照固定
+void ::handle_contract_violation(std::contracts::contract_violation&) {
+  ...
+}
+
+// 引数型はconst std::contracts::contract_violation&でなければならない
+void ::handle_contract_violation(const int&) {
+  ...
+}
+
+// これもダメ（多分
+void ::handle_contract_violation(const auto&) {
+  ...
+}
+
+// inlineであってはならない
+inline void ::handle_contract_violation(const std::contracts::contract_violation&) {
+  ...
+}
+
+// C++リンケージを持つ必要がある 
+extern "C" inline void ::handle_contract_violation(const std::contracts::contract_violation&) {
+  ...
+}
+```
+
+正しいシグネチャで置換した違反ハンドラはリンク時にデフォルトの違反ハンドラからの置換が行われ、実行時にはデフォルトの違反ハンドラと同様にそのプログラム中で一貫して使用されます。
+
+そして、置換するユーザー定義の違反ハンドラ内では通常のC++コードによって違反時処理を記述することができます。どのようにログ出力するのかや何か追加の処理をするのかなどを自由に記述できます。
+
+*observe*と*enforce*セマンティクスではプログラムを終了するか継続するかについて、違反ハンドラが正常にリターン刷るかどうかによって条件付けされていました。デフォルトの違反ハンドラは常に正常にリターンすることを仮定できるため、この条件はユーザー定義の違反ハンドラでのみ変化させることができます。
+
+すなわち、ユーザー定義違反ハンドラの動作によって、*observe*と*enforce*セマンティクスにおけるプログラム継続/終了という2択の動作をカスタマイズすることができます。具体的には、例外を投げて契約違反を起こした処理から脱出させることができ、あるいは違反ハンドラ内で無限ループに入れておくことで契約違反を起こした処理を続行せずにプログラムの動作を継続させる、といった実装を取ることができます。
+
+```cpp
+#include <contracts>
+
+void ::handle_contract_violation(const std::contracts::contract_violation& info) noexcept(false) {
+  throw make_my_contract_violation_exception(info); // 独自の例外を送出してプログラムのより上位の部分でハンドルする
+}
+
+void ::handle_contract_violation(const std::contracts::contract_violation& info) noexcept {
+  for(;;) std::this_thread::yield();  // 無限ループに入れることで元の処理を続行させず、プログラムを終了もさせない
+}
+```
+
+`contract_violation`クラスも含めて、違反ハンドラ関連のユーティリティ（`std::contracts`名前空間のもの）は`<contracts>`で定義されています。契約アサーションを使用するだけならこのヘッダをインクルードする必要はありませんが、違反ハンドラをユーザー定義しようとするとヘッダのインクルードが必要になります。
+
+このような実装において、デフォルトの違反ハンドラの行う診断メッセージ発行を再現したい場合があるでしょう。その場合のために、デフォルトの違反ハンドラを呼び出すためのライブラリ関数`std::contracts::invoke_default_contract_violation_handler()`が用意されています。
+
+```cpp
+#include <contracts>
+
+void ::handle_contract_violation(const std::contracts::contract_violation& info) noexcept(false) {
+  // ログ出力してから例外送出
+  std::contracts::invoke_default_contract_violation_handler(info);
+  throw make_my_contract_violation_exception(info);
+}
+```
+
+`std::contracts::invoke_default_contract_violation_handler()`に違反ハンドラ引数の`contract_violation`オブジェクトを渡して呼び出すことで、違反ハンドラが置換されている場合でもデフォルトの違反ハンドラを呼び出すことができます。
+
+違反ハンドラに提供される`contract_violation`オブジェクトは、違反ハンドラの置換に関わらず同じ方法で作成され供給されます（これをカスタマイズする方法は提供されません）。その生存期間については未規定ですが、少なくとも違反ハンドラが実行を完了するまでの間は生存していることが保証され、またこれは`contract_violation`オブジェクトを介してアクセス可能な全てのオブジェクトについても保証されます。
+
+上記のように例外で脱出する場合、`contract_violation`オブジェクトの参照を保存してもいつまで正しく使用できるかは分からないので注意しましょう。上記の例の場合、`make_my_contract_violation_exception`関数/クラスコンストラクタ内で情報を取り出すだけにとどめておくのが無難です。
+
+このような違反ハンドラの置換は共有ライブラリが動的リンクされている場合でも動作するはずではありますが、どのようにサポートされるかは`new/delete`同様に実装定義となります。特に、共有ライブラリと利用側とで異なるユーザー定義違反ハンドラの置換が行われている場合、おそらくODR違反で未定義動作になります。
+
+#### `std::contracts::contract_violation`
+
+違反ハンドラの引数である`std::contracts::contract_violation`クラスは`<contracts>`ヘッダで定義されているライブラリクラスです。違反ハンドラではこのクラスを介して契約違反に関連した情報を取得することができます。
+
+まず初めにですが、このクラスはユーザーによって構築することができません。デフォルトコンストラクタもムーブコンストラクタも代入演算子もすべて利用できません。基本的に実装が作成して違反ハンドラに渡してきた参照を介して利用するのみです。この性質のため、このクラスオブジェクトを使用する場所は実行時の違反ハンドラ内部に限られます。
+
+`std::contracts::contract_violation`クラスはおおむね次のようになっています
+
+```cpp
+namespace std::contracts {
+  class contract_violation {
+    // no user-accessible constructor
+  public:
+    // コピー/ムーブ禁止
+    contract_violation(const contract_violation&) = delete;
+    contract_violation& operator=(const contract_violation&) = delete;
+
+    // デストラクタはvirtualであってもよい
+    /*実装定義*/ ~contract_violation();
+
+    // 契約違反を起こした述語のテキスト表現を取得する
+    const char* comment() const noexcept;
+
+    // 契約違反の種類を取得する
+    contracts::detection_mode detection_mode() const noexcept;
+    
+    // 現在の呼び出しの違反ハンドラの終了後に終了するかどうかを取得する
+    bool is_terminating() const noexcept;
+    
+    // 違反ハンドラを呼び出した契約アサーションの種類を取得する
+    assertion_kind kind() const noexcept;
+    
+    // 契約違反を起こした契約アサーションのソースコード情報を取得する
+    source_location location() const noexcept;
+    
+    // 契約違反を起こした契約アサーションの評価セマンティクスを取得する
+    evaluation_semantic semantic() const noexcept;
+  };
+
+  // デフォルトの違反ハンドラを呼び出す
+  void invoke_default_contract_violation_handler(const contract_violation&);
+}
+```
+
+`detection_mode`、`assertion_kind`、`evaluation_semantic`は独自の列挙型であり、その定義は次のようになっています
+
+```cpp
+namespace std::contracts {
+
+  // 契約アサーションの種類を表す
+  enum class assertion_kind : /*未規定*/ {
+    pre = 1,
+    post = 2,
+    assert = 3  // contract_assertに対応
+  };
+
+  // 評価セマンティクスの種類を表す
+  enum class evaluation_semantic : /*未規定*/ {
+    ignore = 1,
+    observe = 2,
+    enforce = 3,
+    quick_enforce = 4
+  };
+
+  // 契約違反の種類を表す
+  enum class detection_mode : /*未規定*/ {
+    predicate_false = 1,
+    evaluation_exception = 2
+  };
+}
+```
+
+コメントにも簡単に記載していますが、`std::contracts::contract_violation`クラスの各メンバ関数は次のようなものです
+
+- `.comment()` : 契約違反を起こした契約条件式を文字列化したものが取得できる
+    - 通常の文字列リテラル（`"str"`）と同じエンコーディングでnull終端された文字列が得られる
+- `.detection_mode()` : 違反ハンドラを呼び出した契約違反の種類を表す列挙値が取得できる
+- `.is_terminating()` : 現在の違反ハンドラを正常にリターンしたらプログラムが終了されるかどうかが取得できる
+    - 標準の4つの評価セマンティクスの中では、*enforce*セマンティクスの場合のみ`true`を返す
+- `.kind()` : 契約違反を起こした契約アサーションの種類を表す列挙値が取得できる
+    - `pre()`/`post()`/`contract_assert`の3種類に対応している
+- `.location()` : 契約違反を起こした契約アサーションのソースコード情報が取得できる
+    - 可能な場合、契約違反を起こしたのが事前条件であるならば、返されるソースコード情報は関数呼び出しを行った場所に関するものになる
+- `.semantic()` : 契約違反を起こした契約アサーションの評価セマンティクスの種類を表す列挙値が取得できる
+
+自明かもしれませんが、これらのメンバ関数によって得られるのは現在の違反ハンドラ（を呼び出した契約違反）に関するものです。ある違反ハンドラの呼び出し時の`contract_violation`オブジェクトが、その呼び出しとは無関係な別の契約違反に関する情報を持つことはありません。
+
+```cpp
+#include <contracts>
+#include <print>
+
+void ::handle_contract_violation(const std::contracts::contract_violation& info) noexcept(false) {
+  using namespace std::contracts;
+
+  const auto& loc = info.location();
+
+  std::println("{} In function '{}'", loc.file_name(), loc.function_name());
+  std::print("{}:{}:{}: contruct violation occured", loc.file_name(), loc.line(), loc.column());
+  std::println(" [assertion={}, semantic={}]", info.kind(), info.semantic());
+  std::println("{}", info.comment());
+
+  if (info.is_terminating()) {
+    throw make_my_contract_violation_exception(info);
+  }
+}
+```
+
+`.comment()`/`.location()`関数の返す値は正確には実装定義とされており、上記で説明したような値を返すことは推奨事項となっています。これは、セキュリティが重要なプログラムやリバースエンジニアリング防止を意図するプログラムにおいて、リリースバイナリにオリジナルソースに関する情報を残さないようにすることをサポートするためです。その場合、空文字やデフォルト構築された`source_location`オブジェクトが返されます。
+
+なお、`contract_violation`クラスも含めた`<contracts>`ヘッダ全体はフリースタンディング環境でも利用可能です。ここまで明確にはしていなかったかもしれませんが、Contracts機能そのものが実行環境を問わずに利用可能であることが強く意図されています。
 
 #### 契約条件式の評価中の例外
 
-#### `<contracts>`
+契約違反の種類を表す列挙型`contracts::detection_mode`にしれっと`evaluation_exception`という値があるのに気づいたかもしれません。ここまで触れていませんでしたが、実行時の契約違反の定義は次のようになっています
+
+- 契約条件式が`false`を返した
+- 契約条件式の評価中に例外が送出された
+
+すなわち、違反ハンドラは契約条件式が`false`を返す以外にも、契約条件式が例外を送出した場合にもその例外をハンドリングする形で呼び出されます。
+
+```cpp
+bool condition() noexcept(false);
+
+void f() pre(condition());
+
+int main() {
+  // condition()が例外を送出すると契約違反が発生する
+  // observe/enforセマンティクスの場合、違反ハンドラが呼び出される
+  // quick enforceセマンティクスの場合、プログラムが終了される
+  f();
+}
+```
+
+*quick enforce*セマンティクスの場合でも契約条件式からの例外送出は契約違反として扱われ、即座にプログラムが終了されます。*quick enforce*セマンティクスでは例えば、暗黙の`noexcept`コンテキスト中で契約条件式を評価することで例外送出時に直ちに`std::terminate`につなげることで`try-catch`を省略するという実装が許可されています。
+
+*observe*/*enforce*セマンティクスで評価された場合に違反ハンドラでハンドルされた例外は違反ハンドラによって処理されたものとして扱われるため、違反ハンドラが正常にリターンした後に再スローされることはありません。例外オブジェクトは違反ハンドラ終了とともに破棄され、*observe*セマンティクスの場合は通常通りに実行を継続します。
+
+ユーザー定義違反ハンドラ内では、契約違反を起こした例外オブジェクトを`std::current_exception()`などによって取得することができます。
+
+```cpp
+#include <contracts>
+#include <exception>
+
+void ::handle_contract_violation(const std::contracts::contract_violation& info) noexcept(false) {
+  using namespace std::contracts;
+
+  if (info.detection_mode() == detection_mode::evaluation_exception) {
+    // 独自にハンドルする
+    my::handle(std::current_exception());
+
+    // あるいは再スローする
+    std::rethrow_exception();
+  }
+}
+```
+
+`contract_violation`クラスの`.detection_mode()`による契約違反原因の識別はこのために提供されています。
+
+#### 違反ハンドラからの例外送出と`noexcept`
+
+少なくとも、ユーザー定義の違反ハンドラはほぼ自由に例外を送出することができます。この違反ハンドラの送出する例外の扱いは次のようになります
+
+- 違反ハンドラが送出した例外は契約アサーションが指定されている関数本体から送出されたものとして扱われる
+- 関数が`noexcept`指定されている場合、通常通り`std::terminate`で終了する
+
+事前条件と事後条件でも、そこからの例外はその関数内から投げられたものとして扱われるため、その関数が`noexcept`指定されていると`std::terminate`で終了します。
+
+これにより、契約アサーションが存在する場合は常にそこから例外が送出される可能性が生じることになります。これについては標準化の過程でも議論の的ではありましたが、関数に`noexcept`を付加するかどうかについてはLakos Ruleに従っておくことをお勧めしておきます（すなわち、何らかの契約を持つ関数は無条件`noexcept`すべきではありません）。
+
+一応、`contract_assert`は現在のところ文であるため、`noexcept(contract_assert(false))`のようなクエリはできません。
+
+#### 契約アサーション評価の疑似コード
+
+ここまで説明してきた契約アサーションの評価から違反ハンドラのリターンによるプログラム終了/続行の過程に関しては、通常のC++を用いた疑似コードで記述することができるので、参考にここに載せておきます。
+
+```cpp
+// 評価セマンティクスの取得
+evaluation_semantic _semantic = __current_semantic();
+
+if (evaluation_semantic::ignore == _semantic) {
+  // ignoreセマンティクスの場合
+  // なにもしない
+} else if (evaluation_semantic::observe == _semantic
+        || evaluation_semantic::enforce == _semantic
+        || evaluation_semantic::quick_enforce == _semantic)
+{
+  // 契約チェックを行うセマンティクスの場合
+
+  if consteval {
+    // 定数式における契約チェック
+    ...
+  } else {
+    // 契約条件式の結果を保存する変数
+    bool _violation;
+    // 違反ハンドラを呼び出すべきかを表す変数
+    bool _handled = false; // Violation handler has been invoked.
+
+    // 契約条件式のチェックと違反ハンドラの呼び出し(必要な場合）
+    try {
+      // 契約条件式の評価
+      _violation = __check_predicate(X);
+    } catch (...) {
+      // 契約条件式の評価が例外を送出した場合
+      if (evaluation_semantic::quick_enforce == _semantic) {
+        // quick enforceセマンティクスの終了処理
+        std::terminate(); // implementation−defined program termination
+      } else {
+        // 例外送出による契約違反ハンドリング
+        _violation = true;
+
+        // 契約違反ハンドラの呼び出し
+        __handle_contract_violation(_semantic, detection_mode::evaluation_exception);
+
+        _handled = true;
+      }
+    }
+
+    if (_violation && evaluation_semantic::quick_enforce == _semantic) {
+      // quick enforceセマンティクスの終了処理
+      __builtin_trap(); // implementation−defined program termination
+    }
+    if (_violation && !_handled) {
+      // 契約違反ハンドラの呼び出し
+      __handle_contract_violation(_semantic, detection_mode::predicate_false);
+    }
+    if (_violation && evaluation_semantic::enforce == _semantic) {
+      // enforceセマンティクスの終了処理
+      std::abort(); // implementation−defined program termination
+    }
+  }
+} else {
+  // その他実装定義のセマンティクスの処理
+}
+```
+
+実際に契約アサーションごとにこのようなコードが挿入されるわけではなく、細部をどう実装するかについても実装の自由度がありますが、起こることを理解するのには役立つと思われます。
 
 ### 特殊な関数等に対する契約アサーションの扱い
 
@@ -1050,6 +1444,7 @@ C++ Contractsは当然これで終わりではありません。もともと、C
 
 - 仮想関数に対する契約
 - 関数ポインタに対する契約
+- 違反ハンドラをユーザーが呼び出す方法の提供
 
 などはC++29以降に導入する予定です。他にも、契約アサーションへのラベル指定機能（[P3400R1 Specifying Contract Assertion Properties with Labels](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3400r1.pdf)）などの機能拡張も検討中です。
 
