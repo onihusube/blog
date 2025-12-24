@@ -970,13 +970,97 @@ int main(int argc, char *argv[])
 
 この例のようにプログラム引数に対して使用する以外にも、`main()`呼び出し前（あるいは終了前）のプログラムのより大域的な状態を検査するのにも使用できます。
 
-### その他
+### C++26の他の機能との相互作用
 
 #### 未定義動作とObservable Checkpoints
 
-#### Contractsと例外
+C++26ではObservable Checkpointsという概念が導入されています。これはUBによるタイムトラベル最適化（コード上の因果関係を逆転するような最適化）を防止するためのチェックポイントであり、プログラムのある地点で発生したUBがObservable Checkpointsを超えてプログラムをUBにすることを防止するものです。
+
+`std::observable()`およびI/O関数の呼び出しがObservable Checkpointsとして扱われますが、契約アサーションもObservable Checkpointsを導入します。
+
+より正確には契約アサーションに関連して次のイベントがObservable Checkpointsとして扱われます
+
+- 契約アサーション評価に際して、契約条件式の評価が開始されたこと
+- *observe*セマンティクスで評価された契約アサーションから呼び出された違反ハンドラが正常にリターンしたこと
+
+これによって、契約アサーション以降で発生したUBが契約アサーションを超えて波及し、契約アサーションそのものを消し去ったりその評価をスキップすることが禁止されます。
+
+```cpp
+volatile int i = 0;
+
+void f(int *p) {
+  if (p != nullptr) // #1
+  {
+    ++i;
+  }
+
+  contract_assert(0 <= *p); // p == nullptrの場合UB
+}
+```
+
+この例では、`#1`の後の`contract_assert`が*ignore*セマンティクス以外で評価される場合、（Observable Checkpointsがないとすると）タイムトラベル最適化により`#1`のチェックが削除されるなどの事が発生しえます。
+
+`contract_assert`の契約条件式評価開始地点がObservable Checkpointsになっていることで、契約アサーションの条件式にUBが含まれていたとしても、その契約アサーションよりも前にそのUBが波及するのを阻止します。
+
+```cpp
+void g(int *p) {
+  contract_assert(p != nullptr); // #2
+
+  ++(*p); // p == nullptrの場合UB
+}
+```
+
+この例では、`#2`の`contract_assert`が*observe*セマンティクスで評価されている場合、違反ハンドラの呼び出しがリターンした後でも実行が継続されることでその後の`*p`が実行されUBになります。、（Observable Checkpointsがないとすると）タイムトラベル最適化により`#2`の契約アサーションそのものが削除される可能性があります。
+
+*observe*セマンティクスによって呼び出された違反ハンドラのリターンがObservable Checkpointsになっていることで、契約アサーション以降のUBが契約アサーションそのものを削除することを防止します。このことは*observe*セマンティクスが契約違反発生後も実行継続する際のUBの影響を緩和します。
+
+#### 標準ライブラリの堅牢化モード（Standard Library Hardening）
+
+C++26では標準ライブラリに対して堅牢化モードというものが定義され、標準ライブラリの一部の事前条件が実行時にチェックされ、違反していたらプログラムが終了されるようになります。
+
+ここまで似たような話を聞いてきたと思います。この堅牢化モードにはC++26 Contractsが使用され、Contractsの枠組みの中で標準ライブラリの実行時検査が行われます。
+
+```cpp
+int main() {
+  std::vector vec = {1, 2, 3};
+
+  int& r = vec[4];  // 堅牢化モードでは契約違反が発生し、プログラムが終了される
+}
+```
+
+堅牢化モードにおける評価セマンティクスは*enforce*/*quick enforce*のどちらかが使用され、非堅牢化モードでは*ignore*セマンティクスが使用されます（*observe*セマンティクスは使用されません）。
+
+- [P3471R4 Standard Library Hardening](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3471r4.html)
+- [P3697R1 Minor additions to C++26 standard library hardening](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3697r1.html)
+- [P3878R1 Standard library hardening should not use the 'observe' semantic](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3878r1.html)
+
+#### リフレクション
+
+C++26 Contractsの設計原則として契約アサーションの存在が他のもののコンパイル時プロパティに影響を与えないというものがあることもあり、関数に指定された契約アサーション（事前条件と事後条件）をリフレクション（`^^`）を使用して取得する方法はありません。これはリフレクションを用いて関数をコピーする際にコピーできないプロパティがあるということでもあります。
+
+一応検討はされているようですが、どうなるかはまだよく見えていません。
+
+### 標準化の話
 
 #### C++29以降の展望
+
+C++ Contractsは当然これで終わりではありません。もともと、C++20で議論紛糾の末に標準からいったん削除された後、合意可能な最小の共通仕様（minimal viable product(MVP)）としてのContractsとして設計されたものがC++26 Contractsになっています。
+
+ここで見てきた中でも
+
+- 仮想関数に対する契約
+- 関数ポインタに対する契約
+
+などはC++29以降に導入する予定です。他にも、契約アサーションへのラベル指定機能（[P3400R1 Specifying Contract Assertion Properties with Labels](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3400r1.pdf)）などの機能拡張も検討中です。
+
+さらに進んで、ContractsをC++における未定義動作/エラー性動作のハンドリングに使用するという構想も検討されています。
+
+- [P3100R5 A framework for systematically addressing undefined behaviour in the C++ Standard](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3100r5.pdf)
+    - [P3100R0 Undefined and erroneous behaviour are contract violations - WG21月次提案文書を眺める（2024年05月）](https://onihusube.hatenablog.com/entry/2024/11/24/155428#P3100R0-Undefined-and-erroneous-behaviour-are-contract-violations)
+
+関連して、違反ハンドラをより活用しようとするアイデアもあります
+
+- [契約プログラミング機能の違反ハンドラ - 地面を見下ろす少年の足蹴にされる私](https://onihusube.hatenablog.com/entry/2025/03/30/232511)
 
 #### 実装定義について
 
@@ -1006,3 +1090,4 @@ C++26 Contractsの仕様そのものの直接の提案は[P2900R14](https://www.
 - [P2899R1 Contracts for C++ - Rationale](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p2899r1.pdf)
 - [P3819R0 Remove `evaluation_exception()` from contract-violation handling for C++26](https://open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3819r0.pdf)
 - [P3460 C++ Contracts Implementers Report](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3460r0.pdf)
+- [P3328R0 Observable Checkpoints During Contract Evaluation](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3328r0.pdf)
