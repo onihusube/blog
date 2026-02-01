@@ -155,3 +155,5 @@ Eigen::Transform3d transform = Eigen::Affine3d::Identity();
 - [アフィン変換（平行移動、拡大縮小、回転、スキュー行列） | イメージングソリューション](https://imagingsolution.net/imaging/affine-transformation/)
 - [Eigen: Space transformations](https://libeigen.gitlab.io/eigen/docs-nightly/group__TutorialGeometry.html)
 - [Eigen: Eigen::Transform< Scalar_, Dim_, Mode_, Options_ > Class Template Reference](https://libeigen.gitlab.io/eigen/docs-nightly/classEigen_1_1Transform.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2026/20260201_eigen_transform.md)
