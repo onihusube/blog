@@ -1,4 +1,4 @@
-# ［C++］`std::start_lifetime_as()`によるtype punning
+# ［C++］std::start_lifetime_as()によるtype punning
 
 C++ type punning環境最前線における最新のtype punning手法の紹介です。
 
@@ -32,8 +32,8 @@ int main() {
 
   // Xはimplicit-lifetime typeではあるものの、生存期間が開始されていない（allocate_memory()がユーザー定義関数であるため）
   X* ub_ptr1 = reinterpret_cast<X*>(memory);  
-  ub_ptr1->a = 1; // ☠ UB
-  ub_ptr1->b = 2; // ☠ UB
+  ub_ptr1->a = 1; // 💀 UB
+  ub_ptr1->b = 2; // 💀 UB
 
   // start_lifetime_as()を通すことで生存期間を開始する
   X* valid_ptr = std::start_lifetime_as<X>(memory);
@@ -50,7 +50,7 @@ int main() {
 
 `std::start_lifetime_as()`がオブジェクトの生存期間を開始する仕組みは関数の効果（Effects）として次のように規定されています
 
-> Implicitly creates objects ([intro.object]) within the denoted region consisting of an object a of type T whose address is p, and objects nested within a, as follows: The object representation of a is the contents of the storage prior to the call to start_lifetime_as. The value of each created object o of trivially copyable type ([basic.types.general]) U is determined in the same manner as for a call to bit_cast<U>(E) ([bit.cast]), where E is an lvalue of type U denoting o, except that the storage is not accessed. The value of any other created object is unspecified.
+> Implicitly creates objects ([intro.object]) within the denoted region consisting of an object `a` of type `T` whose address is `p`, and objects nested within `a`, as follows: The object representation of `a` is the contents of the storage prior to the call to `start_lifetime_as`. The value of each created object `o` of trivially copyable type ([basic.types.general]) `U` is determined in the same manner as for a call to `bit_cast<U>(E)` ([bit.cast]), where `E` is an lvalue of type `U` denoting `o`, except that the storage is not accessed. The value of any other created object is unspecified.
 
 翻訳（Powered by PLAMO翻訳）
 
@@ -61,7 +61,7 @@ int main() {
 
 ここでの`p`と`T`は`std::start_lifetime_as<T>(p)`のように呼び出した時の引数のポインタと作成対象のオブジェクト型です。
 
-implicit-lifetime typeが言語の仕組みとして特定の操作（`malloc()`や`memcpy`など）において暗黙的にオブジェクトが作成される場合は単にそのコンテキストで適切なオブジェクトが作成されるというだけでそれ以上の事はせず、特に作成されたオブジェクトの持つ値やオブジェクト表現についての保証は何もありません。
+implicit-lifetime typeが言語の仕組みとして特定の操作（`malloc()`や`memcpy()`など）において暗黙的にオブジェクトが作成される場合は単にそのコンテキストで適切なオブジェクトが作成されるというだけでそれ以上の事はせず、特に作成されたオブジェクトの持つ値やオブジェクト表現についての保証は何もありません。
 
 しかし、`std::start_lifetime_as()`はトリビアルコピー可能な型に関して言語の仕様よりも拡張された保証を持っています。つまり次の二文です
 
@@ -81,10 +81,10 @@ implicit-lifetime typeが言語の仕組みとして特定の操作（`malloc()`
 
 ### type punning
 
-`T* vp = std::start_lifetime_as<T>(p)`においては、次のことが保証されています
+結果的に、`T* vp = std::start_lifetime_as<T>(p)`の様な呼び出しにおいては次のことが保証されています
 
-- `*vp`のオブジェクトのオブジェクト表現は`p`の内容と一致する
-- `T`がトリビアルコピー可能である場合、`*vp`のオブジェクトの値は`p`のビット列を再解釈して決定される
+- `*vp`のオブジェクトのオブジェクト表現は`p`のストレージの内容と一致する
+- `T`がトリビアルコピー可能である場合、`*vp`のオブジェクトの値は`p`のストレージのビット列を再解釈して決定される
 
 すなわち、`T`がトリビアルコピー可能な型であれば`std::start_lifetime_as`は合法的にtype punningが可能です。
 
@@ -121,9 +121,9 @@ bit_cast         : 1078523331
 
 この`*p`の値が`std::bit_cast<std::int32_t>(f)`として再解釈キャストを行った場合と一致することが保証されます。
 
-このことは`std::start_lifetime_as`する際の型`T`がimplicit-lifetime typeかつトリビアルコピー可能であれば保証されます。
+これを利用するには、`std::start_lifetime_as`する際の型`T`がimplicit-lifetime type（多分こっちを違反するとコンパイルエラーになる）かつトリビアルコピー可能である必要があります。
 
-#### 不定値やEV
+#### `std::bit_cast`が有効ではない場合、不定値やEVなど
 
 `std::start_lifetime_as`によるtype punningの保証は`std::bit_cast`に委ねられているため、そちらの規定で未定義だとか不定値だとか言われている場合は同様に有効ではなくなります。
 
@@ -159,7 +159,7 @@ int main() {
   auto* p = std::start_lifetime_as<std::float64_t>(storage);
   
   // *pの値は不定値
-  auto ub = *p; // ☠ UB
+  auto ub = *p; // 💀 UB
 }
 ```
 
@@ -167,7 +167,7 @@ int main() {
 
 ### 利点
 
-基本的には`std::bit_cast`を使った方がほとんどの場合に良いでしょう。implicit-lifetime typeに限定されずに定数式で使用でき、手動`memcpy`ステップが無いので使いやすいなどがあります。
+基本的には`std::bit_cast`を使った方がほとんどの場合に良いでしょう。implicit-lifetime typeに限定されず、定数式で使用でき、手動`memcpy`ステップが無いので使いやすいなどがあります。
 
 あえてこの方法の利点を挙げるなら、ビット再解釈のためにコピー的操作が不要であることがあります。
 
@@ -186,13 +186,13 @@ int main() {
 
 int main() {
   {
-    const std::float32_t f = 3.14f;
+    std::float32_t f = 3.14f;
 
     // 暗にコピーを含む
     std::int32_t r = std::bit_cast<std::int32_t>(f);
   }
   {
-    const std::float32_t f = 3.14f;
+    std::float32_t f = 3.14f;
 
     std::destroy_at(&f);  // 多分不要
 
@@ -209,7 +209,7 @@ int main() {
 とはいえ`std::bit_cast`の呼び出し程度は最適化で簡単に消せる気がするので、このことが本当に有用であるかはよく分かりません・・・
 
 
-#### `std::start_lifetime_as_array()`
+### `std::start_lifetime_as_array()`
 
 `std::start_lifetime_as_array()`は指定領域に指定サイズの配列型の生存期間を開始する関数で、その動作は要素ごとに`std::start_lifetime_as()`によって指定されているため、同様のことが可能になります。配列全体ではなく配列の各要素ごとにですが、配列の場合各要素間にパディングが無いためある型を別の型の配列として読み替えるということもできます。
 
@@ -257,3 +257,5 @@ int main() {
 - [P3960R0 Define copy-constructibility-from-bytes](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p3960r0.html)
 - [[obj.lifetime] - eel.is](https://eel.is/c++draft/obj.lifetime)
 - [未初期化領域への暗黙的なオブジェクト構築 [P0593R6] - cpprefjp](https://cpprefjp.github.io/lang/cpp20/implicit_creation_of_objects_for_low-level_object_manipulation.html)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2026/20260505_punning_start_lifetime_as.md)
