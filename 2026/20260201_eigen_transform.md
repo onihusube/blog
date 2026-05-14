@@ -12,6 +12,9 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+// ないらしい
+using Transform3d = Eigen::Transform<double, 3, Eigen::TransformTraits::Affine>;
+
 int main() {
   // 平行移動を表すアフィン変換を構成
   Eigen::Translation3d tr{10.0, 5.0, 0.0};
@@ -40,8 +43,11 @@ int main() {
   // 例えば、ローカル座標系からグローバル座標系への変換
   Eigen::Translation3d tr{10.0, 5.0, 0.0};
   Eigen::AngleAxisd rot{std::numbers::pi, Eigen::Vector3d::UnitZ()};
-  Eigen::Transform3d transform{tr};
+  Transform3d transform{tr};
+  
   transform *= rot;
+  // こうしても同じ
+  //transform = transform * rot;
 
   Eigen::Vector3d vec{1.0, 2.0, 3.0};
   // 座標変換を適用
@@ -57,16 +63,16 @@ int main() {
 
 ```cpp
 // *してから渡す
-Eigen::Transform3d transform{tr * rot};
+Transform3d transform{tr * rot};
 
 // *したものを代入
-Eigen::Transform3d transform{};
+Transform3d transform{};
 transform = tr * rot;
 
 // 2つのTransformの合成
-Eigen::Transform3d t_rot{rot};
-Eigen::Transform3d t_translate{tr};
-Eigen::Transform3d transform = t_translate * t_rot;
+Transform3d t_rot{rot};
+Transform3d t_translate{tr};
+Transform3d transform = t_translate * t_rot;
 ```
 
 この例はすべて一個前の例の`transform`と同じ変換を表すはずです。
@@ -76,7 +82,7 @@ Eigen::Transform3d transform = t_translate * t_rot;
 `Eigen::Transform`へのアフィン変換の適用方法にはメンバ関数も利用できます。
 
 ```cpp
-Eigen::Transform3d transform = Eigen::Affine3d::Identity();
+Transform3d transform = Eigen::Affine3d::Identity();
 transform.translate(tr);
 transform.rotate(rot);
 ```
@@ -92,20 +98,19 @@ transform.rotate(rot);
 ```cpp
 // T1 -> T2 -> T3 -> T4の順で変換を行うアフィン変換を構成したい
 Eigen::Translation3d T1 = ...;
-Eigen::Matrix3d T2 = ...;
+Eigen::AngleAxisd T2 = ...;
 auto T3 = Eigen::Scaling(...);
 Eigen::Translation3d T4 = ...;
 
 // *による合成
-Eigen::Transform3d transform1{};
-transform = T4 * T3 * T2 * T1;
+Transform3d transform1 = T4 * T3 * T2 * T1;
 
 // メンバ関数による合成
-Eigen::Transform3d transform2 = Eigen::Affine3d::Identity();
-transform.translate(T4);
-transform.scale(T3);
-transform.rotate(T2);
-transform.translate(T1);
+Transform3d transform2 = Eigen::Affine3d::Identity();
+transform2.translate(T4);
+transform2.scale(T3);
+transform2.rotate(T2);
+transform2.translate(T1);
 ```
 
 この`transform1`と`transform2`は同じ変換を表します。
@@ -118,10 +123,10 @@ transform.translate(T1);
 
 ```cpp
 // T1 -> T2 -> T3 -> T4の順で変換を行うアフィン変換を構成
-Eigen::Transform3d transform3{T2};
-transform.translate(T1);    // 右に適用
-transform.prescale(T3);     // 左に適用
-transform.pretranslate(T4); // 左に適用
+Transform3d transform3{T2};
+transform3.translate(T1);    // 右に適用
+transform3.prescale(T3);     // 左に適用
+transform3.pretranslate(T4); // 左に適用
 ```
 
 `.rotate()`に対応するのは`.prerotate()`です。
@@ -135,19 +140,19 @@ transform.pretranslate(T4); // 左に適用
 ここまでの例では黙って回避していましたが`Eigen::Transform`をデフォルト構築すると恒等変換ではなく無の変換が構成されます。これはおそらく内部の変換行列の係数が不定値を取るため、これに対して変換を適用してもおかしな結果を招くでしょう。
 
 ```cpp
-Eigen::Transform3d transform{};
+Transform3d transform{};
 transform *= T4;  // 意図通りの変換が構成されない
 ```
 
 デフォルト構築はクラスメンバにしたときにそのクラスのデフォルトコンストラクタを無効化しないために用意されているだけだと思われます。デフォルト構築した後は代入演算子（`=`）によって上書きするか、そもそも`Eigen::Affine3d::Identity()`などによって明示的に恒等変換で初期化する必要があります。
 
 ```cpp
-Eigen::Transform3d transform{};
+Transform3d transform{};
 transform = T4;  // T4の変換と同等の変換を構成
 ```
 ```cpp
 // 恒等変換を構成
-Eigen::Transform3d transform = Eigen::Affine3d::Identity();
+Transform3d transform = Eigen::Affine3d::Identity();
 ```
 
 ### 参考文献
