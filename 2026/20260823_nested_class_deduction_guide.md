@@ -51,7 +51,7 @@ int main() {
 
 [godbolt](https://godbolt.org/z/4d953WWvh)
 
-これはC++17でCTADが入った時から一貫した仕様です。・・・ですが、GCCは11まではこのメンバクラステンプレートの推論補助の記述に対応していなかったようで、12から修正されています。今回見事にGCC11で困りました。
+これはC++17でCTADが入った時から一貫した仕様です。・・・ですが、GCCは11まではこの入れ子クラステンプレートの推論補助の記述に対応していなかったようで、12から修正されています。今回見事にGCC11で困りました。
 
 ### リーガルチェック
 
@@ -59,7 +59,7 @@ int main() {
 
 > A deduction-guide shall inhabit the scope to which the corresponding class template belongs and, for a member class template, have the same access.
 
-> 推論補助は、対応するクラステンプレートが属するスコープ内に配置され、メンバクラステンプレートの場合は同じアクセス権を持つ必要がある。
+> 推論補助は、対応するクラステンプレートが属するスコープ内に配置され、入れ子クラステンプレートの場合は同じアクセス権を持つ必要がある。
 
 すなわち、正確には同じスコープかつ同じアクセス指定を持つ必要があります。
 
@@ -77,7 +77,7 @@ private:
 
 [godbolt](https://godbolt.org/z/hcof67xoW)
 
-この時、アクセス指定が一致してればいいだけで、`private`や`protected`なメンバクラステンプレートで推論補助が書けないわけではありません。
+この時、アクセス指定が一致してればいいだけで、`private`や`protected`な入れ子クラステンプレートで推論補助が書けないわけではありません。
 
 ```cpp
 struct S {
