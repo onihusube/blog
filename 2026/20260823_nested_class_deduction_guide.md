@@ -1,4 +1,4 @@
-# 入れ子クラステンプレートの推論補助
+# ［C++］入れ子クラステンプレートの推論補助
 
 最近少しはまったことのメモです。
 
@@ -53,11 +53,17 @@ int main() {
 
 これはC++17でCTADが入った時から一貫した仕様です。・・・ですが、GCCは11まではこの入れ子クラステンプレートの推論補助の記述に対応していなかったようで、12から修正されています。今回見事にGCC11で困りました。
 
+GCC11までのバグを回避する簡単な方法は、対応するコンストラクタを書くことです。CTADにおいてはコンストラクタから推論補助が導出されて使用されるため、クラステンプレートのテンプレートパラメータを使用するようなコンストラクタを書くことで推論補助が自動で生成されます。ただし、コンストラクタテンプレートにしてしまうとCTADを成功させることができなくなる（かかなり困難になる）ので注意が必要です。
+
+ただし、上の例のような推論補助と同じ振る舞いをするコンストラクタは書くことができません（たぶん）。
+
 ### リーガルチェック
 
 [[temp.deduct.guide]/3](https://eel.is/c++draft/temp.deduct.guide#3.sentence-4)の一節より
 
 > A deduction-guide shall inhabit the scope to which the corresponding class template belongs and, for a member class template, have the same access.
+
+翻訳（powered by PLAMO翻訳）
 
 > 推論補助は、対応するクラステンプレートが属するスコープ内に配置され、入れ子クラステンプレートの場合は同じアクセス権を持つ必要がある。
 
@@ -110,5 +116,7 @@ struct D : public S {
 ### 参考文献
 
 - [c++ - How to provide deduction guide for nested template class? - Stack Overflow](https://stackoverflow.com/questions/46103102/how-to-provide-deduction-guide-for-nested-template-class)
-- [](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=79501)
+- [gcc bug 79501](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=79501)
 - [Class template argument deduction (CTAD) (since C++17) - cppreference.com](https://en.cppreference.com/cpp/language/class_template_argument_deduction)
+
+[この記事のMarkdownソース](https://github.com/onihusube/blog/blob/master/2026/20260823_nested_class_deduction_guide.md)
